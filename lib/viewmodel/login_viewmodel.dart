@@ -10,11 +10,11 @@ class LoginViewModel extends ChangeNotifier {
   LoginViewModel({LoginRepository? repository})
     : _repository = repository ?? LoginRepository();
 
-  bool _isLoading = false;
+  bool _carregando = false;
   String? _erro;
   UsuarioResponse? _usuario;
 
-  bool get isLoading => _isLoading;
+  bool get Carregando => _carregando;
 
   String? get erro => _erro;
 
@@ -24,7 +24,7 @@ class LoginViewModel extends ChangeNotifier {
     required String email,
     required String senha,
   }) async {
-    _isLoading = true;
+    _carregando = true;
     _erro = null;
 
     notifyListeners();
@@ -40,7 +40,7 @@ class LoginViewModel extends ChangeNotifier {
       _erro = 'Ocorreu um erro inesperado';
       return false;
     } finally {
-      _isLoading = false;
+      _carregando = false;
       notifyListeners();
     }
   }

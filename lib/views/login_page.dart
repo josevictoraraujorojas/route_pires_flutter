@@ -251,11 +251,11 @@ class _LoginPageState extends State<LoginPage> {
                             color: const Color(0xFF006FFD),
                             borderRadius: BorderRadius.circular(10),
 
-                            onPressed: loginViewModel.isLoading
+                            onPressed: loginViewModel.Carregando
                                 ? null
                                 : realizarLogin,
 
-                            child: loginViewModel.isLoading
+                            child: loginViewModel.Carregando
                                 ? const CupertinoActivityIndicator(
                                     color: CupertinoColors.white,
                                   )
