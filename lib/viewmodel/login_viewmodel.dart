@@ -14,7 +14,7 @@ class LoginViewModel extends ChangeNotifier {
   String? _erro;
   UsuarioResponse? _usuario;
 
-  bool get Carregando => _carregando;
+  bool get carregando => _carregando;
 
   String? get erro => _erro;
 
