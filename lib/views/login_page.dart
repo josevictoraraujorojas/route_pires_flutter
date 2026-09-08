@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
+import 'package:route_pires_flutter/views/cadastro_passageiro_page.dart';
+import 'package:route_pires_flutter/views/tipo_cadastro_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -287,7 +289,25 @@ class _LoginPageState extends State<LoginPage> {
                                 padding: EdgeInsets.zero,
                                 minimumSize: Size.zero,
                                 alignment: Alignment.centerLeft,
-                                onPressed: () {},
+                                onPressed: () async {
+                                  final tipo = await TipoCadastroDialog.show(
+                                    context,
+                                  );
+
+                                  if (!context.mounted || tipo == null) {
+                                    return;
+                                  }
+
+                                  if (tipo == TipoCadastro.passageiro) {
+                                    Navigator.push(
+                                      context,
+                                      CupertinoPageRoute(
+                                        builder: (_) =>
+                                            const CadastroPassageiroPage(),
+                                      ),
+                                    );
+                                  }
+                                },
                                 child: Text(
                                   " Registre-se agora",
                                   style: TextStyle(
