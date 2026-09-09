@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:route_pires_flutter/config/api_error.dart';
 import 'package:route_pires_flutter/repositories/login_repository.dart';
 
 import '../model/usuario_response.dart';
@@ -35,16 +34,7 @@ class LoginViewModel extends ChangeNotifier {
 
       return true;
     } on DioException catch (e) {
-      _erro = mensagemErroDio(
-        e,
-        fallback: 'Erro ao realizar login',
-        porStatus: const {
-          400: 'Dados inválidos',
-          401: 'Email ou senha incorretos',
-          404: 'Usuário não encontrado',
-          500: 'Erro interno no servidor',
-        },
-      );
+      _erro = _tratarErroDio(e);
       return false;
     } catch (e) {
       _erro = 'Ocorreu um erro inesperado';
@@ -53,5 +43,24 @@ class LoginViewModel extends ChangeNotifier {
       _carregando = false;
       notifyListeners();
     }
+  }
+
+  String _tratarErroDio(DioException e) {
+    if (e.response != null) {
+      switch (e.response?.statusCode) {
+        case 400:
+          return 'Dados inválidos';
+        case 401:
+          return 'Email ou senha incorretos';
+        case 404:
+          return 'Usuário não encontrado';
+        case 500:
+          return 'Erro interno no servidor';
+        default:
+          return 'Erro ao realizar login';
+      }
+    }
+
+    return 'Não foi possível conectar ao servidor';
   }
 }

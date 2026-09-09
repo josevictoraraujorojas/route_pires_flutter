@@ -6,11 +6,9 @@ App da equipe. A API **não pede senha**. Backend: [RoutePires](https://github.c
 - Swagger: https://routepires.otavio.win/swagger-ui/index.html
 - Saúde: https://routepires.otavio.win/actuator/health/liveness
 
-Telas prontas: **login** (`POST /login`) e **cadastro de passageiro** (`POST /passageiros`). “Esqueci senha” e cadastro de mototaxista ainda não fazem a chamada da API.
+A tela pronta é o **login** (`POST /login`). Cadastro e “esqueci senha” ainda não fazem nada.
 
 No campus do IF o `.win` às vezes reseta. Aí use a API **no PC**.
-
-O cadastro de passageiro precisa do backend que grava `email` (único, em minúsculo) e aplica default `PIX` se o pagamento não vier. Até o merge/deploy, rode a API local.
 
 ## 1. Rodar o app
 
@@ -93,37 +91,28 @@ final response = await ApiClient().dio.post(
 
 O `tipo` na resposta decide o diálogo de boas-vindas (passageiro vs mototaxista).
 
-### Cadastrar passageiro
-
-A tela de cadastro chama isto (`lib/repositories/cadastro_passageiro_repository.dart`). `POST /passageiros` cria dado **de verdade** no Firestore.
-
-A tela pede nome, e-mail, telefone, senha e termos. O app envia só isso. Telefone vai só com dígitos; email em minúsculo. Foto é opcional. Pagamento omitido vira `PIX` no servidor.
-
-```dart
-final response = await ApiClient().dio.post(
-  ApiConfig.passageiros,
-  data: {
-    'nome': nome,
-    'email': email,
-    'telefone': telefone,
-    'senha': senha,
-  },
-);
-```
-
-| HTTP | Significado |
-|---|---|
-| 201 | passageiro criado (`id`, `nome`, `email`, `telefone`, `tipo`) |
-| 400 | validação (telefone, senha, email duplicado, etc.) |
-
-Senha: mínimo 8 caracteres, com letras e números. Depois do 201 o app volta para o login.
-
 ### Listar passageiros
 
 ```dart
 final response = await ApiClient().dio.get(ApiConfig.passageiros);
 // 200 lista JSON, ou 204 se vazio
 ```
+
+### Cadastrar passageiro
+
+`POST /passageiros` cria dado **de verdade** no Firestore. Não use como lixo de teste.
+
+```json
+{
+  "nome": "João Gomes",
+  "telefone": "64999558833",
+  "senha": "senh4b0a",
+  "fotoUrl": "https://exemplo.com/fotos/passageiro.jpg",
+  "metodoPagamentoPreferido": "PIX"
+}
+```
+
+Pagamento: `CREDITO`, `DEBITO`, `PIX`, `DINHEIRO`. Resposta **201**.
 
 Outras rotas no Swagger: `/mototaxistas`, `/corridas-passageiro`, `/corrida-frete`, `/chat`, `/mensagem`, `/denuncias`, `/avaliacoes-mototaxista`.
 
@@ -136,4 +125,3 @@ Outras rotas no Swagger: `/mototaxistas`, `/corridas-passageiro`, `/corrida-fret
 - `API_BASE_URL` **sem** barra no final.
 - Sem header de senha. Sem CSRF neste ambiente.
 - Flutter web só tem CORS para `http://localhost:*` (e `127.0.0.1`). Não abre a API de um site em outro domínio.
-- Cadastro + login só fecha se a API gravar o campo `email`.
