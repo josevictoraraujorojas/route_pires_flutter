@@ -14,6 +14,7 @@ class CadastroMototaxista2Page extends StatefulWidget {
 
   final String placa;
   final String renavam;
+  final String modelo;
   final String ano;
   final bool aceitouTermos;
 
@@ -29,6 +30,7 @@ class CadastroMototaxista2Page extends StatefulWidget {
 
     this.placa = "",
     this.renavam = "",
+    this.modelo = "",
     this.ano = "",
     this.aceitouTermos = false,
   });
@@ -47,6 +49,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
   // DADOS DA PÁGINA 3
   String placa = "";
   String renavam = "";
+  String modelo = "";
   String ano = "";
   bool aceitouTermos = false;
 
@@ -59,6 +62,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
     placa = widget.placa;
     renavam = widget.renavam;
+    modelo = widget.modelo;
     ano = widget.ano;
     aceitouTermos = widget.aceitouTermos;
   }
@@ -111,6 +115,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
               "placa": placa,
               "renavam": renavam,
+              "modelo": modelo,
               "ano": ano,
               "aceitouTermos": aceitouTermos,
             });
@@ -211,6 +216,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
                           builder: (context) => CadastroMototaxista3Page(
                             placa: placa,
                             renavam: renavam,
+                            modelo: modelo,
                             ano: ano,
                             aceitouTermos: aceitouTermos,
                           ),
@@ -222,6 +228,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
                         setState(() {
                           placa = resultado["placa"];
                           renavam = resultado["renavam"];
+                          modelo = resultado["modelo"];
                           ano = resultado["ano"];
                           aceitouTermos = resultado["aceitouTermos"];
                         });

@@ -28,6 +28,7 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
   String placa = "";
   String renavam = "";
+  String modelo = "";
   String ano = "";
   bool aceitouTermos = false;
 
@@ -211,6 +212,7 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
                             placa: placa,
                             renavam: renavam,
+                            modelo: modelo,
                             ano: ano,
                             aceitouTermos: aceitouTermos,
                           ),
@@ -225,6 +227,7 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
                           placa = resultado["placa"];
                           renavam = resultado["renavam"];
+                          modelo = resultado["modelo"];
                           ano = resultado["ano"];
                           aceitouTermos = resultado["aceitouTermos"];
                         });

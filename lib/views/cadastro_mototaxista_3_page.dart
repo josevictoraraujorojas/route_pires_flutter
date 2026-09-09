@@ -1,11 +1,12 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
+import 'package:route_pires_flutter/views/termos_de_uso.dart';
 
 class CadastroMototaxista3Page extends StatefulWidget {
   final String placa;
   final String renavam;
+  final String modelo;
   final String ano;
   final bool aceitouTermos;
 
@@ -13,6 +14,7 @@ class CadastroMototaxista3Page extends StatefulWidget {
     super.key,
     this.placa = "",
     this.renavam = "",
+    this.modelo = "",
     this.ano = "",
     this.aceitouTermos = false,
   });
@@ -27,6 +29,7 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
   final _placaController = TextEditingController();
   final _renavamController = TextEditingController();
+  final _modeloController = TextEditingController();
   final _anoController = TextEditingController();
 
   bool aceitouTermos = false;
@@ -38,6 +41,7 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
     // RECUPERA OS DADOS ANTERIORES
     _placaController.text = widget.placa;
     _renavamController.text = widget.renavam;
+    _modeloController.text = widget.modelo;
     _anoController.text = widget.ano;
 
     aceitouTermos = widget.aceitouTermos;
@@ -47,6 +51,7 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
   void dispose() {
     _placaController.dispose();
     _renavamController.dispose();
+    _modeloController.dispose();
     _anoController.dispose();
 
     super.dispose();
@@ -79,6 +84,7 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
             Navigator.pop(context, {
               "placa": _placaController.text,
               "renavam": _renavamController.text,
+              "modelo": _modeloController.text,
               "ano": _anoController.text,
               "aceitouTermos": aceitouTermos,
             });
@@ -166,6 +172,22 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
               const SizedBox(height: 16),
 
+              //MODELO
+              CampoFormulario(
+                label: "Modelo da moto",
+                placeholder: "Honda cg 150c",
+                controller: _modeloController,
+                validator: (valor) {
+                  if (valor == null || valor.trim().isEmpty) {
+                    return "Informe o modelo da moto";
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 16),
+
               // ANO
               CampoFormulario(
                 label: "Ano da moto",
@@ -204,7 +226,14 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
               const SizedBox(height: 24),
 
               // TERMOS
-              _termos(),
+              TermosDeUso(
+                aceitouTermos: aceitouTermos,
+                onChanged: (valor) {
+                  setState(() {
+                    aceitouTermos = valor;
+                  });
+                },
+              ),
 
               const SizedBox(height: 20),
 
@@ -227,110 +256,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _termos() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-
-      child: FormField<bool>(
-        initialValue: aceitouTermos,
-
-        validator: (valor) {
-          if (valor != true) {
-            return "Você precisa aceitar os termos";
-          }
-
-          return null;
-        },
-
-        builder: (campo) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  CupertinoCheckbox(
-                    value: campo.value ?? false,
-
-                    onChanged: (valor) {
-                      campo.didChange(valor);
-
-                      setState(() {
-                        aceitouTermos = valor ?? false;
-                      });
-                    },
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            color: Color(0xFF71727A),
-                            fontSize: 12,
-                          ),
-
-                          children: [
-                            const TextSpan(text: "Li e aceito os "),
-
-                            TextSpan(
-                              text: "Termos de Uso",
-                              style: const TextStyle(
-                                color: Color(0xFF006FFD),
-                                fontWeight: FontWeight.bold,
-                              ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () {
-                                  print("Clicou nos Termos de Uso");
-                                },
-                            ),
-
-                            const TextSpan(text: " e a "),
-
-                            TextSpan(
-                              text: "Política de Privacidade",
-                              style: const TextStyle(
-                                color: Color(0xFF006FFD),
-                                fontWeight: FontWeight.bold,
-                              ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () {
-                                  print("Clicou na Política de Privacidade");
-                                },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              if (campo.hasError)
-                Padding(
-                  padding: const EdgeInsets.only(top: 5, left: 5),
-
-                  child: Text(
-                    campo.errorText!,
-                    style: const TextStyle(
-                      color: CupertinoColors.systemRed,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
       ),
     );
   }
