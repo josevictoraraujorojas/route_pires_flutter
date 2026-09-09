@@ -4,6 +4,14 @@ import 'package:route_pires_flutter/views/campo_formulario.dart';
 import 'package:route_pires_flutter/views/termos_de_uso.dart';
 
 class CadastroMototaxista3Page extends StatefulWidget {
+  final String nome;
+  final String email;
+  final String telefone;
+  final String senha;
+
+  final String cnh;
+  final String dataValidade;
+
   final String placa;
   final String renavam;
   final String modelo;
@@ -12,6 +20,14 @@ class CadastroMototaxista3Page extends StatefulWidget {
 
   const CadastroMototaxista3Page({
     super.key,
+    this.nome = "",
+    this.email = "",
+    this.telefone = "",
+    this.senha = "",
+
+    this.cnh = "",
+    this.dataValidade = "",
+
     this.placa = "",
     this.renavam = "",
     this.modelo = "",
@@ -244,9 +260,24 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
                 child: CupertinoButton.filled(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      print(_placaController.text);
-                      print(_renavamController.text);
-                      print(_anoController.text);
+                      print("===== DADOS DO CADASTRO =====");
+
+                      // PAGE 1
+                      print("Nome: ${widget.nome}");
+                      print("Email: ${widget.email}");
+                      print("Telefone: ${widget.telefone}");
+                      print("Senha: ${widget.senha}");
+
+                      // PAGE 2
+                      print("CNH: ${widget.cnh}");
+                      print("Data validade: ${widget.dataValidade}");
+
+                      // PAGE 3
+                      print("Placa: ${_placaController.text}");
+                      print("RENAVAM: ${_renavamController.text}");
+                      print("Modelo: ${_modeloController.text}");
+                      print("Ano: ${_anoController.text}");
+                      print("Aceitou termos: $aceitouTermos");
                     }
                   },
 

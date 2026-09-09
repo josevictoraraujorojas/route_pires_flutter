@@ -18,7 +18,7 @@ class CadastroMototaxista2Page extends StatefulWidget {
   final String ano;
   final bool aceitouTermos;
 
-  CadastroMototaxista2Page({
+  const CadastroMototaxista2Page({
     super.key,
     required this.nome,
     required this.email,
@@ -214,6 +214,12 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
                         context,
                         CupertinoPageRoute(
                           builder: (context) => CadastroMototaxista3Page(
+                            nome: widget.nome,
+                            email: widget.email,
+                            telefone: widget.telefone,
+                            senha: widget.senha,
+                            cnh: _cnhController.text,
+                            dataValidade: _dataValidadeController.text,
                             placa: placa,
                             renavam: renavam,
                             modelo: modelo,
