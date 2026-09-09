@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart';
 
 class CadastroPassageiroPage extends StatefulWidget {
   const CadastroPassageiroPage({super.key});
@@ -28,7 +30,7 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
     super.dispose();
   }
 
-  void finalizarCadastro() {
+  Future<void> finalizarCadastro() async {
     if (nomeController.text.trim().isEmpty ||
         emailController.text.trim().isEmpty ||
         telefoneController.text.trim().isEmpty ||
@@ -48,9 +50,38 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
       return;
     }
 
-    _mostrarMensagem(
-      'Formulário válido. A integração com a API de cadastro ainda não foi configurada.',
+    final viewModel = context.read<CadastroPassageiroViewModel>();
+    final ok = await viewModel.cadastrar(
+      nome: nomeController.text.trim(),
+      email: emailController.text.trim(),
+      telefone: telefoneController.text,
+      senha: senhaController.text,
     );
+
+    if (!mounted) return;
+
+    if (ok) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Cadastro'),
+          content: Text(
+            'Cadastro realizado. Bem-vindo, ${nomeController.text.trim()}!',
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      return;
+    }
+
+    _mostrarMensagem(viewModel.erro ?? 'Erro ao realizar cadastro');
   }
 
   void _mostrarMensagem(String mensagem) {
@@ -71,6 +102,8 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<CadastroPassageiroViewModel>();
+
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
       child: SafeArea(
@@ -168,15 +201,19 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                 child: CupertinoButton(
                   color: const Color(0xFF006FFD),
                   borderRadius: BorderRadius.circular(16),
-                  onPressed: finalizarCadastro,
-                  child: const Text(
-                    'FINALIZAR',
-                    style: TextStyle(
-                      color: CupertinoColors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  onPressed: viewModel.carregando ? null : finalizarCadastro,
+                  child: viewModel.carregando
+                      ? const CupertinoActivityIndicator(
+                          color: CupertinoColors.white,
+                        )
+                      : const Text(
+                          'FINALIZAR',
+                          style: TextStyle(
+                            color: CupertinoColors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ],
