@@ -10,7 +10,7 @@ Telas prontas: **login** (`POST /login`) e **cadastro de passageiro** (`POST /pa
 
 No campus do IF o `.win` às vezes reseta. Aí use a API **no PC**.
 
-O cadastro de passageiro desta branch precisa do backend que grava `email` (único, em minúsculo) e aplica default `PIX` se o pagamento não vier. Até o merge/deploy, rode a API local.
+O app usa **https://routepires.otavio.win** por padrão. Só mude `API_BASE_URL` se a API do campus estiver fora do ar.
 
 ## 1. Rodar o app
 
@@ -23,23 +23,22 @@ flutter pub get
 
 | Onde o app roda | `API_BASE_URL` |
 |---|---|
-| Chrome / Flutter web | `https://routepires.otavio.win` (padrão no web) |
-| Emulador Android + API no PC | `http://10.0.2.2:8080` (padrão no Android) |
+| Qualquer device (padrão) | `https://routepires.otavio.win` |
+| Emulador Android + API no PC | `http://10.0.2.2:8080` |
 | Simulador iOS + API no PC | `http://127.0.0.1:8080` |
-| Celular na mesma Wi‑Fi | `http://IP_DO_PC:8080` (`ipconfig`) |
-| API na nuvem (qualquer device) | `https://routepires.otavio.win` |
+| Celular na mesma Wi‑Fi que o PC | `http://IP_DO_PC:8080` (`ipconfig`) |
 
 ```text
-rem Web / Chrome (já cai na API da nuvem)
-flutter run -d chrome
-
-rem Emulador Android + API no PC (padrão 10.0.2.2)
+rem Padrão: API publicada
 flutter run
 
-rem API na nuvem (emulador, celular, etc.)
-flutter run --dart-define=API_BASE_URL=https://routepires.otavio.win
+rem Web / Chrome
+flutter run -d chrome
 
-rem Celular físico (troque o IP)
+rem API no PC (emulador Android)
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080
+
+rem Celular físico + API no PC (troque o IP)
 flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
 ```
 
