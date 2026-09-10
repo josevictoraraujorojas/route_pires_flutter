@@ -2,13 +2,16 @@ import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
-
-import 'package:route_pires_flutter/views/login_page.dart';
+import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
+import 'package:route_pires_flutter/views/cadastro_mototaxista_1_page.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => LoginViewModel(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => LoginViewModel()),
+        ChangeNotifierProvider(create: (_) => MototaxistaViewModel()),
+      ],
       child: const MeuApp(),
     ),
   );
@@ -27,7 +30,7 @@ class MeuApp extends StatelessWidget {
         textTheme: CupertinoTextThemeData(textStyle: GoogleFonts.inter()),
       ),
 
-      home: const LoginPage(),
+      home: const CadastroMototaxista1Page(),
     );
   }
 }

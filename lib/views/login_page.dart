@@ -151,25 +151,9 @@ class _LoginPageState extends State<LoginPage> {
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 24),
 
-                          child: CupertinoTextField(
+                          child: TextFieldPadrao(
                             controller: emailController,
-
-                            keyboardType: TextInputType.emailAddress,
-
-                            style: const TextStyle(color: Color(0xFF1F2024)),
-
                             placeholder: "Email",
-
-                            placeholderStyle: const TextStyle(
-                              color: Color(0xFF8F9098),
-                            ),
-
-                            padding: const EdgeInsets.all(15),
-
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Color(0xFFC5C6CC)),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
                           ),
                         ),
 
@@ -179,44 +163,16 @@ class _LoginPageState extends State<LoginPage> {
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 24),
 
-                          child: CupertinoTextField(
+                          child: TextFieldSenha(
                             controller: senhaController,
-
+                            placeholder: "Senha",
                             obscureText: isObscureText,
 
-                            style: const TextStyle(color: Color(0xFF1F2024)),
-
-                            placeholder: "Senha",
-
-                            placeholderStyle: const TextStyle(
-                              color: Color(0xFF8F9098),
-                            ),
-
-                            suffix: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  isObscureText = !isObscureText;
-                                });
-                              },
-
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 10),
-                                child: Icon(
-                                  isObscureText
-                                      ? CupertinoIcons.eye_slash_fill
-                                      : CupertinoIcons.eye_fill,
-                                  color: Color(0xFF8F9098),
-                                ),
-                              ),
-                            ),
-
-                            padding: const EdgeInsets.all(15),
-
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Color(0xFFC5C6CC)),
-
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            onTap: () {
+                              setState(() {
+                                isObscureText = !isObscureText;
+                              });
+                            },
                           ),
                         ),
 
