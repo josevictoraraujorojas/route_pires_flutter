@@ -1,5 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
+import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
 import 'package:route_pires_flutter/views/termos_de_uso.dart';
 
@@ -83,8 +86,55 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
     return valor;
   }
 
+  Future<void> finalizarCadastro() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final cadastro = MototaxistaCadastro(
+      nome: widget.nome.trim(),
+      telefone: widget.telefone,
+      cnh: widget.cnh.trim(),
+      placa: _placaController.text.trim(),
+      renavam: _renavamController.text.trim(),
+      modelo: _modeloController.text.trim(),
+      ano: _anoController.text.trim(),
+    );
+    final cadastroViewModel = context.read<MototaxistaViewModel>();
+    final cadastrou = await cadastroViewModel.cadastrar(cadastro);
+
+    if (!mounted) {
+      return;
+    }
+
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text(cadastrou ? 'Cadastro realizado' : 'Erro no cadastro'),
+        content: Text(
+          cadastrou
+              ? 'Seu cadastro de mototaxista foi concluído.'
+              : (cadastroViewModel.erro ?? 'Não foi possível concluir o cadastro'),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(context);
+              if (cadastrou) {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cadastroViewModel = context.watch<MototaxistaViewModel>();
+
     return CupertinoPageScaffold(
       backgroundColor: Colors.white,
 
@@ -258,30 +308,14 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
 
                 child: CupertinoButton.filled(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      print("===== DADOS DO CADASTRO =====");
-
-                      // PAGE 1
-                      print("Nome: ${widget.nome}");
-                      print("Email: ${widget.email}");
-                      print("Telefone: ${widget.telefone}");
-                      print("Senha: ${widget.senha}");
-
-                      // PAGE 2
-                      print("CNH: ${widget.cnh}");
-                      print("Data validade: ${widget.dataValidade}");
-
-                      // PAGE 3
-                      print("Placa: ${_placaController.text}");
-                      print("RENAVAM: ${_renavamController.text}");
-                      print("Modelo: ${_modeloController.text}");
-                      print("Ano: ${_anoController.text}");
-                      print("Aceitou termos: $aceitouTermos");
-                    }
-                  },
-
-                  child: const Text("Finalizar Cadastro"),
+                  onPressed: cadastroViewModel.carregando
+                      ? null
+                      : finalizarCadastro,
+                  child: cadastroViewModel.carregando
+                      ? const CupertinoActivityIndicator(
+                          color: CupertinoColors.white,
+                        )
+                      : const Text("Finalizar Cadastro"),
                 ),
               ),
             ],
