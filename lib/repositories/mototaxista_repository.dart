@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:route_pires_flutter/config/api_client.dart';
+import 'package:route_pires_flutter/config/api_config.dart';
 import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
 
 class MototaxistaRepository {
@@ -8,6 +9,6 @@ class MototaxistaRepository {
   MototaxistaRepository() : _dio = ApiClient().dio;
 
   Future<void> cadastrar(MototaxistaCadastro mototaxista) async {
-    await _dio.post('/mototaxistas', data: mototaxista.toJson());
+    await _dio.post(ApiConfig.mototaxistas, data: mototaxista.toJson());
   }
 }

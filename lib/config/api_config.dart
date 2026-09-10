@@ -11,4 +11,5 @@ class ApiConfig {
 
   static const String health = '/actuator/health/liveness';
   static const String passageiros = '/passageiros';
+  static const String mototaxistas = '/mototaxistas';
 }
