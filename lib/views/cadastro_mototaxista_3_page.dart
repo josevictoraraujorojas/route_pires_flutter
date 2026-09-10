@@ -93,6 +93,8 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
     final cadastro = MototaxistaCadastro(
       nome: widget.nome.trim(),
+      email: widget.email.trim(),
+      senha: widget.senha,
       telefone: widget.telefone,
       cnh: widget.cnh.trim(),
       placa: _placaController.text.trim(),
