@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/cadastro_passageiro_page.dart';
+import 'package:route_pires_flutter/views/text_field_padrao.dart';
+import 'package:route_pires_flutter/views/text_field_senha.dart';
 import 'package:route_pires_flutter/views/tipo_cadastro_dialog.dart';
 
 class LoginPage extends StatefulWidget {
