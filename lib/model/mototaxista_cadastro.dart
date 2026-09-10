@@ -1,5 +1,7 @@
 class MototaxistaCadastro {
   final String nome;
+  final String email;
+  final String senha;
   final String telefone;
   final String cnh;
   final String placa;
@@ -9,6 +11,8 @@ class MototaxistaCadastro {
 
   const MototaxistaCadastro({
     required this.nome,
+    required this.email,
+    required this.senha,
     required this.telefone,
     required this.cnh,
     required this.placa,
@@ -20,6 +24,8 @@ class MototaxistaCadastro {
   Map<String, dynamic> toJson() {
     return {
       'nome': nome,
+      'email': email,
+      'senha': senha,
       'telefone': telefone.replaceAll(RegExp(r'\D'), ''),
       'dataCadastro': DateTime.now().toUtc().toIso8601String(),
       'tipo': 'MOTOTAXISTA',
