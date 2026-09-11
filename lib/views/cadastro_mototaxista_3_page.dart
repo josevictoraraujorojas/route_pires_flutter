@@ -27,10 +27,8 @@ class CadastroMototaxista3Page extends StatefulWidget {
     this.email = "",
     this.telefone = "",
     this.senha = "",
-
     this.cnh = "",
     this.dataValidade = "",
-
     this.placa = "",
     this.renavam = "",
     this.modelo = "",
@@ -102,7 +100,9 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
       modelo: _modeloController.text.trim(),
       ano: _anoController.text.trim(),
     );
+
     final cadastroViewModel = context.read<MototaxistaViewModel>();
+
     final cadastrou = await cadastroViewModel.cadastrar(cadastro);
 
     if (!mounted) {
@@ -116,12 +116,14 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
         content: Text(
           cadastrou
               ? 'Seu cadastro de mototaxista foi concluído.'
-              : (cadastroViewModel.erro ?? 'Não foi possível concluir o cadastro'),
+              : (cadastroViewModel.erro ??
+                    'Não foi possível concluir o cadastro'),
         ),
         actions: [
           CupertinoDialogAction(
             onPressed: () {
               Navigator.pop(context);
+
               if (cadastrou) {
                 Navigator.popUntil(context, (route) => route.isFirst);
               }
@@ -133,194 +135,234 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
     );
   }
 
+  void voltar() {
+    Navigator.pop(context, {
+      "placa": _placaController.text,
+      "renavam": _renavamController.text,
+      "modelo": _modeloController.text,
+      "ano": _anoController.text,
+      "aceitouTermos": aceitouTermos,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final cadastroViewModel = context.watch<MototaxistaViewModel>();
 
     return CupertinoPageScaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: CupertinoColors.white,
 
       navigationBar: CupertinoNavigationBar(
-        backgroundColor: Colors.white,
+        backgroundColor: CupertinoColors.white,
 
         middle: const Text("Cadastro de Mototaxista - Passo 3/3"),
 
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-
-          onPressed: () {
-            Navigator.pop(context, {
-              "placa": _placaController.text,
-              "renavam": _renavamController.text,
-              "modelo": _modeloController.text,
-              "ano": _anoController.text,
-              "aceitouTermos": aceitouTermos,
-            });
-          },
-
+          onPressed: voltar,
           child: const Icon(CupertinoIcons.back),
         ),
       ),
 
-      child: SafeArea(
-        child: Form(
-          key: _formKey,
+      child: SizedBox(
+        width: double.infinity,
 
-          child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
 
-            children: [
-              // PLACA
-              CampoFormulario(
-                label: "Placa da moto",
-                placeholder: "ABC1D23",
-                controller: _placaController,
-                keyboardType: TextInputType.text,
+          child: Form(
+            key: _formKey,
 
-                onChanged: (valor) {
-                  String placa = formatarPlaca(valor);
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
 
-                  _placaController.value = TextEditingValue(
-                    text: placa,
-                    selection: TextSelection.collapsed(offset: placa.length),
-                  );
-                },
+              children: [
+                const SizedBox(height: 10),
 
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return "Informe a placa da moto";
-                  }
+                // =========================
+                // PLACA
+                // =========================
+                CampoFormulario(
+                  label: "Placa da moto",
+                  placeholder: "ABC1D23",
+                  controller: _placaController,
+                  keyboardType: TextInputType.text,
 
-                  RegExp regex = RegExp(r'^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$');
+                  onChanged: (valor) {
+                    final placa = formatarPlaca(valor);
 
-                  if (!regex.hasMatch(valor)) {
-                    return "Informe uma placa válida";
-                  }
+                    _placaController.value = TextEditingValue(
+                      text: placa,
+                      selection: TextSelection.collapsed(offset: placa.length),
+                    );
+                  },
 
-                  return null;
-                },
-              ),
+                  validator: (valor) {
+                    if (valor == null || valor.trim().isEmpty) {
+                      return "Informe a placa da moto";
+                    }
 
-              const SizedBox(height: 16),
+                    final regex = RegExp(r'^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$');
 
-              // RENAVAM
-              CampoFormulario(
-                label: "RENAVAM",
-                placeholder: "Digite o RENAVAM",
-                controller: _renavamController,
-                keyboardType: TextInputType.number,
+                    if (!regex.hasMatch(valor)) {
+                      return "Informe uma placa válida";
+                    }
 
-                onChanged: (valor) {
-                  valor = valor.replaceAll(RegExp(r'\D'), '');
-
-                  if (valor.length > 11) {
-                    valor = valor.substring(0, 11);
-                  }
-
-                  _renavamController.value = TextEditingValue(
-                    text: valor,
-                    selection: TextSelection.collapsed(offset: valor.length),
-                  );
-                },
-
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return "Informe o RENAVAM";
-                  }
-
-                  RegExp regex = RegExp(r'^\d{11}$');
-
-                  if (!regex.hasMatch(valor)) {
-                    return "O RENAVAM deve possuir 11 números";
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              //MODELO
-              CampoFormulario(
-                label: "Modelo da moto",
-                placeholder: "Honda cg 150c",
-                controller: _modeloController,
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return "Informe o modelo da moto";
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // ANO
-              CampoFormulario(
-                label: "Ano da moto",
-                placeholder: "Ex: 2024",
-                controller: _anoController,
-                keyboardType: TextInputType.number,
-
-                onChanged: (valor) {
-                  valor = valor.replaceAll(RegExp(r'\D'), '');
-
-                  if (valor.length > 4) {
-                    valor = valor.substring(0, 4);
-                  }
-
-                  _anoController.value = TextEditingValue(
-                    text: valor,
-                    selection: TextSelection.collapsed(offset: valor.length),
-                  );
-                },
-
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return "Informe o ano da moto";
-                  }
-
-                  RegExp regex = RegExp(r'^\d{4}$');
-
-                  if (!regex.hasMatch(valor)) {
-                    return "Informe um ano válido";
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 24),
-
-              // TERMOS
-              TermosDeUso(
-                aceitouTermos: aceitouTermos,
-                onChanged: (valor) {
-                  setState(() {
-                    aceitouTermos = valor;
-                  });
-                },
-              ),
-
-              const SizedBox(height: 20),
-
-              // BOTÃO
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-
-                child: CupertinoButton.filled(
-                  onPressed: cadastroViewModel.carregando
-                      ? null
-                      : finalizarCadastro,
-                  child: cadastroViewModel.carregando
-                      ? const CupertinoActivityIndicator(
-                          color: CupertinoColors.white,
-                        )
-                      : const Text("Finalizar Cadastro"),
+                    return null;
+                  },
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 16),
+
+                // =========================
+                // RENAVAM
+                // =========================
+                CampoFormulario(
+                  label: "RENAVAM",
+                  placeholder: "Digite o RENAVAM",
+                  controller: _renavamController,
+                  keyboardType: TextInputType.number,
+
+                  onChanged: (valor) {
+                    valor = valor.replaceAll(RegExp(r'\D'), '');
+
+                    if (valor.length > 11) {
+                      valor = valor.substring(0, 11);
+                    }
+
+                    _renavamController.value = TextEditingValue(
+                      text: valor,
+                      selection: TextSelection.collapsed(offset: valor.length),
+                    );
+                  },
+
+                  validator: (valor) {
+                    if (valor == null || valor.trim().isEmpty) {
+                      return "Informe o RENAVAM";
+                    }
+
+                    final regex = RegExp(r'^\d{11}$');
+
+                    if (!regex.hasMatch(valor)) {
+                      return "O RENAVAM deve possuir 11 números";
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // =========================
+                // MODELO
+                // =========================
+                CampoFormulario(
+                  label: "Modelo da moto",
+                  placeholder: "Honda CG 150",
+                  controller: _modeloController,
+
+                  validator: (valor) {
+                    if (valor == null || valor.trim().isEmpty) {
+                      return "Informe o modelo da moto";
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // =========================
+                // ANO
+                // =========================
+                CampoFormulario(
+                  label: "Ano da moto",
+                  placeholder: "Ex: 2024",
+                  controller: _anoController,
+                  keyboardType: TextInputType.number,
+
+                  onChanged: (valor) {
+                    valor = valor.replaceAll(RegExp(r'\D'), '');
+
+                    if (valor.length > 4) {
+                      valor = valor.substring(0, 4);
+                    }
+
+                    _anoController.value = TextEditingValue(
+                      text: valor,
+                      selection: TextSelection.collapsed(offset: valor.length),
+                    );
+                  },
+
+                  validator: (valor) {
+                    if (valor == null || valor.trim().isEmpty) {
+                      return "Informe o ano da moto";
+                    }
+
+                    final regex = RegExp(r'^\d{4}$');
+
+                    if (!regex.hasMatch(valor)) {
+                      return "Informe um ano válido";
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                // =========================
+                // TERMOS DE USO
+                // =========================
+                TermosDeUso(
+                  aceitouTermos: aceitouTermos,
+                  onChanged: (valor) {
+                    setState(() {
+                      aceitouTermos = valor;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                // =========================
+                // BOTÃO FINALIZAR
+                // =========================
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      color: const Color(0xFF006FFD),
+                      borderRadius: BorderRadius.circular(12),
+
+                      onPressed: cadastroViewModel.carregando
+                          ? null
+                          : finalizarCadastro,
+
+                      child: cadastroViewModel.carregando
+                          ? const CupertinoActivityIndicator(
+                              color: CupertinoColors.white,
+                            )
+                          : const Text(
+                              "FINALIZAR CADASTRO",
+                              style: TextStyle(
+                                color: CupertinoColors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),

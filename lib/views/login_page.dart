@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
+import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
+import 'package:route_pires_flutter/views/cadastro_mototaxista_1_page.dart';
 import 'package:route_pires_flutter/views/cadastro_passageiro_page.dart';
 import 'package:route_pires_flutter/views/text_field_padrao.dart';
 import 'package:route_pires_flutter/views/text_field_senha.dart';
@@ -265,6 +267,19 @@ class _LoginPageState extends State<LoginPage> {
                                           create: (_) =>
                                               CadastroPassageiroViewModel(),
                                           child: const CadastroPassageiroPage(),
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  if (tipo == TipoCadastro.mototaxista) {
+                                    Navigator.push(
+                                      context,
+                                      CupertinoPageRoute(
+                                        builder: (_) => ChangeNotifierProvider(
+                                          create: (_) => MototaxistaViewModel(),
+                                          child:
+                                              const CadastroMototaxista1Page(),
                                         ),
                                       ),
                                     );

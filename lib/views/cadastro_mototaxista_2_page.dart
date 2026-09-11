@@ -24,10 +24,8 @@ class CadastroMototaxista2Page extends StatefulWidget {
     required this.email,
     required this.telefone,
     required this.senha,
-
     this.cnh = "",
     this.dataValidade = "",
-
     this.placa = "",
     this.renavam = "",
     this.modelo = "",
@@ -95,157 +93,198 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
         '${valor.substring(4)}';
   }
 
+  Future<void> irParaProximoPasso() async {
+    // Valida os campos da página 2
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final resultado = await Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (context) => CadastroMototaxista3Page(
+          nome: widget.nome,
+          email: widget.email,
+          telefone: widget.telefone,
+          senha: widget.senha,
+
+          // Dados desta página
+          cnh: _cnhController.text,
+          dataValidade: _dataValidadeController.text,
+
+          // Dados que vieram da página 3 anteriormente
+          placa: placa,
+          renavam: renavam,
+          modelo: modelo,
+          ano: ano,
+          aceitouTermos: aceitouTermos,
+        ),
+      ),
+    );
+
+    // RECEBE OS DADOS DA PÁGINA 3
+    if (resultado != null) {
+      setState(() {
+        placa = resultado["placa"];
+        renavam = resultado["renavam"];
+        modelo = resultado["modelo"];
+        ano = resultado["ano"];
+        aceitouTermos = resultado["aceitouTermos"];
+      });
+    }
+  }
+
+  void voltar() {
+    Navigator.pop(context, {
+      "cnh": _cnhController.text,
+      "dataValidade": _dataValidadeController.text,
+
+      "placa": placa,
+      "renavam": renavam,
+      "modelo": modelo,
+      "ano": ano,
+      "aceitouTermos": aceitouTermos,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: CupertinoColors.white,
 
       navigationBar: CupertinoNavigationBar(
-        backgroundColor: Colors.white,
+        backgroundColor: CupertinoColors.white,
 
         middle: const Text("Cadastro de Mototaxista - Passo 2/3"),
 
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-
-          onPressed: () {
-            Navigator.pop(context, {
-              "cnh": _cnhController.text,
-              "dataValidade": _dataValidadeController.text,
-
-              "placa": placa,
-              "renavam": renavam,
-              "modelo": modelo,
-              "ano": ano,
-              "aceitouTermos": aceitouTermos,
-            });
-          },
-
+          onPressed: voltar,
           child: const Icon(CupertinoIcons.back),
         ),
       ),
 
-      child: SafeArea(
-        child: Form(
-          key: _formKey,
+      child: SizedBox(
+        width: double.infinity,
 
-          child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
 
-            children: [
-              // CNH
-              CampoFormulario(
-                label: "Número de CNH",
-                placeholder: "69314369120",
-                controller: _cnhController,
-                keyboardType: TextInputType.number,
+          child: Form(
+            key: _formKey,
 
-                onChanged: (valor) {
-                  valor = valor.replaceAll(RegExp(r'\D'), '');
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
 
-                  if (valor.length > 11) {
-                    valor = valor.substring(0, 11);
-                  }
+              children: [
+                const SizedBox(height: 10),
 
-                  _cnhController.value = TextEditingValue(
-                    text: valor,
-                    selection: TextSelection.collapsed(offset: valor.length),
-                  );
-                },
+                // =========================
+                // CNH
+                // =========================
+                CampoFormulario(
+                  label: "Número de CNH",
+                  placeholder: "69314369120",
+                  controller: _cnhController,
+                  keyboardType: TextInputType.number,
 
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return "Informe sua CNH";
-                  }
+                  onChanged: (valor) {
+                    valor = valor.replaceAll(RegExp(r'\D'), '');
 
-                  RegExp regex = RegExp(r'^\d{11}$');
-
-                  if (!regex.hasMatch(valor)) {
-                    return "A CNH deve possuir 11 números";
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // DATA
-              CampoFormulario(
-                label: "Data de validade",
-                placeholder: "21/12/2034",
-                controller: _dataValidadeController,
-                keyboardType: TextInputType.datetime,
-
-                onChanged: (valor) {
-                  String data = formatarData(valor);
-
-                  _dataValidadeController.value = TextEditingValue(
-                    text: data,
-                    selection: TextSelection.collapsed(offset: data.length),
-                  );
-                },
-
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return "Informe a data de validade";
-                  }
-
-                  RegExp regex = RegExp(r'^\d{2}/\d{2}/\d{4}$');
-
-                  if (!regex.hasMatch(valor)) {
-                    return "Informe a data no formato DD/MM/AAAA";
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 20),
-
-              // BOTÃO
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-
-                child: CupertinoButton.filled(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      final resultado = await Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          builder: (context) => CadastroMototaxista3Page(
-                            nome: widget.nome,
-                            email: widget.email,
-                            telefone: widget.telefone,
-                            senha: widget.senha,
-                            cnh: _cnhController.text,
-                            dataValidade: _dataValidadeController.text,
-                            placa: placa,
-                            renavam: renavam,
-                            modelo: modelo,
-                            ano: ano,
-                            aceitouTermos: aceitouTermos,
-                          ),
-                        ),
-                      );
-
-                      // RECEBE OS DADOS DA PÁGINA 3
-                      if (resultado != null) {
-                        setState(() {
-                          placa = resultado["placa"];
-                          renavam = resultado["renavam"];
-                          modelo = resultado["modelo"];
-                          ano = resultado["ano"];
-                          aceitouTermos = resultado["aceitouTermos"];
-                        });
-                      }
+                    if (valor.length > 11) {
+                      valor = valor.substring(0, 11);
                     }
+
+                    _cnhController.value = TextEditingValue(
+                      text: valor,
+                      selection: TextSelection.collapsed(offset: valor.length),
+                    );
                   },
 
-                  child: const Text("Próximo Passo"),
+                  validator: (valor) {
+                    if (valor == null || valor.trim().isEmpty) {
+                      return "Informe sua CNH";
+                    }
+
+                    final regex = RegExp(r'^\d{11}$');
+
+                    if (!regex.hasMatch(valor)) {
+                      return "A CNH deve possuir 11 números";
+                    }
+
+                    return null;
+                  },
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 16),
+
+                // =========================
+                // DATA DE VALIDADE
+                // =========================
+                CampoFormulario(
+                  label: "Data de validade",
+                  placeholder: "21/12/2034",
+                  controller: _dataValidadeController,
+                  keyboardType: TextInputType.datetime,
+
+                  onChanged: (valor) {
+                    final data = formatarData(valor);
+
+                    _dataValidadeController.value = TextEditingValue(
+                      text: data,
+                      selection: TextSelection.collapsed(offset: data.length),
+                    );
+                  },
+
+                  validator: (valor) {
+                    if (valor == null || valor.trim().isEmpty) {
+                      return "Informe a data de validade";
+                    }
+
+                    final regex = RegExp(r'^\d{2}/\d{2}/\d{4}$');
+
+                    if (!regex.hasMatch(valor)) {
+                      return "Informe a data no formato DD/MM/AAAA";
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                // =========================
+                // BOTÃO
+                // =========================
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      color: const Color(0xFF006FFD),
+                      borderRadius: BorderRadius.circular(12),
+
+                      onPressed: irParaProximoPasso,
+
+                      child: const Text(
+                        "PRÓXIMO PASSO",
+                        style: TextStyle(
+                          color: CupertinoColors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
