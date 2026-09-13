@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_1_page.dart';
 import 'package:route_pires_flutter/views/cadastro_passageiro_page.dart';
+import 'package:route_pires_flutter/views/solicitar_corrida_page.dart';
 import 'package:route_pires_flutter/views/text_field_padrao.dart';
 import 'package:route_pires_flutter/views/text_field_senha.dart';
 import 'package:route_pires_flutter/views/tipo_cadastro_dialog.dart';
@@ -44,20 +45,9 @@ class _LoginPageState extends State<LoginPage> {
       final usuario = loginViewModel.usuario;
 
       if (usuario?.tipo == "PASSAGEIRO") {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text("Login realizado Passageiro!"),
-            content: Text("Bem-vindo, ${usuario?.nome}!"),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text("OK"),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
+        Navigator.pushReplacement(
+          context,
+          CupertinoPageRoute(builder: (_) => const SolicitarCorridaPage()),
         );
       } else {
         showCupertinoDialog(
