@@ -25,15 +25,32 @@ class UsuarioResponse {
       nome: json['nome'] ?? '',
       email: json['email'] ?? '',
       telefone: json['telefone'] ?? '',
-      dataCadastro: json['dataCadastro'] != null
-          ? DateTime.parse(json['dataCadastro'])
-          : null,
+      dataCadastro: _parseData(json['dataCadastro']),
       tipo: json['tipo'] ?? '',
       fotoUrl: json['fotoUrl'],
       historicoCorridas: json['historicoCorridas'] != null
           ? List<String>.from(json['historicoCorridas'])
           : [],
     );
+  }
+
+  static DateTime? _parseData(dynamic value) {
+    if (value is! String || value.isEmpty) return null;
+    try {
+      return DateTime.parse(value);
+    } catch (_) {
+      final normalizado = value
+          .replaceFirstMapped(
+            RegExp(r'^(\d{2})-(\d{2})-(\d{4})'),
+            (match) => '${match[3]}-${match[2]}-${match[1]}',
+          )
+          .replaceFirst('+0000', 'Z');
+      try {
+        return DateTime.parse(normalizado);
+      } catch (_) {
+        return null;
+      }
+    }
   }
 
   Map<String, dynamic> toJson() {
