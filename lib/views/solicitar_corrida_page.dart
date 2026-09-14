@@ -1,21 +1,14 @@
 import 'package:flutter/cupertino.dart';
+import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/model/categoria_corrida.dart';
+import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/botao_primario.dart';
 import 'package:route_pires_flutter/views/fluxo_corrida_page.dart';
 import 'package:route_pires_flutter/views/pesquisar_localizacao_page.dart';
-import 'package:route_pires_flutter/views/rodape_navegacao.dart';
-import 'package:route_pires_flutter/views/text_field_padrao.dart';
-
-typedef AoSolicitarCorrida = void Function({
-  required String categoria,
-  required String pagamento,
-  required String inicio,
-  required String destino,
-});
 
 class SolicitarCorridaPage extends StatefulWidget {
-  const SolicitarCorridaPage({super.key, this.aoSolicitar});
-
-  final AoSolicitarCorrida? aoSolicitar;
+  const SolicitarCorridaPage({super.key});
 
   @override
   State<SolicitarCorridaPage> createState() => _SolicitarCorridaPageState();
@@ -23,9 +16,9 @@ class SolicitarCorridaPage extends StatefulWidget {
 
 class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   static const categorias = {
-    'CORRIDA': Color(0xFFFFB800),
-    'FRETE SIMPLES': Color(0xFFFF5E6C),
-    'FRETE': Color(0xFF43C5A5),
+    CategoriaCorrida.corrida: Color(0xFFFFB800),
+    CategoriaCorrida.freteSimples: Color(0xFFFF5E6C),
+    CategoriaCorrida.frete: Color(0xFF43C5A5),
   };
   static const pagamentos = {
     'PIX': Color(0xFF4A9DD1),
@@ -34,89 +27,84 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
     'DINHEIRO': Color(0xFF0B8F87),
   };
 
-  final inicioController = TextEditingController(
-    text: 'Rua Inicial - Setor Universitário',
+  static const inicioPadrao = LocalizacaoPonto(
+    latitude: -17.3037,
+    longitude: -48.2855,
+    rotulo: 'Rua Inicial - Setor Universitário',
   );
-  final destinoController = TextEditingController(text: 'Rua Final - Centro');
-  String? categoria = 'CORRIDA';
+  static const destinoPadrao = LocalizacaoPonto(
+    latitude: -17.2948,
+    longitude: -48.2718,
+    rotulo: 'Rua Final - Centro',
+  );
+
+  LocalizacaoPonto? inicio = inicioPadrao;
+  LocalizacaoPonto? destino = destinoPadrao;
+  CategoriaCorrida? categoria = CategoriaCorrida.corrida;
   String? pagamento = 'PIX';
-  bool _localizacaoInicialAberta = false;
 
   bool get formularioValido =>
-      categoria != null &&
-      pagamento != null &&
-      inicioController.text.isNotEmpty &&
-      destinoController.text.isNotEmpty;
+      categoria != null && inicio != null && destino != null;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _abrirLocalizacaoInicial();
-    });
-  }
-
-  Future<void> _abrirLocalizacaoInicial() async {
-    if (_localizacaoInicialAberta || !mounted) return;
-    _localizacaoInicialAberta = true;
-
-    final endereco = await Navigator.push<String>(
-      context,
-      CupertinoPageRoute(builder: (_) => const PesquisarLocalizacaoPage()),
-    );
-
-    if (!mounted || endereco == null || endereco.isEmpty) return;
-    setState(() => inicioController.text = endereco);
-  }
-
-  @override
-  void dispose() {
-    inicioController.dispose();
-    destinoController.dispose();
-    super.dispose();
-  }
-
-  Future<void> pesquisarLocal(TextEditingController controller) async {
-    final endereco = await Navigator.push<String>(
+  Future<void> pesquisarLocal({required bool ehInicio}) async {
+    final atual = ehInicio ? inicio : destino;
+    final ponto = await Navigator.push<LocalizacaoPonto>(
       context,
       CupertinoPageRoute(
-        builder: (_) => PesquisarLocalizacaoPage(valorInicial: controller.text),
+        builder: (_) => PesquisarLocalizacaoPage(pontoInicial: atual),
       ),
     );
-    if (!mounted || endereco == null) return;
-    setState(() => controller.text = endereco);
+    if (!mounted || ponto == null) return;
+    setState(() {
+      if (ehInicio) {
+        inicio = ponto;
+      } else {
+        destino = ponto;
+      }
+    });
   }
 
   void limpar() {
     setState(() {
       categoria = null;
       pagamento = null;
-      inicioController.clear();
-      destinoController.clear();
+      inicio = null;
+      destino = null;
     });
   }
 
   void solicitar() {
     if (!formularioValido) return;
 
-    widget.aoSolicitar?.call(
-      categoria: categoria!,
-      pagamento: pagamento!,
-      inicio: inicioController.text,
-      destino: destinoController.text,
-    );
-
-    if (widget.aoSolicitar == null) {
-      Navigator.push(
-        context,
-        CupertinoPageRoute(
-          builder: (_) => FluxoCorridaPage(
-            inicio: inicioController.text,
-            destino: destinoController.text,
-          ),
+    final usuario = context.read<LoginViewModel>().usuario;
+    if (usuario == null || usuario.id.isEmpty) {
+      showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Erro'),
+          content: const Text('Faça login para solicitar uma corrida'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
         ),
       );
+      return;
     }
+
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => FluxoCorridaPage(
+          passageiroId: usuario.id,
+          categoria: categoria!,
+          origem: inicio!,
+          destino: destino!,
+        ),
+      ),
+    );
   }
 
   @override
@@ -153,18 +141,20 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
                 child: Column(
                   children: [
-                    _SecaoOpcoes(
+                    _SecaoOpcoes<CategoriaCorrida>(
                       titulo: 'Categoria',
                       opcoes: categorias,
                       selecionada: categoria,
+                      rotulo: (valor) => valor.label,
                       aoSelecionar: (valor) =>
                           setState(() => categoria = valor),
                     ),
                     const _Divisor(),
-                    _SecaoOpcoes(
+                    _SecaoOpcoes<String>(
                       titulo: 'Forma de Pagamento',
                       opcoes: pagamentos,
                       selecionada: pagamento,
+                      rotulo: (valor) => valor,
                       aoSelecionar: (valor) =>
                           setState(() => pagamento = valor),
                     ),
@@ -172,28 +162,27 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
                     _CampoLocalizacao(
                       label: 'Local de Início',
                       placeholder: 'Selecione o local de início',
-                      controller: inicioController,
-                      onTap: () => pesquisarLocal(inicioController),
+                      valor: inicio?.rotulo,
+                      onTap: () => pesquisarLocal(ehInicio: true),
                     ),
                     const SizedBox(height: 22),
                     _CampoLocalizacao(
-                      label: 'Local de Término',
+                      label: 'Local de Termino',
                       placeholder: 'Selecione o local de término',
-                      controller: destinoController,
-                      onTap: () => pesquisarLocal(destinoController),
+                      valor: destino?.rotulo,
+                      onTap: () => pesquisarLocal(ehInicio: false),
                     ),
                   ],
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               child: BotaoPrimario(
                 texto: 'Buscar Corrida',
                 onPressed: formularioValido ? solicitar : null,
               ),
             ),
-            const RodapeNavegacao(),
           ],
         ),
       ),
@@ -201,18 +190,20 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   }
 }
 
-class _SecaoOpcoes extends StatelessWidget {
+class _SecaoOpcoes<T> extends StatelessWidget {
   const _SecaoOpcoes({
     required this.titulo,
     required this.opcoes,
     required this.selecionada,
+    required this.rotulo,
     required this.aoSelecionar,
   });
 
   final String titulo;
-  final Map<String, Color> opcoes;
-  final String? selecionada;
-  final ValueChanged<String> aoSelecionar;
+  final Map<T, Color> opcoes;
+  final T? selecionada;
+  final String Function(T valor) rotulo;
+  final ValueChanged<T> aoSelecionar;
 
   @override
   Widget build(BuildContext context) {
@@ -254,24 +245,27 @@ class _SecaoOpcoes extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(44, 32),
                 onPressed: () => aoSelecionar(opcao.key),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: opcao.value,
-                    borderRadius: BorderRadius.circular(18),
-                    border: ativa
-                        ? Border.all(color: const Color(0xFF1F2024), width: 1.5)
-                        : null,
-                  ),
-                  child: Text(
-                    opcao.key,
-                    style: const TextStyle(
-                      color: CupertinoColors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                child: Opacity(
+                  opacity: ativa ? 1 : 0.7,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: opcao.value,
+                      borderRadius: BorderRadius.circular(18),
+                      border: ativa
+                          ? Border.all(color: CupertinoColors.white, width: 2)
+                          : null,
+                    ),
+                    child: Text(
+                      rotulo(opcao.key),
+                      style: const TextStyle(
+                        color: CupertinoColors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -288,17 +282,18 @@ class _CampoLocalizacao extends StatelessWidget {
   const _CampoLocalizacao({
     required this.label,
     required this.placeholder,
-    required this.controller,
+    required this.valor,
     required this.onTap,
   });
 
   final String label;
   final String placeholder;
-  final TextEditingController controller;
+  final String? valor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final vazio = valor == null || valor!.isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -317,10 +312,20 @@ class _CampoLocalizacao extends StatelessWidget {
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
-          child: AbsorbPointer(
-            child: TextFieldPadrao(
-              controller: controller,
-              placeholder: placeholder,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFC5C6CC)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              vazio ? placeholder : valor!,
+              style: TextStyle(
+                color: vazio
+                    ? const Color(0xFF8F9098)
+                    : const Color(0xFF1F2024),
+              ),
             ),
           ),
         ),

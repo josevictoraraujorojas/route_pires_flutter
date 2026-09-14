@@ -1,18 +1,24 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show CircleAvatar;
-import 'package:route_pires_flutter/views/botao_primario.dart';
+import 'package:route_pires_flutter/model/categoria_corrida.dart';
+import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
 import 'package:route_pires_flutter/viewmodel/corrida_viewmodel.dart';
 import 'package:route_pires_flutter/views/rodape_navegacao.dart';
 
 class FluxoCorridaPage extends StatefulWidget {
   const FluxoCorridaPage({
     super.key,
-    required this.inicio,
+    required this.passageiroId,
+    required this.categoria,
+    required this.origem,
     required this.destino,
   });
 
-  final String inicio;
-  final String destino;
+  final String passageiroId;
+  final CategoriaCorrida categoria;
+  final LocalizacaoPonto origem;
+  final LocalizacaoPonto destino;
 
   @override
   State<FluxoCorridaPage> createState() => _FluxoCorridaPageState();
@@ -24,13 +30,59 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
   @override
   void initState() {
     super.initState();
-    viewModel = CorridaViewModel();
+    viewModel = CorridaViewModel(
+      passageiroId: widget.passageiroId,
+      categoria: widget.categoria,
+      origem: widget.origem,
+      destino: widget.destino,
+    );
+    viewModel.buscarMotoristas();
   }
 
   @override
   void dispose() {
     viewModel.dispose();
     super.dispose();
+  }
+
+  Future<void> _confirmar() async {
+    final ok = await viewModel.confirmarNegociacao();
+    if (!mounted) return;
+
+    if (ok) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Corrida solicitada'),
+          content: Text('Solicitação enviada para ${viewModel.motorista}.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      return;
+    }
+
+    if (viewModel.erroCriacao == null) return;
+
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Erro'),
+        content: Text(viewModel.erroCriacao ?? 'Erro ao solicitar corrida'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -62,10 +114,18 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
   }
 
   Widget _conteudo() => switch (viewModel.etapa) {
-    EtapaCorrida.buscando => _buscando(),
     EtapaCorrida.motoristas => _listaMotoristas(),
     EtapaCorrida.negociacao => _negociacao(),
   };
+
+  String get _textoStatusLista {
+    if (viewModel.carregando) return 'Procurando Corrida...';
+    if (viewModel.erro != null) return viewModel.erro!;
+    final quantidade = viewModel.motoristas.length;
+    if (quantidade == 0) return 'Nenhum mototaxista encontrado';
+    if (quantidade == 1) return '1 mototaxista';
+    return '$quantidade mototaxistas';
+  }
 
   Widget _statusBusca(String texto) {
     return Container(
@@ -87,30 +147,24 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
     );
   }
 
-  Widget _buscando() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-      child: Column(
-        children: [
-          _statusBusca('Procurando Corrida...'),
-          Expanded(
-            child: Center(
-              child: Image.asset(
-                'assets/images/img_busca.png',
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.contain,
-              ),
-            ),
+  Widget _botaoCancelar() {
+    return SizedBox(
+      width: 124,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFF006FFD)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          color: CupertinoColors.white,
+          borderRadius: BorderRadius.circular(10),
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: Color(0xFF006FFD), fontSize: 12),
           ),
-          SizedBox(
-            width: 94,
-            child: BotaoPrimario(
-              texto: 'Cancelar',
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -120,54 +174,67 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
-          child: _statusBusca('Procurando Corrida...'),
+          child: _statusBusca(_textoStatusLista),
         ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            itemCount: CorridaViewModel.motoristas.length,
-            itemBuilder: (context, index) => CupertinoButton(
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              onPressed: () => viewModel.selecionarMotorista(
-                CorridaViewModel.motoristas[index],
-              ),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Color(0xFFEAF2FF),
-                    child: Icon(
-                      CupertinoIcons.person_fill,
-                      color: Color(0xFFAAD8FF),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      CorridaViewModel.motoristas[index],
-                      style: const TextStyle(
-                        color: Color(0xFF1F2024),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const _Estrelas(valor: 5, tamanho: 17),
-                ],
-              ),
-            ),
-          ),
+        Expanded(child: _corpoLista()),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: _botaoCancelar(),
         ),
       ],
     );
   }
 
+  Widget _corpoLista() {
+    if (viewModel.carregando) {
+      return Center(
+        child: Image.asset(
+          'assets/images/img_busca.png',
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.contain,
+        ),
+      );
+    }
+
+    if (viewModel.erro != null) {
+      return Center(
+        child: CupertinoButton(
+          onPressed: viewModel.buscarMotoristas,
+          child: const Text('Tentar novamente'),
+        ),
+      );
+    }
+
+    if (viewModel.motoristas.isEmpty) {
+      return const Center(
+        child: Text(
+          'Nenhum mototaxista encontrado',
+          style: TextStyle(color: Color(0xFF8F9098), fontSize: 14),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      itemCount: viewModel.motoristas.length,
+      itemBuilder: (context, index) {
+        final mototaxista = viewModel.motoristas[index];
+        return _ItemMotorista(
+          mototaxista: mototaxista,
+          onPressed: () => viewModel.selecionarMotorista(mototaxista),
+        );
+      },
+    );
+  }
+
   Widget _negociacao() {
+    final mototaxista = viewModel.motoristaSelecionado;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
       child: Column(
         children: [
-          _statusBusca('Procurando Corrida...'),
+          _statusBusca('Deseja Negociar?'),
           Expanded(
             child: Stack(
               alignment: Alignment.center,
@@ -211,7 +278,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const _Estrelas(valor: 4, tamanho: 28),
+                      _Estrelas(valor: mototaxista?.estrelas ?? 0, tamanho: 28),
                       const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
@@ -237,16 +304,21 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
                           Expanded(
                             child: _BotaoNegociacao(
                               texto: 'Não',
-                              onPressed: viewModel.recusarNegociacao,
+                              onPressed: viewModel.carregandoCriacao
+                                  ? null
+                                  : viewModel.recusarNegociacao,
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: _BotaoNegociacao(
-                              texto: 'Sim',
+                              texto: viewModel.carregandoCriacao
+                                  ? '...'
+                                  : 'Sim',
                               preenchido: true,
-                              onPressed: () =>
-                                  Navigator.pop(context, viewModel.motorista),
+                              onPressed: viewModel.carregandoCriacao
+                                  ? null
+                                  : _confirmar,
                             ),
                           ),
                         ],
@@ -257,25 +329,43 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
               ],
             ),
           ),
-          SizedBox(
-            width: 124,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFF006FFD)),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: CupertinoButton(
-                padding: EdgeInsets.zero,
-                color: CupertinoColors.white,
-                borderRadius: BorderRadius.circular(10),
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF006FFD), fontSize: 12),
-                ),
+          _botaoCancelar(),
+        ],
+      ),
+    );
+  }
+}
+
+class _ItemMotorista extends StatelessWidget {
+  const _ItemMotorista({required this.mototaxista, required this.onPressed});
+
+  final MototaxistaResumo mototaxista;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      onPressed: onPressed,
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 22,
+            backgroundColor: Color(0xFFEAF2FF),
+            child: Icon(CupertinoIcons.person_fill, color: Color(0xFFAAD8FF)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              mototaxista.nome,
+              style: const TextStyle(
+                color: Color(0xFF1F2024),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
+          _Estrelas(valor: mototaxista.estrelas, tamanho: 17),
         ],
       ),
     );
@@ -314,7 +404,7 @@ class _BotaoNegociacao extends StatelessWidget {
   });
 
   final String texto;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool preenchido;
 
   @override
@@ -327,6 +417,9 @@ class _BotaoNegociacao extends StatelessWidget {
       child: CupertinoButton(
         padding: EdgeInsets.zero,
         color: preenchido ? const Color(0xFF006FFD) : CupertinoColors.white,
+        disabledColor: preenchido
+            ? const Color(0xFFB4D2FF)
+            : CupertinoColors.white,
         borderRadius: BorderRadius.circular(10),
         onPressed: onPressed,
         child: Text(

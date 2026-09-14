@@ -3,10 +3,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 class MapaCorridaMock extends StatefulWidget {
-  const MapaCorridaMock({super.key, this.exibirRota = false, this.onTap});
+  const MapaCorridaMock({
+    super.key,
+    this.exibirRota = false,
+    this.onTap,
+    this.pontoInicial,
+  });
 
   final bool exibirRota;
   final ValueChanged<LatLng>? onTap;
+  final LatLng? pontoInicial;
 
   @override
   State<MapaCorridaMock> createState() => _MapaCorridaMockState();
@@ -25,7 +31,7 @@ class _MapaCorridaMockState extends State<MapaCorridaMock> {
   ];
 
   final mapController = MapController();
-  LatLng pontoSelecionado = centro;
+  late LatLng pontoSelecionado = widget.pontoInicial ?? centro;
 
   @override
   void dispose() {
@@ -77,7 +83,7 @@ class _MapaCorridaMockState extends State<MapaCorridaMock> {
             FlutterMap(
               mapController: mapController,
               options: MapOptions(
-                initialCenter: centro,
+                initialCenter: widget.pontoInicial ?? centro,
                 initialZoom: 14.5,
                 onTap: (_, ponto) => selecionar(ponto),
               ),
