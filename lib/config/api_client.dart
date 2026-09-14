@@ -14,6 +14,7 @@ class ApiClient {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'User-Agent': 'RoutePiresFlutter/1.0',
         },
       ),
     );

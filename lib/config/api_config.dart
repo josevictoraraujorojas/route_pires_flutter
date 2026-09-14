@@ -12,4 +12,6 @@ class ApiConfig {
   static const String health = '/actuator/health/liveness';
   static const String passageiros = '/passageiros';
   static const String mototaxistas = '/mototaxistas';
+  static const String corridasPassageiro = '/corridas-passageiro';
+  static const String corridaFrete = '/corrida-frete';
 }
