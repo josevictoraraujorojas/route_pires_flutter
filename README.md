@@ -8,17 +8,25 @@ App da equipe. A API **não pede senha**. Backend: [RoutePires](https://github.c
 
 Telas prontas: **login** (`POST /login`) e **cadastro de passageiro** (`POST /passageiros`). “Esqueci senha” e cadastro de mototaxista ainda não fazem a chamada da API.
 
+<<<<<<< HEAD
 No campus do IF o `.win` às vezes reseta. Aí use a API **no PC**.
 
 O app usa **https://routepires.otavio.win** por padrão. Só mude `API_BASE_URL` se a API do campus estiver fora do ar.
 
 ## 1. Rodar o app
 
+=======
+O app usa **https://routepires.otavio.win**. Não use API local no dia a dia.
+
+## 1. Rodar o app
+
+>>>>>>> 0284b5f339017158619f108eb15a4d6ec1db26f6
 ```text
 git clone https://github.com/josevictoraraujorojas/route_pires_flutter.git
 cd route_pires_flutter
 git checkout cadastro_passageiro
 flutter pub get
+<<<<<<< HEAD
 ```
 
 | Onde o app roda | `API_BASE_URL` |
@@ -63,6 +71,14 @@ curl http://127.0.0.1:8080/actuator/health/liveness
 Tem que voltar `{"status":"UP"}`.
 
 ## 3. Consumir a API (Dio)
+=======
+flutter run
+```
+
+Web: `flutter run -d chrome`. Sem `--dart-define`. A URL da API já está no código.
+
+## 2. Consumir a API (Dio)
+>>>>>>> 0284b5f339017158619f108eb15a4d6ec1db26f6
 
 Cliente: `lib/config/api_client.dart` (`ApiConfig.baseUrl`). Caminhos **relativos**. Sem header de senha. Sem CSRF.
 
@@ -127,6 +143,7 @@ final response = await ApiClient().dio.get(ApiConfig.passageiros);
 
 Outras rotas no Swagger: `/mototaxistas`, `/corridas-passageiro`, `/corrida-frete`, `/chat`, `/mensagem`, `/denuncias`, `/avaliacoes-mototaxista`.
 
+<<<<<<< HEAD
 ## 4. Se não conectar
 
 - API no ar? Liveness ou Swagger.
@@ -137,3 +154,11 @@ Outras rotas no Swagger: `/mototaxistas`, `/corridas-passageiro`, `/corrida-fret
 - Sem header de senha. Sem CSRF neste ambiente.
 - Flutter web só tem CORS para `http://localhost:*` (e `127.0.0.1`). Não abre a API de um site em outro domínio.
 - Cadastro + login só fecha se a API gravar o campo `email`.
+=======
+## 3. Se não conectar
+
+- API no ar? https://routepires.otavio.win/actuator/health/liveness
+- Sem header de senha. Sem CSRF neste ambiente.
+- Flutter web só tem CORS para `http://localhost:*` (e `127.0.0.1`).
+- Só se o `.win` estiver fora: `flutter run --dart-define=API_BASE_URL=...` (sem barra no final).
+>>>>>>> 0284b5f339017158619f108eb15a4d6ec1db26f6
