@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_3_page.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
 
@@ -179,9 +178,6 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
               children: [
                 const SizedBox(height: 10),
 
-                // =========================
-                // CNH
-                // =========================
                 CampoFormulario(
                   label: "Número de CNH",
                   placeholder: "69314369120",
@@ -218,9 +214,6 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
                 const SizedBox(height: 16),
 
-                // =========================
-                // DATA DE VALIDADE
-                // =========================
                 CampoFormulario(
                   label: "Data de validade",
                   placeholder: "21/12/2034",
@@ -253,9 +246,6 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
                 const SizedBox(height: 24),
 
-                // =========================
-                // BOTÃO
-                // =========================
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
 

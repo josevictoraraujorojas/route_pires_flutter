@@ -4,6 +4,7 @@ class MototaxistaCadastro {
   final String senha;
   final String telefone;
   final String cnh;
+  final String dataValidade;
   final String placa;
   final String renavam;
   final String modelo;
@@ -15,6 +16,7 @@ class MototaxistaCadastro {
     required this.senha,
     required this.telefone,
     required this.cnh,
+    required this.dataValidade,
     required this.placa,
     required this.renavam,
     required this.modelo,
@@ -37,10 +39,11 @@ class MototaxistaCadastro {
         'placa': placa,
         'renavam': renavam,
         'modelo': modelo,
-        'ano': ano,
+        'ano': int.parse(ano),
       },
       'servicosOferecidos': [],
       'cnh': cnh,
+      'dataValidade': dataValidade,
     };
   }
 }

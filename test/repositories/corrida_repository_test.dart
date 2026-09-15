@@ -158,9 +158,19 @@ void main() {
       await expectLater(criarPassageiro(), throwsA(isA<StateError>()));
     });
 
-    test('Não deve tratar lista 2xx como corrida criada', () async {
+    test('Deve aceitar lista 2xx com id no primeiro item', () async {
       await stubResposta([
-        {'id': 'outra-corrida', 'status': 'ANDAMENTO'},
+        {'id': 'frete-1', 'status': 'ANDAMENTO'},
+      ]);
+
+      final corrida = await criarPassageiro();
+
+      expect(corrida.id, 'frete-1');
+    });
+
+    test('Não deve tratar lista 2xx sem id como corrida criada', () async {
+      await stubResposta([
+        {'status': 'ANDAMENTO'},
       ]);
 
       await expectLater(criarPassageiro(), throwsA(isA<StateError>()));

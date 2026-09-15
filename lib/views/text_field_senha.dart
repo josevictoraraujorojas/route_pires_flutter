@@ -4,7 +4,7 @@ class TextFieldSenha extends StatelessWidget {
   final TextEditingController controller;
   final String placeholder;
   final bool obscureText;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Function(String)? onChanged;
 
   const TextFieldSenha({
@@ -12,7 +12,7 @@ class TextFieldSenha extends StatelessWidget {
     required this.controller,
     required this.placeholder,
     required this.obscureText,
-    required this.onTap,
+    this.onTap,
     this.onChanged,
   });
 
@@ -31,21 +31,20 @@ class TextFieldSenha extends StatelessWidget {
 
       placeholderStyle: const TextStyle(color: Color(0xFF8F9098)),
 
-      suffix: GestureDetector(
-        onTap: onTap,
-
-        child: Padding(
-          padding: const EdgeInsets.only(right: 10),
-
-          child: Icon(
-            obscureText
-                ? CupertinoIcons.eye_slash_fill
-                : CupertinoIcons.eye_fill,
-
-            color: const Color(0xFF8F9098),
-          ),
-        ),
-      ),
+      suffix: onTap == null
+          ? null
+          : GestureDetector(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Icon(
+                  obscureText
+                      ? CupertinoIcons.eye_slash_fill
+                      : CupertinoIcons.eye_fill,
+                  color: const Color(0xFF8F9098),
+                ),
+              ),
+            ),
 
       padding: const EdgeInsets.all(15),
 

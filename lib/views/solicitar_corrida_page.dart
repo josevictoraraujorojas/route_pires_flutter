@@ -41,7 +41,10 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   }
 
   bool get formularioValido =>
-      categoria != null && inicio != null && destino != null;
+      categoria != null &&
+      pagamento != null &&
+      inicio != null &&
+      destino != null;
 
   Future<void> pesquisarLocal({required bool ehInicio}) async {
     final atual = ehInicio ? inicio : destino;

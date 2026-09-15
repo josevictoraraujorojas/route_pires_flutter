@@ -18,16 +18,16 @@ cd route_pires_flutter
 flutter pub get
 ```
 
-| Onde o app roda | `API_BASE_URL` |
+| Onde o app roda | `API_BASE_URL` (se não passar `--dart-define`) |
 |---|---|
-| Chrome / Flutter web | `https://routepires.otavio.win` (padrão no web) |
-| Emulador Android + API no PC | `http://10.0.2.2:8080` (padrão no Android) |
+| Chrome / Flutter web | `https://routepires.otavio.win` |
+| Emulador Android + API no PC | `http://10.0.2.2:8080` |
 | Simulador iOS + API no PC | `http://127.0.0.1:8080` |
 | Celular na mesma Wi‑Fi | `http://IP_DO_PC:8080` (`ipconfig`) |
-| API na nuvem (qualquer device) | `https://routepires.otavio.win` |
+| API na nuvem (qualquer device) | `--dart-define=API_BASE_URL=https://routepires.otavio.win` |
 
 ```text
-rem Web / Chrome (já cai na API da nuvem)
+rem Web / Chrome (padrão: API da nuvem)
 flutter run -d chrome
 
 rem Emulador Android + API no PC (padrão 10.0.2.2)
@@ -43,6 +43,8 @@ flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
 Sem barra no final da URL. Emulador Android **não** usa `localhost`; usa `10.0.2.2`.
 
 Android já permite HTTP local (`INTERNET` + `usesCleartextTraffic`).
+
+No Google Cloud da chave do mapa, ligue **Maps SDK for Android**, **Maps SDK for iOS** e **Maps JavaScript API** (Chrome). Sem isso o mapa fica cinza.
 
 ## 2. API no PC (quando o .win não abrir)
 

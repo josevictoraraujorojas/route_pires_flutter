@@ -103,10 +103,26 @@ class CorridaRepository {
   }
 
   CorridaResponse _parseResposta(dynamic data) {
-    if (data is Map) {
-      final corrida = CorridaResponse.fromJson(Map<String, dynamic>.from(data));
-      if (corrida.id.isNotEmpty) return corrida;
+    final mapa = _mapaComId(data);
+    if (mapa != null) {
+      return CorridaResponse.fromJson(mapa);
+    }
+    if (data is List) {
+      for (final item in data) {
+        final daLista = _mapaComId(item);
+        if (daLista != null) {
+          return CorridaResponse.fromJson(daLista);
+        }
+      }
     }
     throw StateError('Resposta da corrida sem id');
+  }
+
+  Map<String, dynamic>? _mapaComId(dynamic data) {
+    if (data is! Map) return null;
+    final mapa = Map<String, dynamic>.from(data);
+    final id = mapa['id']?.toString() ?? '';
+    if (id.isEmpty) return null;
+    return mapa;
   }
 }

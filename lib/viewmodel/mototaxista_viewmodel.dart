@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
 import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
 
@@ -16,6 +17,17 @@ class MototaxistaViewModel extends ChangeNotifier {
   String? get erro => _erro;
 
   Future<bool> cadastrar(MototaxistaCadastro mototaxista) async {
+    if (!senhaValida(mototaxista.senha)) {
+      _erro = mensagemSenhaInvalida;
+      notifyListeners();
+      return false;
+    }
+    if (int.tryParse(mototaxista.ano) == null) {
+      _erro = 'Informe um ano válido';
+      notifyListeners();
+      return false;
+    }
+
     _carregando = true;
     _erro = null;
     notifyListeners();

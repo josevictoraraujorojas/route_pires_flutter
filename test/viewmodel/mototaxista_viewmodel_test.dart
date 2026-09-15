@@ -21,6 +21,7 @@ void main() {
       senha: 'senh4b0a',
       telefone: '64999558833',
       cnh: '12345678900',
+      dataValidade: '24/10/2030',
       placa: 'ABC1D23',
       renavam: '12345678901',
       modelo: 'Honda CG 160',
@@ -29,6 +30,35 @@ void main() {
   });
 
   group('MototaxistaViewModel Tests |', () {
+    test(
+      'Não deve chamar o repositório quando a senha for só letras',
+      () async {
+        final fraco = MototaxistaCadastro(
+          nome: mototaxista.nome,
+          email: mototaxista.email,
+          senha: 'abcdefgh',
+          telefone: mototaxista.telefone,
+          cnh: mototaxista.cnh,
+          dataValidade: mototaxista.dataValidade,
+          placa: mototaxista.placa,
+          renavam: mototaxista.renavam,
+          modelo: mototaxista.modelo,
+          ano: mototaxista.ano,
+        );
+
+        final resultado = await viewModel.cadastrar(fraco);
+
+        expect(resultado, isFalse);
+        expect(
+          viewModel.erro,
+          equals(
+            'A senha deve ter no mínimo 8 caracteres, com letras e números.',
+          ),
+        );
+        verifyZeroInteractions(mockRepository);
+      },
+    );
+
     test('Deve cadastrar com sucesso', () async {
       when(() => mockRepository.cadastrar(mototaxista))
           .thenAnswer((_) async {});

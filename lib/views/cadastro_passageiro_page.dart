@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
 import 'package:route_pires_flutter/views/termos_de_uso.dart';
@@ -315,8 +316,8 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                       return 'Crie a senha';
                     }
 
-                    if (valor.length < 8) {
-                      return 'A senha deve ter pelo menos 8 caracteres';
+                    if (!senhaValida(valor)) {
+                      return mensagemSenhaInvalida;
                     }
 
                     return null;

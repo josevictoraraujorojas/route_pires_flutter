@@ -41,7 +41,10 @@ class _MapaCorridaState extends State<MapaCorrida> {
   void initState() {
     super.initState();
     if (pontoSelecionado == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => localizar());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        localizar();
+      });
     }
   }
 
@@ -99,7 +102,7 @@ class _MapaCorridaState extends State<MapaCorrida> {
   }
 
   Future<void> localizar() async {
-    if (localizando) return;
+    if (!mounted || localizando) return;
     final versao = ++versaoLocalizacao;
     setState(() => localizando = true);
 
@@ -175,6 +178,7 @@ class _MapaCorridaState extends State<MapaCorrida> {
               ),
               onMapCreated: _onMapCreated,
               onTap: (ponto) => selecionar(pontoDeGoogle(ponto)),
+              style: '[{"featureType":"poi","stylers":[{"visibility":"off"}]}]',
               markers: _marcadores,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,

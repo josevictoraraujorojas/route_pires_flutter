@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_2_page.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
 
@@ -14,19 +14,11 @@ class CadastroMototaxista1Page extends StatefulWidget {
 class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
   final _formKey = GlobalKey<FormState>();
 
-  // ============================================================
-  // CONTROLLERS
-  // ============================================================
-
   final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
   final _telefoneController = TextEditingController();
   final _senhaController = TextEditingController();
   final _senhaConfirmacaoController = TextEditingController();
-
-  // ============================================================
-  // ESTADOS
-  // ============================================================
 
   bool isObscureSenha = true;
   bool isObscureConfirmacaoSenha = true;
@@ -42,10 +34,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
   bool aceitouTermos = false;
 
-  // ============================================================
-  // DISPOSE
-  // ============================================================
-
   @override
   void dispose() {
     _nomeController.dispose();
@@ -56,10 +44,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
     super.dispose();
   }
-
-  // ============================================================
-  // FORMATAÇÃO DO TELEFONE
-  // ============================================================
 
   String formatarTelefone(String valor) {
     valor = valor.replaceAll(RegExp(r'\D'), '');
@@ -82,10 +66,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
         '${valor.substring(7)}';
   }
 
-  // ============================================================
-  // PRÓXIMO PASSO
-  // ============================================================
-
   Future<void> irParaProximoPasso() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -95,13 +75,10 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
       context,
       CupertinoPageRoute(
         builder: (context) => CadastroMototaxista2Page(
-          // Dados da página 1
           nome: _nomeController.text,
           email: _emailController.text,
           telefone: _telefoneController.text,
           senha: _senhaController.text,
-
-          // Dados que podem ter vindo de páginas posteriores
           cnh: cnh,
           dataValidade: dataValidade,
 
@@ -114,10 +91,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
         ),
       ),
     );
-
-    // ==========================================================
-    // RECEBE OS DADOS DA PÁGINA 2
-    // ==========================================================
 
     if (resultado != null) {
       setState(() {
@@ -134,18 +107,10 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
     }
   }
 
-  // ============================================================
-  // TELA
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
-
-      // ========================================================
-      // BARRA SUPERIOR
-      // ========================================================
       navigationBar: const CupertinoNavigationBar(
         backgroundColor: CupertinoColors.white,
         middle: Text(
@@ -154,9 +119,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
         ),
       ),
 
-      // ========================================================
-      // CONTEÚDO
-      // ========================================================
       child: SizedBox(
         width: double.infinity,
 
@@ -169,15 +131,8 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ==================================================
-                // ESPAÇAMENTO SUPERIOR
-                // ==================================================
-
                 const SizedBox(height: 24),
 
-                // ==================================================
-                // TÍTULO
-                // ==================================================
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -193,9 +148,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
                 const SizedBox(height: 24),
 
-                // ==================================================
-                // NOME
-                // ==================================================
                 CampoFormulario(
                   label: 'Nome completo',
                   placeholder: 'Digite seu nome completo',
@@ -210,9 +162,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
                   },
                 ),
 
-                // ==================================================
-                // E-MAIL
-                // ==================================================
                 CampoFormulario(
                   label: 'E-mail',
                   placeholder: 'nome@email.com',
@@ -232,9 +181,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
                   },
                 ),
 
-                // ==================================================
-                // TELEFONE
-                // ==================================================
                 CampoFormulario(
                   label: 'Número de telefone',
                   placeholder: '(64) 91234-5678',
@@ -267,9 +213,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
                   },
                 ),
 
-                // ==================================================
-                // SENHA
-                // ==================================================
                 CampoFormulario(
                   label: 'Senha',
                   placeholder: 'Crie uma senha',
@@ -290,17 +233,14 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
                       return 'Crie a senha';
                     }
 
-                    if (valor.length < 8) {
-                      return 'A senha deve ter pelo menos 8 caracteres';
+                    if (!senhaValida(valor)) {
+                      return mensagemSenhaInvalida;
                     }
 
                     return null;
                   },
                 ),
 
-                // ==================================================
-                // CONFIRMAR SENHA
-                // ==================================================
                 CampoFormulario(
                   label: 'Confirmar senha',
                   placeholder: 'Confirme a senha',
@@ -331,9 +271,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
                 const SizedBox(height: 24),
 
-                // ==================================================
-                // BOTÃO PRÓXIMO PASSO
-                // ==================================================
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
 
@@ -362,9 +299,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
                   ),
                 ),
 
-                // ==================================================
-                // ESPAÇO FINAL
-                // ==================================================
                 const SizedBox(height: 40),
               ],
             ),

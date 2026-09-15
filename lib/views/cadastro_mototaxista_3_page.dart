@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
@@ -95,6 +94,7 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
       senha: widget.senha,
       telefone: widget.telefone,
       cnh: widget.cnh.trim(),
+      dataValidade: widget.dataValidade.trim(),
       placa: _placaController.text.trim(),
       renavam: _renavamController.text.trim(),
       modelo: _modeloController.text.trim(),
@@ -179,9 +179,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
               children: [
                 const SizedBox(height: 10),
 
-                // =========================
-                // PLACA
-                // =========================
                 CampoFormulario(
                   label: "Placa da moto",
                   placeholder: "ABC1D23",
@@ -214,9 +211,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
                 const SizedBox(height: 16),
 
-                // =========================
-                // RENAVAM
-                // =========================
                 CampoFormulario(
                   label: "RENAVAM",
                   placeholder: "Digite o RENAVAM",
@@ -253,9 +247,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
                 const SizedBox(height: 16),
 
-                // =========================
-                // MODELO
-                // =========================
                 CampoFormulario(
                   label: "Modelo da moto",
                   placeholder: "Honda CG 150",
@@ -272,9 +263,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
                 const SizedBox(height: 16),
 
-                // =========================
-                // ANO
-                // =========================
                 CampoFormulario(
                   label: "Ano da moto",
                   placeholder: "Ex: 2024",
@@ -311,9 +299,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
                 const SizedBox(height: 24),
 
-                // =========================
-                // TERMOS DE USO
-                // =========================
                 TermosDeUso(
                   aceitouTermos: aceitouTermos,
                   onChanged: (valor) {
@@ -325,9 +310,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
                 const SizedBox(height: 20),
 
-                // =========================
-                // BOTÃO FINALIZAR
-                // =========================
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
 

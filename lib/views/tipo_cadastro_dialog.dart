@@ -23,7 +23,6 @@ class TipoCadastroDialog {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // TÍTULO
                   const Text(
                     'Tipo de Cadastro',
                     textAlign: TextAlign.center,
@@ -36,7 +35,6 @@ class TipoCadastroDialog {
 
                   const SizedBox(height: 8),
 
-                  // DESCRIÇÃO
                   const Text(
                     'Escolha como deseja se cadastrar:',
                     textAlign: TextAlign.center,
@@ -49,7 +47,6 @@ class TipoCadastroDialog {
 
                   const SizedBox(height: 22),
 
-                  // PASSAGEIRO
                   _TipoCadastroButton(
                     label: 'Quero ser Passageiro',
                     onPressed: () {
@@ -59,7 +56,6 @@ class TipoCadastroDialog {
 
                   const SizedBox(height: 9),
 
-                  // MOTOTAXISTA
                   _TipoCadastroButton(
                     label: 'Quero ser Mototaxista',
                     onPressed: () {
@@ -69,7 +65,6 @@ class TipoCadastroDialog {
 
                   const SizedBox(height: 9),
 
-                  // CANCELAR
                   _TipoCadastroButton(
                     label: 'Cancelar / Voltar',
                     color: const Color(0xFFFF5B6B),

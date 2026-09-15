@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/repositories/cadastro_passageiro_repository.dart';
 
 class CadastroPassageiroViewModel extends ChangeNotifier {
@@ -25,8 +26,8 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
     final telefoneDigitos = telefone.replaceAll(RegExp(r'\D'), '');
     final emailNormalizado = email.trim().toLowerCase();
 
-    if (!_senhaValida(senha)) {
-      _erro = 'A senha deve ter no mínimo 8 caracteres, com letras e números.';
+    if (!senhaValida(senha)) {
+      _erro = mensagemSenhaInvalida;
       notifyListeners();
       return false;
     }
@@ -66,14 +67,5 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
       _carregando = false;
       notifyListeners();
     }
-  }
-
-  bool _senhaValida(String senha) {
-    if (senha.length < 8) {
-      return false;
-    }
-    final temLetra = RegExp(r'[A-Za-z]').hasMatch(senha);
-    final temNumero = RegExp(r'\d').hasMatch(senha);
-    return temLetra && temNumero;
   }
 }
