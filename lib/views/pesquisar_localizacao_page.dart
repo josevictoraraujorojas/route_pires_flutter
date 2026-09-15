@@ -1,14 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/repositories/localizacao_repository.dart';
 import 'package:route_pires_flutter/views/botao_primario.dart';
-import 'package:route_pires_flutter/views/mapa_corrida_mock.dart';
+import 'package:route_pires_flutter/views/mapa_corrida.dart';
 import 'package:route_pires_flutter/views/rodape_navegacao.dart';
 
 class PesquisarLocalizacaoPage extends StatefulWidget {
-  const PesquisarLocalizacaoPage({super.key, this.pontoInicial});
+  const PesquisarLocalizacaoPage({
+    super.key,
+    this.pontoInicial,
+    this.onSelecionar,
+    this.repository,
+  });
 
   final LocalizacaoPonto? pontoInicial;
+  final ValueChanged<LocalizacaoPonto>? onSelecionar;
+  final LocalizacaoRepository? repository;
 
   @override
   State<PesquisarLocalizacaoPage> createState() =>
@@ -16,82 +26,140 @@ class PesquisarLocalizacaoPage extends StatefulWidget {
 }
 
 class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
-  static const enderecos = [
-    LocalizacaoPonto(
-      latitude: -17.29972,
-      longitude: -48.27944,
-      rotulo: 'Rua Exemplo - Setor Exemplo',
-    ),
-    LocalizacaoPonto(
-      latitude: -17.3014,
-      longitude: -48.2812,
-      rotulo: 'Rua Exemplo Filho Neto',
-    ),
-    LocalizacaoPonto(
-      latitude: -17.2983,
-      longitude: -48.2770,
-      rotulo: 'Rua Exp - Centro',
-    ),
-    LocalizacaoPonto(
-      latitude: -17.3037,
-      longitude: -48.2855,
-      rotulo: 'Rua Inicial - Setor Universitário',
-    ),
-    LocalizacaoPonto(
-      latitude: -17.2948,
-      longitude: -48.2718,
-      rotulo: 'Rua Final - Centro',
-    ),
-  ];
-
-  static const _centro = LocalizacaoPonto(
-    latitude: -17.29972,
-    longitude: -48.27944,
-    rotulo: 'Local selecionado no mapa',
-  );
-
-  late final TextEditingController controller;
-  late LocalizacaoPonto pontoMapa;
+  final controller = TextEditingController();
+  late final repository = widget.repository ?? LocalizacaoRepository();
+  Timer? debounceBusca;
+  Timer? debounceEndereco;
+  LocalizacaoPonto? pontoMapa;
+  List<LocalizacaoPonto> sugestoes = const [];
+  String? erroBusca;
+  String? erroMapa;
+  bool buscando = false;
+  bool identificando = false;
+  int versaoBusca = 0;
+  int versaoEndereco = 0;
 
   @override
   void initState() {
     super.initState();
-    pontoMapa = widget.pontoInicial ?? _centro;
-    controller = TextEditingController();
+    pontoMapa = widget.pontoInicial;
   }
 
   @override
   void dispose() {
+    debounceBusca?.cancel();
+    debounceEndereco?.cancel();
     controller.dispose();
     super.dispose();
   }
 
-  void selecionar(LocalizacaoPonto ponto) => Navigator.pop(context, ponto);
-
-  void limparBusca() {
-    controller.clear();
-    setState(() {});
+  void selecionar(LocalizacaoPonto ponto) {
+    final callback = widget.onSelecionar;
+    callback != null ? callback(ponto) : Navigator.pop(context, ponto);
   }
 
-  LocalizacaoPonto pontoDoMapa(LatLng latLng) {
-    return LocalizacaoPonto(
-      latitude: latLng.latitude,
-      longitude: latLng.longitude,
-      rotulo:
-          '${latLng.latitude.toStringAsFixed(6)}, ${latLng.longitude.toStringAsFixed(6)}',
+  void limparBusca() {
+    debounceBusca?.cancel();
+    controller.clear();
+    versaoBusca++;
+    setState(() {
+      buscando = false;
+      sugestoes = const [];
+      erroBusca = null;
+    });
+  }
+
+  void agendarBusca(String texto) {
+    debounceBusca?.cancel();
+    versaoBusca++;
+    final termo = texto.trim();
+    setState(() {
+      buscando = false;
+      sugestoes = const [];
+      erroBusca = null;
+    });
+    if (termo.length < 3) return;
+    debounceBusca = Timer(
+      const Duration(milliseconds: 500),
+      () => buscar(termo),
     );
+  }
+
+  Future<void> buscar(String texto) async {
+    debounceBusca?.cancel();
+    final termo = texto.trim();
+    if (termo.length < 3) {
+      setState(() => erroBusca = 'Digite pelo menos 3 caracteres.');
+      return;
+    }
+
+    final versao = ++versaoBusca;
+    setState(() {
+      buscando = true;
+      erroBusca = null;
+      sugestoes = const [];
+    });
+
+    try {
+      final resultado = await repository.buscar(termo);
+      if (!mounted || versao != versaoBusca) return;
+      setState(() {
+        sugestoes = resultado;
+        erroBusca = resultado.isEmpty ? 'Nenhum endereço encontrado.' : null;
+      });
+    } catch (_) {
+      if (!mounted || versao != versaoBusca) return;
+      setState(() {
+        erroBusca = 'Não foi possível buscar endereços. Verifique a conexão.';
+      });
+    } finally {
+      if (mounted && versao == versaoBusca) {
+        setState(() => buscando = false);
+      }
+    }
+  }
+
+  void selecionarNoMapa(LatLng ponto) {
+    debounceEndereco?.cancel();
+    final versao = ++versaoEndereco;
+    setState(() {
+      pontoMapa = LocalizacaoPonto(
+        latitude: ponto.latitude,
+        longitude: ponto.longitude,
+        rotulo: 'Buscando endereço...',
+      );
+      identificando = true;
+      erroMapa = null;
+    });
+
+    debounceEndereco = Timer(const Duration(seconds: 1), () async {
+      try {
+        final endereco = await repository.endereco(ponto);
+        if (!mounted || versao != versaoEndereco) return;
+        setState(() => pontoMapa = endereco);
+      } catch (_) {
+        if (!mounted || versao != versaoEndereco) return;
+        setState(() {
+          pontoMapa = LocalizacaoPonto(
+            latitude: ponto.latitude,
+            longitude: ponto.longitude,
+            rotulo:
+                '${ponto.latitude.toStringAsFixed(6)}, '
+                '${ponto.longitude.toStringAsFixed(6)}',
+          );
+          erroMapa = 'Não foi possível identificar o endereço deste ponto.';
+        });
+      } finally {
+        if (mounted && versao == versaoEndereco) {
+          setState(() => identificando = false);
+        }
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final termo = controller.text.trim().toLowerCase();
-    final sugestoes = termo.isEmpty
-        ? <LocalizacaoPonto>[]
-        : enderecos
-              .where(
-                (endereco) => endereco.rotulo.toLowerCase().contains(termo),
-              )
-              .toList();
+    final mostrarBusca = buscando || erroBusca != null || sugestoes.isNotEmpty;
 
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
@@ -110,9 +178,10 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               child: CupertinoSearchTextField(
                 controller: controller,
-                autofocus: true,
-                placeholder: 'Rua Exemplo',
-                onChanged: (_) => setState(() {}),
+                placeholder: 'Rua, número ou bairro',
+                onSubmitted: buscar,
+                onSuffixTap: limparBusca,
+                onChanged: agendarBusca,
               ),
             ),
             Expanded(
@@ -120,27 +189,23 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
                 children: [
                   Column(
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 18),
-                        child: Text(
-                          'Selecionar Localização',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      _LocalSelecionado(
+                        ponto: pontoMapa,
+                        carregando: identificando,
+                        erro: erroMapa,
                       ),
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: MapaCorridaMock(
-                            pontoInicial: LatLng(
-                              pontoMapa.latitude,
-                              pontoMapa.longitude,
-                            ),
-                            onTap: (latLng) {
-                              setState(() => pontoMapa = pontoDoMapa(latLng));
-                            },
+                          child: MapaCorrida(
+                            pontoInicial: pontoMapa == null
+                                ? null
+                                : LatLng(
+                                    pontoMapa!.latitude,
+                                    pontoMapa!.longitude,
+                                  ),
+                            onTap: selecionarNoMapa,
+                            onErro: (erro) => setState(() => erroMapa = erro),
                           ),
                         ),
                       ),
@@ -148,38 +213,40 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
                         padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                         child: BotaoPrimario(
                           texto: 'SELECIONAR',
-                          onPressed: () => selecionar(pontoMapa),
+                          onPressed: pontoMapa == null || identificando
+                              ? null
+                              : () => selecionar(pontoMapa!),
                         ),
                       ),
                       const RodapeNavegacao(),
                     ],
                   ),
-                  if (sugestoes.isNotEmpty)
+                  if (mostrarBusca)
                     ColoredBox(
                       color: CupertinoColors.white,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: sugestoes.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return const Padding(
-                              padding: EdgeInsets.only(bottom: 8, top: 4),
-                              child: Text(
-                                'PESQUISA SUGERIDA',
-                                style: TextStyle(
-                                  color: Color(0xFF8F9098),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.4,
+                      child: buscando
+                          ? const Center(child: CupertinoActivityIndicator())
+                          : erroBusca != null
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  erroBusca!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Color(0xFF8F9098),
+                                  ),
                                 ),
                               ),
-                            );
-                          }
-                          final endereco = sugestoes[index - 1];
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: CupertinoButton(
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemCount: sugestoes.length,
+                              itemBuilder: (context, index) {
+                                final endereco = sugestoes[index];
+                                return CupertinoButton(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 14,
                                   ),
@@ -203,28 +270,70 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
                                       ),
                                     ],
                                   ),
-                                ),
-                              ),
-                              CupertinoButton(
-                                padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(44, 44),
-                                onPressed: limparBusca,
-                                child: const Icon(
-                                  CupertinoIcons.xmark,
-                                  size: 16,
-                                  color: Color(0xFFC5C6CC),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                                );
+                              },
+                            ),
                     ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LocalSelecionado extends StatelessWidget {
+  const _LocalSelecionado({
+    required this.ponto,
+    required this.carregando,
+    required this.erro,
+  });
+
+  final LocalizacaoPonto? ponto;
+  final bool carregando;
+  final String? erro;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (carregando) ...[
+                const CupertinoActivityIndicator(radius: 8),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Text(
+                  ponto?.rotulo ?? 'Localize-se ou toque no mapa',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (erro != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              erro!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: CupertinoColors.systemRed,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

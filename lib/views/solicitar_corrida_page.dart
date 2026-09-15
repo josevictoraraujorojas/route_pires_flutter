@@ -8,7 +8,9 @@ import 'package:route_pires_flutter/views/fluxo_corrida_page.dart';
 import 'package:route_pires_flutter/views/pesquisar_localizacao_page.dart';
 
 class SolicitarCorridaPage extends StatefulWidget {
-  const SolicitarCorridaPage({super.key});
+  const SolicitarCorridaPage({super.key, required this.inicioInicial});
+
+  final LocalizacaoPonto inicioInicial;
 
   @override
   State<SolicitarCorridaPage> createState() => _SolicitarCorridaPageState();
@@ -27,21 +29,16 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
     'DINHEIRO': Color(0xFF0B8F87),
   };
 
-  static const inicioPadrao = LocalizacaoPonto(
-    latitude: -17.3037,
-    longitude: -48.2855,
-    rotulo: 'Rua Inicial - Setor Universitário',
-  );
-  static const destinoPadrao = LocalizacaoPonto(
-    latitude: -17.2948,
-    longitude: -48.2718,
-    rotulo: 'Rua Final - Centro',
-  );
-
-  LocalizacaoPonto? inicio = inicioPadrao;
-  LocalizacaoPonto? destino = destinoPadrao;
+  late LocalizacaoPonto? inicio;
+  LocalizacaoPonto? destino;
   CategoriaCorrida? categoria = CategoriaCorrida.corrida;
   String? pagamento = 'PIX';
+
+  @override
+  void initState() {
+    super.initState();
+    inicio = widget.inicioInicial;
+  }
 
   bool get formularioValido =>
       categoria != null && inicio != null && destino != null;
