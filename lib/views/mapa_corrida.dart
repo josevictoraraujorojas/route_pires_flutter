@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
+import 'package:route_pires_flutter/config/localizacao_atual.dart';
 
 gmaps.LatLng pontoParaGoogle(LatLng ponto) {
   return gmaps.LatLng(ponto.latitude, ponto.longitude);
@@ -43,7 +43,7 @@ class _MapaCorridaState extends State<MapaCorrida> {
     if (pontoSelecionado == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        localizar();
+        localizar(selecionar: false);
       });
     }
   }
@@ -95,44 +95,22 @@ class _MapaCorridaState extends State<MapaCorrida> {
     }
   }
 
-  Future<void> localizar() async {
+  Future<void> localizar({bool selecionar = true}) async {
     if (!mounted || localizando) return;
     final versao = ++versaoLocalizacao;
     setState(() => localizando = true);
 
     try {
-      final servicoAtivo = await Geolocator.isLocationServiceEnabled();
+      final ponto = await posicaoAtual();
       if (!mounted || versao != versaoLocalizacao) return;
-      if (!servicoAtivo) {
-        _mostrarErro('Ative a localização do aparelho.');
-        return;
+      if (selecionar) {
+        _aplicarPonto(ponto);
       }
-
-      var permissao = await Geolocator.checkPermission();
-      if (!mounted || versao != versaoLocalizacao) return;
-      if (permissao == LocationPermission.denied) {
-        permissao = await Geolocator.requestPermission();
-        if (!mounted || versao != versaoLocalizacao) return;
-      }
-      if (permissao == LocationPermission.denied) {
-        _mostrarErro('Permissão de localização negada.');
-        return;
-      }
-      if (permissao == LocationPermission.deniedForever) {
-        _mostrarErro('Libere a localização nas configurações do aplicativo.');
-        return;
-      }
-
-      final posicao = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-      if (!mounted || versao != versaoLocalizacao) return;
-      final ponto = LatLng(posicao.latitude, posicao.longitude);
-      _aplicarPonto(ponto);
       await _mover(ponto, zoomLocal);
+    } on FalhaLocalizacao catch (erro) {
+      if (versao == versaoLocalizacao) {
+        _mostrarErro(erro.mensagem);
+      }
     } catch (_) {
       if (versao == versaoLocalizacao) {
         _mostrarErro('Não foi possível obter sua localização.');

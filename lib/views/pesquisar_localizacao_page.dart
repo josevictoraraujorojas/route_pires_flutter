@@ -11,11 +11,13 @@ import 'package:route_pires_flutter/views/rodape_navegacao.dart';
 class PesquisarLocalizacaoPage extends StatefulWidget {
   const PesquisarLocalizacaoPage({
     super.key,
+    this.titulo = 'Pesquisar Localização',
     this.pontoInicial,
     this.onSelecionar,
     this.repository,
   });
 
+  final String titulo;
   final LocalizacaoPonto? pontoInicial;
   final ValueChanged<LocalizacaoPonto>? onSelecionar;
   final LocalizacaoRepository? repository;
@@ -163,11 +165,11 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
 
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         backgroundColor: CupertinoColors.white,
         middle: Text(
-          'Pesquisar Localização',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          widget.titulo,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
         ),
       ),
       child: SafeArea(
