@@ -24,7 +24,7 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
     required String senha,
   }) async {
     final telefoneDigitos = telefone.replaceAll(RegExp(r'\D'), '');
-    final emailNormalizado = email.trim().toLowerCase();
+    final emailLimpo = emailNormalizado(email);
 
     if (!senhaValida(senha)) {
       _erro = mensagemSenhaInvalida;
@@ -45,7 +45,7 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
     try {
       await _repository.cadastrar(
         nome: nome.trim(),
-        email: emailNormalizado,
+        email: emailLimpo,
         telefone: telefoneDigitos,
         senha: senha,
       );

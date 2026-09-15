@@ -28,7 +28,8 @@ class CorridaViewModel extends ChangeNotifier {
   final LocalizacaoPonto destino;
   final MototaxistaRepository _mototaxistaRepository;
   final CorridaRepository _corridaRepository;
-  final CancelToken _cancelToken = CancelToken();
+  final CancelToken _cancelLista = CancelToken();
+  final CancelToken _cancelCriacao = CancelToken();
 
   EtapaCorrida _etapa = EtapaCorrida.motoristas;
   List<MototaxistaResumo> _motoristas = const [];
@@ -50,6 +51,7 @@ class CorridaViewModel extends ChangeNotifier {
   String? get erroCriacao => _erroCriacao;
   String get titulo => carregando ? 'Buscando Corrida' : 'Corrida';
   String get motorista => _motoristaSelecionado?.nome ?? '';
+  bool get bloqueiaSaida => _carregandoCriacao || _corridaCriada != null;
 
   void _avisar() {
     if (!_disposed) notifyListeners();
@@ -67,7 +69,7 @@ class CorridaViewModel extends ChangeNotifier {
 
     try {
       _motoristas = await _mototaxistaRepository.listar(
-        cancelToken: _cancelToken,
+        cancelToken: _cancelLista,
       );
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
@@ -123,7 +125,7 @@ class CorridaViewModel extends ChangeNotifier {
         mototaxistaId: mototaxista.id,
         origem: origem,
         destino: destino,
-        cancelToken: _cancelToken,
+        cancelToken: _cancelCriacao,
       );
       return !_disposed;
     } on DioException catch (e) {
@@ -152,8 +154,8 @@ class CorridaViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    if (!_cancelToken.isCancelled) {
-      _cancelToken.cancel();
+    if (!_cancelLista.isCancelled) {
+      _cancelLista.cancel();
     }
     super.dispose();
   }

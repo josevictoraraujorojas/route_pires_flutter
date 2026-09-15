@@ -1,3 +1,5 @@
+import 'package:route_pires_flutter/config/validacao.dart';
+
 class MototaxistaCadastro {
   final String nome;
   final String email;
@@ -26,7 +28,7 @@ class MototaxistaCadastro {
   Map<String, dynamic> toJson() {
     return {
       'nome': nome,
-      'email': email,
+      'email': emailNormalizado(email),
       'senha': senha,
       'telefone': telefone.replaceAll(RegExp(r'\D'), ''),
       'dataCadastro': DateTime.now().toUtc().toIso8601String(),

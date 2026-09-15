@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/repositories/login_repository.dart';
 
 import '../model/usuario_response.dart';
@@ -31,7 +32,10 @@ class LoginViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _usuario = await _repository.logar(email: email, senha: senha);
+      _usuario = await _repository.logar(
+        email: emailNormalizado(email),
+        senha: senha,
+      );
 
       return true;
     } on DioException catch (e) {

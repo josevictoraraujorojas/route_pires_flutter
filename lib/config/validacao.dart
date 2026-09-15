@@ -1,6 +1,8 @@
 const mensagemSenhaInvalida =
     'A senha deve ter no mínimo 8 caracteres, com letras e números.';
 
+String emailNormalizado(String email) => email.trim().toLowerCase();
+
 bool senhaValida(String senha) {
   if (senha.length < 8) return false;
   final temLetra = RegExp(r'[A-Za-z]').hasMatch(senha);

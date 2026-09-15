@@ -51,6 +51,20 @@ void main() {
       },
     );
 
+    test('Deve enviar o email em minúsculo no login', () async {
+      when(() => mockRepository.logar(email: 'ana@teste.com', senha: '123'))
+          .thenAnswer((_) async => usuarioFake);
+
+      final resultado = await viewModel.realizarLogin(
+        email: 'Ana@Teste.com',
+        senha: '123',
+      );
+
+      expect(resultado, isTrue);
+      verify(() => mockRepository.logar(email: 'ana@teste.com', senha: '123'))
+          .called(1);
+    });
+
     test('Deve retornar erro 400 e preencher a variável erro com "Dados inválidos"', () async {
       final erroDio400 = DioException(
         requestOptions: RequestOptions(path: '/login'),

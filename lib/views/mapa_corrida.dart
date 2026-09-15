@@ -61,12 +61,6 @@ class _MapaCorridaState extends State<MapaCorrida> {
     }
   }
 
-  @override
-  void dispose() {
-    mapController?.dispose();
-    super.dispose();
-  }
-
   bool _mesmoPonto(LatLng a, LatLng? b) {
     return b != null && a.latitude == b.latitude && a.longitude == b.longitude;
   }

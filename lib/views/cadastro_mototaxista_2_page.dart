@@ -43,7 +43,6 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
   final _cnhController = TextEditingController();
   final _dataValidadeController = TextEditingController();
 
-  // DADOS DA PÁGINA 3
   String placa = "";
   String renavam = "";
   String modelo = "";
@@ -121,7 +120,6 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
       ),
     );
 
-    // RECEBE OS DADOS DA PÁGINA 3
     if (resultado != null) {
       setState(() {
         placa = resultado["placa"];

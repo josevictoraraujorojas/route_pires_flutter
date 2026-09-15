@@ -15,29 +15,17 @@ class CadastroPassageiroPage extends StatefulWidget {
 class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // ============================================================
-  // CONTROLLERS
-  // ============================================================
-
   final nomeController = TextEditingController();
   final emailController = TextEditingController();
   final telefoneController = TextEditingController();
   final senhaController = TextEditingController();
   final confirmarSenhaController = TextEditingController();
 
-  // ============================================================
-  // ESTADOS
-  // ============================================================
-
   bool termosAceitos = false;
   bool termosErro = false;
 
   bool senhaVisivel = false;
   bool confirmarSenhaVisivel = false;
-
-  // ============================================================
-  // DISPOSE
-  // ============================================================
 
   @override
   void dispose() {
@@ -49,10 +37,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
 
     super.dispose();
   }
-
-  // ============================================================
-  // FINALIZAR CADASTRO
-  // ============================================================
 
   Future<void> finalizarCadastro() async {
     final formValido = _formKey.currentState!.validate();
@@ -75,10 +59,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
     );
 
     if (!mounted) return;
-
-    // ==========================================================
-    // CADASTRO REALIZADO
-    // ==========================================================
 
     if (ok) {
       await showCupertinoDialog<void>(
@@ -106,16 +86,8 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
       return;
     }
 
-    // ==========================================================
-    // ERRO NO CADASTRO
-    // ==========================================================
-
     _mostrarMensagem(viewModel.erro ?? 'Erro ao realizar cadastro');
   }
-
-  // ============================================================
-  // MENSAGEM DE ERRO
-  // ============================================================
 
   void _mostrarMensagem(String mensagem) {
     showCupertinoDialog<void>(
@@ -134,10 +106,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
       ),
     );
   }
-
-  // ============================================================
-  // FORMATAÇÃO TELEFONE
-  // ============================================================
 
   String formatarTelefone(String valor) {
     valor = valor.replaceAll(RegExp(r'\D'), '');
@@ -160,10 +128,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
         '${valor.substring(7)}';
   }
 
-  // ============================================================
-  // TELA
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<CadastroPassageiroViewModel>();
@@ -171,9 +135,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
     return CupertinoPageScaffold(
       backgroundColor: const Color(0xFFFFFFFF),
 
-      // ========================================================
-      // BARRA SUPERIOR
-      // ========================================================
       navigationBar: const CupertinoNavigationBar(
         backgroundColor: CupertinoColors.white,
         middle: Text(
@@ -182,9 +143,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
         ),
       ),
 
-      // ========================================================
-      // CONTEÚDO
-      // ========================================================
       child: SizedBox(
         width: double.infinity,
 
@@ -197,15 +155,8 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ==================================================
-                // ESPAÇAMENTO SUPERIOR
-                // ==================================================
-
                 const SizedBox(height: 24),
 
-                // ==================================================
-                // TÍTULO
-                // ==================================================
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -221,9 +172,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
 
                 const SizedBox(height: 24),
 
-                // ==================================================
-                // NOME
-                // ==================================================
                 CampoFormulario(
                   label: 'Nome completo',
                   placeholder: 'Digite seu nome completo',
@@ -238,9 +186,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                   },
                 ),
 
-                // ==================================================
-                // E-MAIL
-                // ==================================================
                 CampoFormulario(
                   label: 'E-mail',
                   placeholder: 'nome@email.com',
@@ -260,9 +205,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                   },
                 ),
 
-                // ==================================================
-                // TELEFONE
-                // ==================================================
                 CampoFormulario(
                   label: 'Número de telefone',
                   placeholder: '(64) 91234-5678',
@@ -293,9 +235,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                   },
                 ),
 
-                // ==================================================
-                // SENHA
-                // ==================================================
                 CampoFormulario(
                   label: 'Senha',
                   placeholder: 'Crie uma senha',
@@ -324,9 +263,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                   },
                 ),
 
-                // ==================================================
-                // CONFIRMAR SENHA
-                // ==================================================
                 CampoFormulario(
                   label: 'Confirmar senha',
                   placeholder: 'Confirme a senha',
@@ -355,14 +291,8 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                   },
                 ),
 
-                // ==================================================
-                // ESPAÇAMENTO
-                // ==================================================
                 const SizedBox(height: 8),
 
-                // ==================================================
-                // TERMOS DE USO
-                // ==================================================
                 TermosDeUso(
                   aceitouTermos: termosAceitos,
 
@@ -374,9 +304,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                   },
                 ),
 
-                // ==================================================
-                // ERRO DOS TERMOS
-                // ==================================================
                 if (termosErro)
                   Container(
                     width: double.infinity,
@@ -390,14 +317,8 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                     ),
                   ),
 
-                // ==================================================
-                // ESPAÇAMENTO
-                // ==================================================
                 const SizedBox(height: 20),
 
-                // ==================================================
-                // BOTÃO FINALIZAR
-                // ==================================================
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
 
@@ -432,9 +353,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                   ),
                 ),
 
-                // ==================================================
-                // ESPAÇO FINAL
-                // ==================================================
                 const SizedBox(height: 40),
               ],
             ),
