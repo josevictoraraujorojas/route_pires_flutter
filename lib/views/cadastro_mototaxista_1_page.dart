@@ -23,7 +23,6 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
   bool isObscureSenha = true;
   bool isObscureConfirmacaoSenha = true;
 
-  // Dados das próximas páginas
   String cnh = "";
   String dataValidade = "";
 

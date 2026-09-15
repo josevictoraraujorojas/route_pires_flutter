@@ -1,9 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
-import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_1_page.dart';
 import 'package:route_pires_flutter/views/cadastro_passageiro_page.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
@@ -253,11 +251,8 @@ class _LoginPageState extends State<LoginPage> {
                                     Navigator.push(
                                       context,
                                       CupertinoPageRoute(
-                                        builder: (_) => ChangeNotifierProvider(
-                                          create: (_) =>
-                                              CadastroPassageiroViewModel(),
-                                          child: const CadastroPassageiroPage(),
-                                        ),
+                                        builder: (_) =>
+                                            const CadastroPassageiroPage(),
                                       ),
                                     );
                                   }
@@ -266,11 +261,8 @@ class _LoginPageState extends State<LoginPage> {
                                     Navigator.push(
                                       context,
                                       CupertinoPageRoute(
-                                        builder: (_) => ChangeNotifierProvider(
-                                          create: (_) => MototaxistaViewModel(),
-                                          child:
-                                              const CadastroMototaxista1Page(),
-                                        ),
+                                        builder: (_) =>
+                                            const CadastroMototaxista1Page(),
                                       ),
                                     );
                                   }

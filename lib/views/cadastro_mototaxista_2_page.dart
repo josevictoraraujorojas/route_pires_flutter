@@ -92,7 +92,6 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
   }
 
   Future<void> irParaProximoPasso() async {
-    // Valida os campos da página 2
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -105,12 +104,8 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
           email: widget.email,
           telefone: widget.telefone,
           senha: widget.senha,
-
-          // Dados desta página
           cnh: _cnhController.text,
           dataValidade: _dataValidadeController.text,
-
-          // Dados que vieram da página 3 anteriormente
           placa: placa,
           renavam: renavam,
           modelo: modelo,
@@ -146,132 +141,141 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.white,
-
-      navigationBar: CupertinoNavigationBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        voltar();
+      },
+      child: CupertinoPageScaffold(
         backgroundColor: CupertinoColors.white,
 
-        middle: const Text("Cadastro de Mototaxista - Passo 2/3"),
+        navigationBar: CupertinoNavigationBar(
+          backgroundColor: CupertinoColors.white,
 
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: voltar,
-          child: const Icon(CupertinoIcons.back),
+          middle: const Text("Cadastro de Mototaxista - Passo 2/3"),
+
+          leading: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: voltar,
+            child: const Icon(CupertinoIcons.back),
+          ),
         ),
-      ),
 
-      child: SizedBox(
-        width: double.infinity,
+        child: SizedBox(
+          width: double.infinity,
 
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
 
-          child: Form(
-            key: _formKey,
+            child: Form(
+              key: _formKey,
 
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
 
-              children: [
-                const SizedBox(height: 10),
+                children: [
+                  const SizedBox(height: 10),
 
-                CampoFormulario(
-                  label: "Número de CNH",
-                  placeholder: "69314369120",
-                  controller: _cnhController,
-                  keyboardType: TextInputType.number,
+                  CampoFormulario(
+                    label: "Número de CNH",
+                    placeholder: "69314369120",
+                    controller: _cnhController,
+                    keyboardType: TextInputType.number,
 
-                  onChanged: (valor) {
-                    valor = valor.replaceAll(RegExp(r'\D'), '');
+                    onChanged: (valor) {
+                      valor = valor.replaceAll(RegExp(r'\D'), '');
 
-                    if (valor.length > 11) {
-                      valor = valor.substring(0, 11);
-                    }
+                      if (valor.length > 11) {
+                        valor = valor.substring(0, 11);
+                      }
 
-                    _cnhController.value = TextEditingValue(
-                      text: valor,
-                      selection: TextSelection.collapsed(offset: valor.length),
-                    );
-                  },
+                      _cnhController.value = TextEditingValue(
+                        text: valor,
+                        selection: TextSelection.collapsed(
+                          offset: valor.length,
+                        ),
+                      );
+                    },
 
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) {
-                      return "Informe sua CNH";
-                    }
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return "Informe sua CNH";
+                      }
 
-                    final regex = RegExp(r'^\d{11}$');
+                      final regex = RegExp(r'^\d{11}$');
 
-                    if (!regex.hasMatch(valor)) {
-                      return "A CNH deve possuir 11 números";
-                    }
+                      if (!regex.hasMatch(valor)) {
+                        return "A CNH deve possuir 11 números";
+                      }
 
-                    return null;
-                  },
-                ),
+                      return null;
+                    },
+                  ),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                CampoFormulario(
-                  label: "Data de validade",
-                  placeholder: "21/12/2034",
-                  controller: _dataValidadeController,
-                  keyboardType: TextInputType.datetime,
+                  CampoFormulario(
+                    label: "Data de validade",
+                    placeholder: "21/12/2034",
+                    controller: _dataValidadeController,
+                    keyboardType: TextInputType.datetime,
 
-                  onChanged: (valor) {
-                    final data = formatarData(valor);
+                    onChanged: (valor) {
+                      final data = formatarData(valor);
 
-                    _dataValidadeController.value = TextEditingValue(
-                      text: data,
-                      selection: TextSelection.collapsed(offset: data.length),
-                    );
-                  },
+                      _dataValidadeController.value = TextEditingValue(
+                        text: data,
+                        selection: TextSelection.collapsed(offset: data.length),
+                      );
+                    },
 
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) {
-                      return "Informe a data de validade";
-                    }
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return "Informe a data de validade";
+                      }
 
-                    final regex = RegExp(r'^\d{2}/\d{2}/\d{4}$');
+                      final regex = RegExp(r'^\d{2}/\d{2}/\d{4}$');
 
-                    if (!regex.hasMatch(valor)) {
-                      return "Informe a data no formato DD/MM/AAAA";
-                    }
+                      if (!regex.hasMatch(valor)) {
+                        return "Informe a data no formato DD/MM/AAAA";
+                      }
 
-                    return null;
-                  },
-                ),
+                      return null;
+                    },
+                  ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
 
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
 
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      color: const Color(0xFF006FFD),
-                      borderRadius: BorderRadius.circular(12),
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        color: const Color(0xFF006FFD),
+                        borderRadius: BorderRadius.circular(12),
 
-                      onPressed: irParaProximoPasso,
+                        onPressed: irParaProximoPasso,
 
-                      child: const Text(
-                        "PRÓXIMO PASSO",
-                        style: TextStyle(
-                          color: CupertinoColors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                        child: const Text(
+                          "PRÓXIMO PASSO",
+                          style: TextStyle(
+                            color: CupertinoColors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 20),
-              ],
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),

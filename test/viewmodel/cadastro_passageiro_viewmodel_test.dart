@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -38,6 +40,32 @@ void main() {
       expect(viewModel.erro, isNull);
       expect(viewModel.carregando, isFalse);
     });
+
+    test(
+      'Não deve quebrar se o ViewModel for disposed no meio do POST',
+      () async {
+        final espera = Completer<void>();
+        when(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).thenAnswer((_) => espera.future);
+
+        final futuro = viewModel.cadastrar(
+          nome: 'Ana Teste',
+          email: 'Ana@Teste.com',
+          telefone: '(64) 99955-8833',
+          senha: 'senh4b0a',
+        );
+        viewModel.dispose();
+        espera.complete();
+
+        expect(await futuro, isTrue);
+      },
+    );
 
     test('Não deve chamar o repositório quando a senha for fraca', () async {
       final resultado = await viewModel.cadastrar(

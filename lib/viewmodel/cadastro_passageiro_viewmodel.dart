@@ -11,11 +11,16 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
     : _repository = repository ?? CadastroPassageiroRepository();
 
   bool _carregando = false;
+  bool _disposed = false;
   String? _erro;
 
   bool get carregando => _carregando;
 
   String? get erro => _erro;
+
+  void _avisar() {
+    if (!_disposed) notifyListeners();
+  }
 
   Future<bool> cadastrar({
     required String nome,
@@ -28,19 +33,19 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
 
     if (!senhaValida(senha)) {
       _erro = mensagemSenhaInvalida;
-      notifyListeners();
+      _avisar();
       return false;
     }
 
     if (telefoneDigitos.length < 10 || telefoneDigitos.length > 11) {
       _erro = 'Informe um telefone com DDD (10 ou 11 dígitos).';
-      notifyListeners();
+      _avisar();
       return false;
     }
 
     _carregando = true;
     _erro = null;
-    notifyListeners();
+    _avisar();
 
     try {
       await _repository.cadastrar(
@@ -65,7 +70,13 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
       return false;
     } finally {
       _carregando = false;
-      notifyListeners();
+      _avisar();
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

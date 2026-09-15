@@ -16,25 +16,28 @@ class _SelecaoLocalPageState extends State<SelecaoLocalPage> {
   final repository = LocalizacaoRepository();
   LocalizacaoPonto? inicio;
   String? erroGps;
-  bool buscandoGps = false;
+  Future<void>? _carregandoInicio;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) carregarInicio();
-    });
+  Future<void> carregarInicio() {
+    return _carregandoInicio ??= _buscarInicio();
   }
 
-  Future<void> carregarInicio() async {
-    if (buscandoGps) return;
-    setState(() {
-      buscandoGps = true;
-      erroGps = null;
-    });
+  Future<void> _buscarInicio() async {
+    setState(() => erroGps = null);
     try {
       final posicao = await posicaoAtual();
-      final ponto = await repository.endereco(posicao);
+      LocalizacaoPonto ponto;
+      try {
+        ponto = await repository.endereco(posicao);
+      } catch (_) {
+        ponto = LocalizacaoPonto(
+          latitude: posicao.latitude,
+          longitude: posicao.longitude,
+          rotulo:
+              '${posicao.latitude.toStringAsFixed(6)}, '
+              '${posicao.longitude.toStringAsFixed(6)}',
+        );
+      }
       if (!mounted) return;
       setState(() => inicio = ponto);
     } on FalhaLocalizacao catch (erro) {
@@ -44,8 +47,16 @@ class _SelecaoLocalPageState extends State<SelecaoLocalPage> {
       if (!mounted) return;
       setState(() => erroGps = 'Não foi possível obter sua localização.');
     } finally {
-      if (mounted) setState(() => buscandoGps = false);
+      _carregandoInicio = null;
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) carregarInicio();
+    });
   }
 
   Future<void> aoSelecionarDestino(LocalizacaoPonto destino) async {

@@ -132,229 +132,237 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
   Widget build(BuildContext context) {
     final viewModel = context.watch<CadastroPassageiroViewModel>();
 
-    return CupertinoPageScaffold(
-      backgroundColor: const Color(0xFFFFFFFF),
+    return PopScope(
+      canPop: !viewModel.carregando,
+      child: CupertinoPageScaffold(
+        backgroundColor: const Color(0xFFFFFFFF),
 
-      navigationBar: const CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.white,
-        middle: Text(
-          'Cadastro de Passageiro',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        navigationBar: CupertinoNavigationBar(
+          automaticallyImplyLeading: !viewModel.carregando,
+          backgroundColor: CupertinoColors.white,
+          middle: const Text(
+            'Cadastro de Passageiro',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          ),
         ),
-      ),
 
-      child: SizedBox(
-        width: double.infinity,
+        child: SizedBox(
+          width: double.infinity,
 
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
 
-          child: Form(
-            key: _formKey,
+            child: Form(
+              key: _formKey,
 
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 24),
 
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  child: const Text(
-                    'Crie sua conta',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF000000),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                CampoFormulario(
-                  label: 'Nome completo',
-                  placeholder: 'Digite seu nome completo',
-                  controller: nomeController,
-
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) {
-                      return 'Informe seu nome';
-                    }
-
-                    return null;
-                  },
-                ),
-
-                CampoFormulario(
-                  label: 'E-mail',
-                  placeholder: 'nome@email.com',
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) {
-                      return 'Informe seu e-mail';
-                    }
-
-                    if (!valor.contains('@')) {
-                      return 'Informe um e-mail válido';
-                    }
-
-                    return null;
-                  },
-                ),
-
-                CampoFormulario(
-                  label: 'Número de telefone',
-                  placeholder: '(64) 91234-5678',
-                  controller: telefoneController,
-                  keyboardType: TextInputType.phone,
-
-                  onChanged: (valor) {
-                    final telefone = formatarTelefone(valor);
-
-                    telefoneController.value = TextEditingValue(
-                      text: telefone,
-                      selection: TextSelection.collapsed(
-                        offset: telefone.length,
-                      ),
-                    );
-                  },
-
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) {
-                      return 'Informe seu telefone';
-                    }
-
-                    if (!RegExp(r'^\(\d{2}\) \d{5}-\d{4}$').hasMatch(valor)) {
-                      return 'Informe um telefone válido';
-                    }
-
-                    return null;
-                  },
-                ),
-
-                CampoFormulario(
-                  label: 'Senha',
-                  placeholder: 'Crie uma senha',
-                  controller: senhaController,
-
-                  senha: true,
-
-                  obscureText: !senhaVisivel,
-
-                  onTap: () {
-                    setState(() {
-                      senhaVisivel = !senhaVisivel;
-                    });
-                  },
-
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) {
-                      return 'Crie a senha';
-                    }
-
-                    if (!senhaValida(valor)) {
-                      return mensagemSenhaInvalida;
-                    }
-
-                    return null;
-                  },
-                ),
-
-                CampoFormulario(
-                  label: 'Confirmar senha',
-                  placeholder: 'Confirme a senha',
-                  controller: confirmarSenhaController,
-
-                  senha: true,
-
-                  obscureText: !confirmarSenhaVisivel,
-
-                  onTap: () {
-                    setState(() {
-                      confirmarSenhaVisivel = !confirmarSenhaVisivel;
-                    });
-                  },
-
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) {
-                      return 'Confirme sua senha';
-                    }
-
-                    if (valor != senhaController.text) {
-                      return 'As senhas não coincidem';
-                    }
-
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 8),
-
-                TermosDeUso(
-                  aceitouTermos: termosAceitos,
-
-                  onChanged: (valor) {
-                    setState(() {
-                      termosAceitos = valor;
-                      termosErro = false;
-                    });
-                  },
-                ),
-
-                if (termosErro)
                   Container(
                     width: double.infinity,
-                    margin: const EdgeInsets.only(left: 29, right: 24, top: 5),
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
                     child: const Text(
-                      'Você precisa aceitar os termos de uso',
+                      'Crie sua conta',
                       style: TextStyle(
-                        color: CupertinoColors.systemRed,
-                        fontSize: 12,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF000000),
                       ),
                     ),
                   ),
 
-                const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  CampoFormulario(
+                    label: 'Nome completo',
+                    placeholder: 'Digite seu nome completo',
+                    controller: nomeController,
 
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return 'Informe seu nome';
+                      }
 
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
+                      return null;
+                    },
+                  ),
 
-                      color: const Color(0xFF006FFD),
+                  CampoFormulario(
+                    label: 'E-mail',
+                    placeholder: 'nome@email.com',
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
 
-                      borderRadius: BorderRadius.circular(10),
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return 'Informe seu e-mail';
+                      }
 
-                      onPressed: viewModel.carregando
-                          ? null
-                          : finalizarCadastro,
+                      if (!valor.contains('@')) {
+                        return 'Informe um e-mail válido';
+                      }
 
-                      child: viewModel.carregando
-                          ? const CupertinoActivityIndicator(
-                              color: CupertinoColors.white,
-                            )
-                          : const Text(
-                              'FINALIZAR',
-                              style: TextStyle(
+                      return null;
+                    },
+                  ),
+
+                  CampoFormulario(
+                    label: 'Número de telefone',
+                    placeholder: '(64) 91234-5678',
+                    controller: telefoneController,
+                    keyboardType: TextInputType.phone,
+
+                    onChanged: (valor) {
+                      final telefone = formatarTelefone(valor);
+
+                      telefoneController.value = TextEditingValue(
+                        text: telefone,
+                        selection: TextSelection.collapsed(
+                          offset: telefone.length,
+                        ),
+                      );
+                    },
+
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return 'Informe seu telefone';
+                      }
+
+                      if (!RegExp(r'^\(\d{2}\) \d{5}-\d{4}$').hasMatch(valor)) {
+                        return 'Informe um telefone válido';
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  CampoFormulario(
+                    label: 'Senha',
+                    placeholder: 'Crie uma senha',
+                    controller: senhaController,
+
+                    senha: true,
+
+                    obscureText: !senhaVisivel,
+
+                    onTap: () {
+                      setState(() {
+                        senhaVisivel = !senhaVisivel;
+                      });
+                    },
+
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return 'Crie a senha';
+                      }
+
+                      if (!senhaValida(valor)) {
+                        return mensagemSenhaInvalida;
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  CampoFormulario(
+                    label: 'Confirmar senha',
+                    placeholder: 'Confirme a senha',
+                    controller: confirmarSenhaController,
+
+                    senha: true,
+
+                    obscureText: !confirmarSenhaVisivel,
+
+                    onTap: () {
+                      setState(() {
+                        confirmarSenhaVisivel = !confirmarSenhaVisivel;
+                      });
+                    },
+
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return 'Confirme sua senha';
+                      }
+
+                      if (valor != senhaController.text) {
+                        return 'As senhas não coincidem';
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  TermosDeUso(
+                    aceitouTermos: termosAceitos,
+
+                    onChanged: (valor) {
+                      setState(() {
+                        termosAceitos = valor;
+                        termosErro = false;
+                      });
+                    },
+                  ),
+
+                  if (termosErro)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(
+                        left: 29,
+                        right: 24,
+                        top: 5,
+                      ),
+                      child: const Text(
+                        'Você precisa aceitar os termos de uso',
+                        style: TextStyle(
+                          color: CupertinoColors.systemRed,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 20),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+
+                        color: const Color(0xFF006FFD),
+
+                        borderRadius: BorderRadius.circular(10),
+
+                        onPressed: viewModel.carregando
+                            ? null
+                            : finalizarCadastro,
+
+                        child: viewModel.carregando
+                            ? const CupertinoActivityIndicator(
                                 color: CupertinoColors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
+                              )
+                            : const Text(
+                                'FINALIZAR',
+                                style: TextStyle(
+                                  color: CupertinoColors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                ),
                               ),
-                            ),
+                      ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 40),
-              ],
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
           ),
         ),
