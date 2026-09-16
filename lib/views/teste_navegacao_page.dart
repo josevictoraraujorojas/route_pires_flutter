@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
+import 'package:route_pires_flutter/views/drawer_corrida.dart';
+import 'package:route_pires_flutter/views/drawer_entrega.dart';
 import 'package:route_pires_flutter/views/lista_passageiros.dart';
+
+enum TipoSolicitacao { corrida, entrega }
 
 class TesteNavegacaoPage extends StatefulWidget {
   const TesteNavegacaoPage({super.key});
@@ -17,32 +21,28 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
   // ============================================================
 
   bool navegacaoInicializada = false;
+
   bool iniciandoNavegacao = false;
+
   bool navegacaoAtiva = false;
 
-  // Controle da lista de passageiros
-  bool listaExpandida = false;
+  bool mostrandoPassageiro = false;
+
+  bool listaExpandida = true;
+
+  // ============================================================
+  // SOLICITAÇÃO SELECIONADA
+  // ============================================================
+
+  Map<String, dynamic>? solicitacaoSelecionada;
+
+  TipoSolicitacao? tipoSolicitacao;
 
   // ============================================================
   // DESTINO
   // ============================================================
 
   NavigationWaypoint? destino;
-
-  // ============================================================
-  // LISTENER
-  // ============================================================
-
-  StreamSubscription<RemainingTimeOrDistanceChangedEvent>? distanciaListener;
-
-  // ============================================================
-  // INFORMAÇÕES DA NAVEGAÇÃO
-  // ============================================================
-
-  double distanciaRestante = 0;
-  double tempoRestante = 0;
-
-  TrafficDelaySeverity nivelTransito = TrafficDelaySeverity.noData;
 
   // ============================================================
   // CONTROLLER DO MAPA
@@ -70,8 +70,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
     await GoogleMapsNavigator.initializeNavigationSession();
 
-    configurarListenerDistancia();
-
     if (!mounted) return;
 
     setState(() {
@@ -84,10 +82,30 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
   // ============================================================
 
   void criarDestino() {
+    if (solicitacaoSelecionada == null) {
+      throw Exception('Nenhuma solicitação selecionada.');
+    }
+
+    final double latitude = (solicitacaoSelecionada!['latitude'] as num)
+        .toDouble();
+
+    final double longitude = (solicitacaoSelecionada!['longitude'] as num)
+        .toDouble();
+
+    final String nome =
+        solicitacaoSelecionada!['nome']?.toString() ?? 'Destino';
+
     destino = NavigationWaypoint.withLatLngTarget(
-      title: 'Destino',
-      target: LatLng(latitude: -17.4654, longitude: -48.2044),
+      title: nome,
+      target: LatLng(latitude: latitude, longitude: longitude),
     );
+
+    print('=================================');
+    print('DESTINO DA SOLICITAÇÃO');
+    print('Nome: $nome');
+    print('Latitude: $latitude');
+    print('Longitude: $longitude');
+    print('=================================');
   }
 
   // ============================================================
@@ -126,9 +144,23 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
     });
 
     try {
+      print('=================================');
+      print('INICIANDO NAVEGAÇÃO');
+      print('Tipo: $tipoSolicitacao');
+      print('Solicitação: $solicitacaoSelecionada');
+      print('=================================');
+
+      // ----------------------------------------------------------
+      // CRIAR DESTINO
+      // ----------------------------------------------------------
+
       print('Criando destino...');
 
       final destinos = criarDestinos();
+
+      // ----------------------------------------------------------
+      // CALCULAR ROTA
+      // ----------------------------------------------------------
 
       print('Calculando rota...');
 
@@ -148,16 +180,31 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
       print('Rota calculada com sucesso!');
 
+      // ----------------------------------------------------------
+      // INICIAR GUIDANCE
+      // ----------------------------------------------------------
+
       await GoogleMapsNavigator.startGuidance();
 
       print('Navegação iniciada!');
+
+      // ----------------------------------------------------------
+      // ESCONDER LISTA E DRAWER
+      // ----------------------------------------------------------
 
       if (!mounted) return;
 
       setState(() {
         iniciandoNavegacao = false;
+
         navegacaoAtiva = true;
+
+        mostrandoPassageiro = false;
+
+        listaExpandida = false;
       });
+
+      print('Lista e drawer escondidos.');
     } catch (e) {
       print('Erro ao iniciar navegação: $e');
 
@@ -174,106 +221,96 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
   // ============================================================
 
   Future<void> finalizarNavegacao() async {
-    print('Finalizando navegação...');
+    print('=================================');
+    print('FINALIZANDO NAVEGAÇÃO');
+    print('=================================');
 
     try {
+      // ----------------------------------------------------------
+      // PARAR NAVEGAÇÃO
+      // ----------------------------------------------------------
+
       await GoogleMapsNavigator.stopGuidance();
 
-      print('Navegação finalizada!');
+      print('Guidance finalizado.');
+
+      // ----------------------------------------------------------
+      // REMOVER ROTA DO MAPA
+      // ----------------------------------------------------------
+
+      await GoogleMapsNavigator.clearDestinations();
+
+      print('Rota removida do mapa.');
+
+      // ----------------------------------------------------------
+      // LIMPAR ESTADOS
+      // ----------------------------------------------------------
 
       if (!mounted) return;
 
       setState(() {
         navegacaoAtiva = false;
 
-        distanciaRestante = 0;
-        tempoRestante = 0;
+        iniciandoNavegacao = false;
 
-        nivelTransito = TrafficDelaySeverity.noData;
+        mostrandoPassageiro = false;
+
+        solicitacaoSelecionada = null;
+
+        tipoSolicitacao = null;
+
+        listaExpandida = true;
+
+        destino = null;
       });
+
+      print('Lista voltou.');
     } catch (e) {
       print('Erro ao finalizar navegação: $e');
     }
   }
 
   // ============================================================
-  // LISTENER DE DISTÂNCIA, TEMPO E TRÂNSITO
+  // ABRIR SOLICITAÇÃO
   // ============================================================
 
-  void configurarListenerDistancia() {
-    distanciaListener =
-        GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener((
-          evento,
-        ) {
-          print('=================================');
-          print('ATUALIZAÇÃO DA NAVEGAÇÃO');
-          print('Distância: ${evento.remainingDistance}');
-          print('Tempo: ${evento.remainingTime}');
-          print('Trânsito: ${evento.delaySeverity}');
-          print('=================================');
+  void abrirPassageiro(Map<String, dynamic> solicitacao) {
+    // ----------------------------------------------------------
+    // Descobre o tipo da solicitação
+    //
+    // Se não existir "tipo", considera como corrida.
+    // ----------------------------------------------------------
 
-          if (!mounted) return;
+    final String tipo =
+        solicitacao['tipo']?.toString().toLowerCase() ?? 'corrida';
 
-          setState(() {
-            distanciaRestante = evento.remainingDistance;
+    setState(() {
+      solicitacaoSelecionada = solicitacao;
 
-            tempoRestante = evento.remainingTime;
+      mostrandoPassageiro = true;
 
-            nivelTransito = evento.delaySeverity;
-          });
-        });
+      if (tipo == 'entrega') {
+        tipoSolicitacao = TipoSolicitacao.entrega;
+      } else {
+        tipoSolicitacao = TipoSolicitacao.corrida;
+      }
+    });
+
+    print('Solicitação selecionada: $tipoSolicitacao');
   }
 
   // ============================================================
-  // FORMATAR DISTÂNCIA
+  // VOLTAR PARA LISTA
   // ============================================================
 
-  String obterDistanciaFormatada() {
-    if (distanciaRestante <= 0) {
-      return 'Calculando...';
-    }
+  void voltarParaLista() {
+    setState(() {
+      mostrandoPassageiro = false;
 
-    if (distanciaRestante >= 1000) {
-      final km = distanciaRestante / 1000;
+      solicitacaoSelecionada = null;
 
-      return '${km.toStringAsFixed(1)} km';
-    }
-
-    return '${distanciaRestante.toStringAsFixed(0)} m';
-  }
-
-  // ============================================================
-  // FORMATAR TEMPO
-  // ============================================================
-
-  String obterTempoFormatado() {
-    if (tempoRestante <= 0) {
-      return 'Calculando...';
-    }
-
-    final minutos = (tempoRestante / 60).ceil();
-
-    return '$minutos min';
-  }
-
-  // ============================================================
-  // TEXTO DO TRÂNSITO
-  // ============================================================
-
-  String obterTextoTransito() {
-    switch (nivelTransito) {
-      case TrafficDelaySeverity.light:
-        return 'Trânsito leve';
-
-      case TrafficDelaySeverity.medium:
-        return 'Trânsito médio';
-
-      case TrafficDelaySeverity.heavy:
-        return 'Trânsito intenso';
-
-      case TrafficDelaySeverity.noData:
-        return 'Sem dados';
-    }
+      tipoSolicitacao = null;
+    });
   }
 
   // ============================================================
@@ -293,50 +330,43 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text(
-          'Navegação',
-          style: TextStyle(color: CupertinoColors.black),
-        ),
-      ),
+    return navegacaoInicializada
+        ? SafeArea(
+            child: Stack(
+              children: [
+                // ==================================================
+                // MAPA
+                // ==================================================
 
-      child: navegacaoInicializada
-          ? SafeArea(
-              child: Stack(
-                children: [
-                  // ==================================================
-                  // MAPA
-                  // ==================================================
+                Positioned.fill(
+                  child: GoogleMapsNavigationView(
+                    onViewCreated: (controller) async {
+                      mapController = controller;
 
-                  Positioned.fill(
-                    child: GoogleMapsNavigationView(
-                      onViewCreated: (controller) async {
-                        mapController = controller;
+                      await controller.setMyLocationEnabled(true);
 
-                        await controller.setMyLocationEnabled(true);
+                      await controller.followMyLocation(
+                        CameraPerspective.tilted,
+                        zoomLevel: 18,
+                      );
 
-                        await controller.followMyLocation(
-                          CameraPerspective.tilted,
-                          zoomLevel: 18,
-                        );
-
-                        print('Mapa criado');
-                      },
-                    ),
+                      print('Mapa criado');
+                    },
                   ),
+                ),
 
-                  // ==================================================
-                  // LISTA DE PASSAGEIROS
-                  // ==================================================
+                // ==================================================
+                // PAINEL INFERIOR
+                //
+                // Só aparece quando NÃO existe navegação ativa.
+                // ==================================================
+                if (!navegacaoAtiva)
                   Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
-
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-
                       curve: Curves.easeInOut,
 
                       height: listaExpandida ? 500 : 100,
@@ -368,40 +398,52 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
                           // ========================================
 
                           SizedBox(
+                            height: 45,
                             width: double.infinity,
+
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
                                   listaExpandida = !listaExpandida;
+
+                                  // Se fechar a lista,
+                                  // volta para a lista principal.
+                                  if (!listaExpandida) {
+                                    mostrandoPassageiro = false;
+
+                                    solicitacaoSelecionada = null;
+
+                                    tipoSolicitacao = null;
+                                  }
                                 });
                               },
 
-                              child: SizedBox(
-                                width: double.infinity,
+                              child: Center(
+                                child: Icon(
+                                  listaExpandida
+                                      ? CupertinoIcons.chevron_down
+                                      : CupertinoIcons.chevron_up,
 
-                                height: 45,
+                                  size: 20,
 
-                                child: Center(
-                                  child: Icon(
-                                    listaExpandida
-                                        ? CupertinoIcons.chevron_down
-                                        : CupertinoIcons.chevron_up,
-
-                                    size: 20,
-
-                                    color: CupertinoColors.systemBlue,
-                                  ),
+                                  color: CupertinoColors.systemBlue,
                                 ),
                               ),
                             ),
                           ),
 
                           // ========================================
-                          // LISTA
+                          // CONTEÚDO
                           // ========================================
                           Expanded(
-                            child: listaExpandida
-                                ? const ListaPassageiros()
+                            child:
+                                mostrandoPassageiro &&
+                                    solicitacaoSelecionada != null
+                                ? _construirDrawer()
+                                : listaExpandida
+                                ? ListaPassageiros(
+                                    onPassageiroSelecionado: abrirPassageiro,
+                                  )
                                 : const SizedBox(),
                           ),
                         ],
@@ -409,36 +451,67 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
                     ),
                   ),
 
-                  // ==================================================
-                  // BOTÃO DE NAVEGAÇÃO
-                  // ==================================================
+                // ==================================================
+                // BOTÃO FINALIZAR
+                //
+                // Só aparece durante a navegação.
+                // ==================================================
+                if (navegacaoAtiva)
                   Positioned(
                     left: 12,
                     right: 12,
                     bottom: 12,
 
                     child: CupertinoButton.filled(
-                      onPressed: iniciandoNavegacao
-                          ? null
-                          : navegacaoAtiva
-                          ? finalizarNavegacao
-                          : iniciarNavegacao,
+                      onPressed: iniciandoNavegacao ? null : finalizarNavegacao,
 
-                      child: Text(
-                        iniciandoNavegacao
-                            ? 'Calculando rota...'
-                            : navegacaoAtiva
-                            ? 'Finalizar navegação'
-                            : 'Iniciar navegação',
-
-                        style: const TextStyle(color: CupertinoColors.white),
+                      child: const Text(
+                        'Finalizar navegação',
+                        style: TextStyle(color: CupertinoColors.white),
                       ),
                     ),
                   ),
-                ],
-              ),
-            )
-          : const Center(child: CupertinoActivityIndicator()),
+
+                // ==================================================
+                // LOADING
+                // ==================================================
+                if (iniciandoNavegacao)
+                  Positioned.fill(
+                    child: Container(
+                      color: CupertinoColors.black.withOpacity(0.15),
+
+                      child: const Center(
+                        child: CupertinoActivityIndicator(radius: 15),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          )
+        : const Center(child: CupertinoActivityIndicator());
+  }
+
+  // ============================================================
+  // CONSTRUIR DRAWER
+  // ============================================================
+
+  Widget _construirDrawer() {
+    if (tipoSolicitacao == TipoSolicitacao.entrega) {
+      return DrawerEntrega(
+        entrega: solicitacaoSelecionada!,
+
+        onIniciar: iniciarNavegacao,
+
+        onVoltar: voltarParaLista,
+      );
+    }
+
+    return DrawerCorrida(
+      corrida: solicitacaoSelecionada!,
+
+      onIniciar: iniciarNavegacao,
+
+      onVoltar: voltarParaLista,
     );
   }
 
@@ -448,8 +521,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
   @override
   void dispose() {
-    distanciaListener?.cancel();
-
     if (navegacaoInicializada) {
       GoogleMapsNavigator.cleanup();
     }

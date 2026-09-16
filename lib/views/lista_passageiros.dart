@@ -1,15 +1,59 @@
 import 'package:flutter/cupertino.dart';
 
 class ListaPassageiros extends StatelessWidget {
-  const ListaPassageiros({super.key});
+  final Function(Map<String, dynamic>) onPassageiroSelecionado;
+
+  const ListaPassageiros({super.key, required this.onPassageiroSelecionado});
 
   final List<Map<String, dynamic>> passageiros = const [
-    {'nome': 'Haley James', 'avaliacao': 5},
-    {'nome': 'Nathan Scott', 'avaliacao': 5},
-    {'nome': 'Brooke Davis', 'avaliacao': 5},
-    {'nome': 'Jamie Scott', 'avaliacao': 5},
-    {'nome': 'Marvin McFadden', 'avaliacao': 5},
-    {'nome': 'Antwon Taylor', 'avaliacao': 5},
+    {
+      'nome': 'Haley James',
+      'avaliacao': 5,
+      'tipo': 'corrida',
+      // Centro
+      'latitude': -17.3015,
+      'longitude': -48.2765,
+    },
+    {
+      'nome': 'Nathan Scott',
+      'avaliacao': 5,
+      'tipo': 'entrega',
+      // Alto da Baronesa
+      'latitude': -17.2958,
+      'longitude': -48.2740,
+    },
+    {
+      'nome': 'Brooke Davis',
+      'avaliacao': 3,
+      'tipo': 'corrida',
+      // Jardim Guanabara
+      'latitude': -17.3075,
+      'longitude': -48.2705,
+    },
+    {
+      'nome': 'Jamie Scott',
+      'avaliacao': 5,
+      'tipo': 'entrega',
+      // Parque Santana
+      'latitude': -17.3105,
+      'longitude': -48.2835,
+    },
+    {
+      'nome': 'Marvin McFadden',
+      'avaliacao': 5,
+      'tipo': 'corrida',
+      // Jardim JK
+      'latitude': -17.2965,
+      'longitude': -48.2860,
+    },
+    {
+      'nome': 'Antwon Taylor',
+      'avaliacao': 5,
+      'tipo': 'entrega',
+      // Setor Industrial
+      'latitude': -17.3135,
+      'longitude': -48.2725,
+    },
   ];
 
   @override
@@ -22,63 +66,96 @@ class ListaPassageiros extends StatelessWidget {
       itemBuilder: (context, index) {
         final passageiro = passageiros[index];
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        final String nome = passageiro['nome'];
+        final int avaliacao = passageiro['avaliacao'];
+        final String tipo = passageiro['tipo'];
 
-          child: Row(
-            children: [
-              // ==========================================
-              // FOTO
-              // ==========================================
+        return GestureDetector(
+          onTap: () {
+            onPassageiroSelecionado(passageiro);
+          },
 
-              Container(
-                width: 48,
-                height: 48,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
 
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEAF3FF),
-                  borderRadius: BorderRadius.circular(14),
-                ),
+            child: Row(
+              children: [
+                // ==================================================
+                // FOTO / ÍCONE
+                // ==================================================
 
-                child: const Icon(
-                  CupertinoIcons.person_fill,
-                  size: 30,
-                  color: Color(0xFF9ED0FF),
-                ),
-              ),
+                Container(
+                  width: 48,
+                  height: 48,
 
-              const SizedBox(width: 24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF3FF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
 
-              // ==========================================
-              // NOME
-              // ==========================================
-              Expanded(
-                child: Text(
-                  passageiro['nome'],
+                  child: Icon(
+                    tipo == 'corrida'
+                        ? CupertinoIcons.person_fill
+                        : CupertinoIcons.cube_box_fill,
 
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: CupertinoColors.black,
+                    size: 30,
+
+                    color: const Color(0xFF9ED0FF),
                   ),
                 ),
-              ),
 
-              // ==========================================
-              // ESTRELAS
-              // ==========================================
-              Row(
-                mainAxisSize: MainAxisSize.min,
+                const SizedBox(width: 24),
 
-                children: List.generate(passageiro['avaliacao'], (index) {
-                  return const Icon(
-                    CupertinoIcons.star_fill,
-                    size: 11,
-                    color: CupertinoColors.systemBlue,
-                  );
-                }),
-              ),
-            ],
+                // ==================================================
+                // INFORMAÇÕES
+                // ==================================================
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+
+                    children: [
+                      // NOME
+                      Text(
+                        nome,
+
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: CupertinoColors.black,
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      // TIPO
+                      Text(
+                        tipo == 'corrida' ? 'Corrida' : 'Entrega',
+
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: CupertinoColors.systemGrey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ==================================================
+                // AVALIAÇÃO
+                // ==================================================
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+
+                  children: List.generate(avaliacao, (index) {
+                    return const Icon(
+                      CupertinoIcons.star_fill,
+                      size: 11,
+                      color: CupertinoColors.systemBlue,
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
         );
       },
