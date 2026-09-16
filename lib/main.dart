@@ -5,6 +5,7 @@ import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/login_page.dart';
+import 'package:route_pires_flutter/views/teste_navegacao_page.dart';
 
 void main() {
   runApp(
@@ -32,7 +33,7 @@ class MeuApp extends StatelessWidget {
         textTheme: CupertinoTextThemeData(textStyle: GoogleFonts.inter()),
       ),
 
-      home: const LoginPage(),
+      home: const TesteNavegacaoPage(),
     );
   }
 }
