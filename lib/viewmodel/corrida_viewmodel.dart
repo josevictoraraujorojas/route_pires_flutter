@@ -64,9 +64,12 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
     avisar();
 
     try {
-      _motoristas = await _mototaxistaRepository.listar(
+      final lista = await _mototaxistaRepository.listar(
         cancelToken: _cancelLista,
       );
+      _motoristas = lista
+          .where((mototaxista) => mototaxista.disponivel)
+          .toList();
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
       _motoristas = const [];
