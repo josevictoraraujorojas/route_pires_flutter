@@ -5,54 +5,129 @@ class ListaPassageiros extends StatelessWidget {
 
   const ListaPassageiros({super.key, required this.onPassageiroSelecionado});
 
+  // ============================================================
+  // LISTA DE SOLICITAÇÕES
+  // ============================================================
+
   final List<Map<String, dynamic>> passageiros = const [
     {
       'nome': 'Haley James',
       'avaliacao': 5,
       'tipo': 'corrida',
+
+      // ----------------------------------------------------------
+      // LOCAL DO CLIENTE
       // Centro
-      'latitude': -17.3015,
-      'longitude': -48.2765,
+      // ----------------------------------------------------------
+      'latitude_cliente': -17.3015,
+      'longitude_cliente': -48.2765,
+
+      // ----------------------------------------------------------
+      // DESTINO FINAL
+      // Jardim Guanabara
+      // ----------------------------------------------------------
+      'latitude_destino': -17.3075,
+      'longitude_destino': -48.2705,
     },
+
     {
       'nome': 'Nathan Scott',
       'avaliacao': 5,
       'tipo': 'entrega',
+
+      // ----------------------------------------------------------
+      // LOCAL DO CLIENTE
       // Alto da Baronesa
-      'latitude': -17.2958,
-      'longitude': -48.2740,
+      // ----------------------------------------------------------
+      'latitude_cliente': -17.2958,
+      'longitude_cliente': -48.2740,
+
+      // ----------------------------------------------------------
+      // DESTINO FINAL
+      // Parque Santana
+      // ----------------------------------------------------------
+      'latitude_destino': -17.3105,
+      'longitude_destino': -48.2835,
     },
+
     {
       'nome': 'Brooke Davis',
       'avaliacao': 3,
       'tipo': 'corrida',
+
+      // ----------------------------------------------------------
+      // LOCAL DO CLIENTE
       // Jardim Guanabara
-      'latitude': -17.3075,
-      'longitude': -48.2705,
+      // ----------------------------------------------------------
+      'latitude_cliente': -17.3075,
+      'longitude_cliente': -48.2705,
+
+      // ----------------------------------------------------------
+      // DESTINO FINAL
+      // Jardim JK
+      // ----------------------------------------------------------
+      'latitude_destino': -17.2965,
+      'longitude_destino': -48.2860,
     },
+
     {
       'nome': 'Jamie Scott',
       'avaliacao': 5,
       'tipo': 'entrega',
+
+      // ----------------------------------------------------------
+      // LOCAL DO CLIENTE
       // Parque Santana
-      'latitude': -17.3105,
-      'longitude': -48.2835,
+      // ----------------------------------------------------------
+      'latitude_cliente': -17.3105,
+      'longitude_cliente': -48.2835,
+
+      // ----------------------------------------------------------
+      // DESTINO FINAL
+      // Setor Industrial
+      // ----------------------------------------------------------
+      'latitude_destino': -17.3135,
+      'longitude_destino': -48.2725,
     },
+
     {
       'nome': 'Marvin McFadden',
       'avaliacao': 5,
       'tipo': 'corrida',
+
+      // ----------------------------------------------------------
+      // LOCAL DO CLIENTE
       // Jardim JK
-      'latitude': -17.2965,
-      'longitude': -48.2860,
+      // ----------------------------------------------------------
+      'latitude_cliente': -17.2965,
+      'longitude_cliente': -48.2860,
+
+      // ----------------------------------------------------------
+      // DESTINO FINAL
+      // Centro
+      // ----------------------------------------------------------
+      'latitude_destino': -17.3015,
+      'longitude_destino': -48.2765,
     },
+
     {
       'nome': 'Antwon Taylor',
       'avaliacao': 5,
       'tipo': 'entrega',
+
+      // ----------------------------------------------------------
+      // LOCAL DO CLIENTE
       // Setor Industrial
-      'latitude': -17.3135,
-      'longitude': -48.2725,
+      // ----------------------------------------------------------
+      'latitude_cliente': -17.3135,
+      'longitude_cliente': -48.2725,
+
+      // ----------------------------------------------------------
+      // DESTINO FINAL
+      // Alto da Baronesa
+      // ----------------------------------------------------------
+      'latitude_destino': -17.2958,
+      'longitude_destino': -48.2740,
     },
   ];
 
@@ -72,6 +147,8 @@ class ListaPassageiros extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
+            // Envia TODOS os dados da solicitação
+            // para a página principal.
             onPassageiroSelecionado(passageiro);
           },
 
@@ -81,7 +158,7 @@ class ListaPassageiros extends StatelessWidget {
             child: Row(
               children: [
                 // ==================================================
-                // FOTO / ÍCONE
+                // ÍCONE
                 // ==================================================
 
                 Container(
@@ -114,7 +191,6 @@ class ListaPassageiros extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
 
                     children: [
-                      // NOME
                       Text(
                         nome,
 
@@ -127,7 +203,6 @@ class ListaPassageiros extends StatelessWidget {
 
                       const SizedBox(height: 4),
 
-                      // TIPO
                       Text(
                         tipo == 'corrida' ? 'Corrida' : 'Entrega',
 

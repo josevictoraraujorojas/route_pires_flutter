@@ -39,10 +39,12 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
   TipoSolicitacao? tipoSolicitacao;
 
   // ============================================================
-  // DESTINO
+  // DESTINOS
   // ============================================================
 
-  NavigationWaypoint? destino;
+  NavigationWaypoint? destinoCliente;
+
+  NavigationWaypoint? destinoFinal;
 
   // ============================================================
   // CONTROLLER DO MAPA
@@ -78,46 +80,92 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
   }
 
   // ============================================================
-  // CRIAR DESTINO
-  // ============================================================
-
-  void criarDestino() {
-    if (solicitacaoSelecionada == null) {
-      throw Exception('Nenhuma solicitação selecionada.');
-    }
-
-    final double latitude = (solicitacaoSelecionada!['latitude'] as num)
-        .toDouble();
-
-    final double longitude = (solicitacaoSelecionada!['longitude'] as num)
-        .toDouble();
-
-    final String nome =
-        solicitacaoSelecionada!['nome']?.toString() ?? 'Destino';
-
-    destino = NavigationWaypoint.withLatLngTarget(
-      title: nome,
-      target: LatLng(latitude: latitude, longitude: longitude),
-    );
-
-    print('=================================');
-    print('DESTINO DA SOLICITAÇÃO');
-    print('Nome: $nome');
-    print('Latitude: $latitude');
-    print('Longitude: $longitude');
-    print('=================================');
-  }
-
-  // ============================================================
   // CRIAR DESTINOS
   // ============================================================
 
   Destinations criarDestinos() {
-    criarDestino();
+    if (solicitacaoSelecionada == null) {
+      throw Exception('Nenhuma solicitação selecionada.');
+    }
+
+    // ==========================================================
+    // DADOS DO CLIENTE
+    // ==========================================================
+
+    final double latitudeCliente = double.parse(
+      solicitacaoSelecionada!['latitude_cliente'].toString(),
+    );
+
+    final double longitudeCliente = double.parse(
+      solicitacaoSelecionada!['longitude_cliente'].toString(),
+    );
+
+    // ==========================================================
+    // DADOS DO DESTINO FINAL
+    // ==========================================================
+
+    final double latitudeDestino = double.parse(
+      solicitacaoSelecionada!['latitude_destino'].toString(),
+    );
+
+    final double longitudeDestino = double.parse(
+      solicitacaoSelecionada!['longitude_destino'].toString(),
+    );
+
+    final String nome =
+        solicitacaoSelecionada!['nome']?.toString() ?? 'Cliente';
+
+    // ==========================================================
+    // WAYPOINT DO CLIENTE
+    // ==========================================================
+
+    destinoCliente = NavigationWaypoint.withLatLngTarget(
+      title: nome,
+
+      target: LatLng(latitude: latitudeCliente, longitude: longitudeCliente),
+    );
+
+    // ==========================================================
+    // WAYPOINT DO DESTINO FINAL
+    // ==========================================================
+
+    destinoFinal = NavigationWaypoint.withLatLngTarget(
+      title: 'Destino final',
+
+      target: LatLng(latitude: latitudeDestino, longitude: longitudeDestino),
+    );
+
+    // ==========================================================
+    // LOG
+    // ==========================================================
+
+    print('=================================');
+    print('DESTINOS DA SOLICITAÇÃO');
+    print('=================================');
+
+    print('Cliente: $nome');
+
+    print('Latitude cliente: $latitudeCliente');
+
+    print('Longitude cliente: $longitudeCliente');
+
+    print('---------------------------------');
+
+    print('Latitude destino: $latitudeDestino');
+
+    print('Longitude destino: $longitudeDestino');
+
+    print('=================================');
+
+    // ==========================================================
+    // RETORNA OS DOIS DESTINOS
+    // ==========================================================
 
     return Destinations(
-      waypoints: [destino!],
+      waypoints: [destinoCliente!, destinoFinal!],
+
       displayOptions: NavigationDisplayOptions(),
+
       routingOptions: criarOpcoesDeRota(),
     );
   }
@@ -150,21 +198,25 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
       print('Solicitação: $solicitacaoSelecionada');
       print('=================================');
 
-      // ----------------------------------------------------------
-      // CRIAR DESTINO
-      // ----------------------------------------------------------
+      // ========================================================
+      // CRIAR OS DOIS DESTINOS
+      // ========================================================
 
-      print('Criando destino...');
+      print('Criando destinos...');
 
       final destinos = criarDestinos();
 
-      // ----------------------------------------------------------
+      // ========================================================
       // CALCULAR ROTA
-      // ----------------------------------------------------------
+      // ========================================================
 
       print('Calculando rota...');
 
       final status = await GoogleMapsNavigator.setDestinations(destinos);
+
+      // ========================================================
+      // VERIFICAR STATUS
+      // ========================================================
 
       if (status != NavigationRouteStatus.statusOk) {
         print('Erro ao calcular rota: $status');
@@ -180,17 +232,17 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
       print('Rota calculada com sucesso!');
 
-      // ----------------------------------------------------------
+      // ========================================================
       // INICIAR GUIDANCE
-      // ----------------------------------------------------------
+      // ========================================================
 
       await GoogleMapsNavigator.startGuidance();
 
       print('Navegação iniciada!');
 
-      // ----------------------------------------------------------
+      // ========================================================
       // ESCONDER LISTA E DRAWER
-      // ----------------------------------------------------------
+      // ========================================================
 
       if (!mounted) return;
 
@@ -226,25 +278,25 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
     print('=================================');
 
     try {
-      // ----------------------------------------------------------
+      // ========================================================
       // PARAR NAVEGAÇÃO
-      // ----------------------------------------------------------
+      // ========================================================
 
       await GoogleMapsNavigator.stopGuidance();
 
       print('Guidance finalizado.');
 
-      // ----------------------------------------------------------
-      // REMOVER ROTA DO MAPA
-      // ----------------------------------------------------------
+      // ========================================================
+      // REMOVER ROTA
+      // ========================================================
 
       await GoogleMapsNavigator.clearDestinations();
 
       print('Rota removida do mapa.');
 
-      // ----------------------------------------------------------
+      // ========================================================
       // LIMPAR ESTADOS
-      // ----------------------------------------------------------
+      // ========================================================
 
       if (!mounted) return;
 
@@ -261,7 +313,9 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
         listaExpandida = true;
 
-        destino = null;
+        destinoCliente = null;
+
+        destinoFinal = null;
       });
 
       print('Lista voltou.');
@@ -275,16 +329,18 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
   // ============================================================
 
   void abrirPassageiro(Map<String, dynamic> solicitacao) {
-    // ----------------------------------------------------------
-    // Descobre o tipo da solicitação
-    //
-    // Se não existir "tipo", considera como corrida.
-    // ----------------------------------------------------------
-
     final String tipo =
         solicitacao['tipo']?.toString().toLowerCase() ?? 'corrida';
 
     setState(() {
+      // Aqui guardamos TODOS os dados.
+      //
+      // Isso inclui:
+      // latitude_cliente
+      // longitude_cliente
+      // latitude_destino
+      // longitude_destino
+
       solicitacaoSelecionada = solicitacao;
 
       mostrandoPassageiro = true;
@@ -296,7 +352,12 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
       }
     });
 
-    print('Solicitação selecionada: $tipoSolicitacao');
+    print(
+      'Solicitação selecionada: '
+      '$tipoSolicitacao',
+    );
+
+    print('Dados: $solicitacao');
   }
 
   // ============================================================
@@ -357,16 +418,16 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
                 // ==================================================
                 // PAINEL INFERIOR
-                //
-                // Só aparece quando NÃO existe navegação ativa.
                 // ==================================================
                 if (!navegacaoAtiva)
                   Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
+
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
+
                       curve: Curves.easeInOut,
 
                       height: listaExpandida ? 500 : 100,
@@ -406,8 +467,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
                                 setState(() {
                                   listaExpandida = !listaExpandida;
 
-                                  // Se fechar a lista,
-                                  // volta para a lista principal.
                                   if (!listaExpandida) {
                                     mostrandoPassageiro = false;
 
@@ -453,8 +512,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
                 // ==================================================
                 // BOTÃO FINALIZAR
-                //
-                // Só aparece durante a navegação.
                 // ==================================================
                 if (navegacaoAtiva)
                   Positioned(
@@ -467,6 +524,7 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
                       child: const Text(
                         'Finalizar navegação',
+
                         style: TextStyle(color: CupertinoColors.white),
                       ),
                     ),
