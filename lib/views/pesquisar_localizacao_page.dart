@@ -19,7 +19,7 @@ class PesquisarLocalizacaoPage extends StatefulWidget {
 
   final String titulo;
   final LocalizacaoPonto? pontoInicial;
-  final ValueChanged<LocalizacaoPonto>? onSelecionar;
+  final Future<void> Function(LocalizacaoPonto ponto)? onSelecionar;
   final LocalizacaoRepository? repository;
 
   @override
@@ -40,6 +40,7 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
   bool identificando = false;
   int versaoBusca = 0;
   int versaoEndereco = 0;
+  bool selecionando = false;
 
   @override
   void initState() {
@@ -55,9 +56,19 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
     super.dispose();
   }
 
-  void selecionar(LocalizacaoPonto ponto) {
-    final callback = widget.onSelecionar;
-    callback != null ? callback(ponto) : Navigator.pop(context, ponto);
+  Future<void> selecionar(LocalizacaoPonto ponto) async {
+    if (selecionando) return;
+    setState(() => selecionando = true);
+    try {
+      final callback = widget.onSelecionar;
+      if (callback != null) {
+        await callback(ponto);
+      } else if (mounted) {
+        Navigator.pop(context, ponto);
+      }
+    } finally {
+      if (mounted) setState(() => selecionando = false);
+    }
   }
 
   void limparBusca() {
@@ -215,7 +226,8 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
                         padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                         child: BotaoPrimario(
                           texto: 'SELECIONAR',
-                          onPressed: pontoMapa == null || identificando
+                          onPressed:
+                              pontoMapa == null || identificando || selecionando
                               ? null
                               : () => selecionar(pontoMapa!),
                         ),
@@ -252,7 +264,9 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 14,
                                   ),
-                                  onPressed: () => selecionar(endereco),
+                                  onPressed: selecionando
+                                      ? null
+                                      : () => selecionar(endereco),
                                   child: Row(
                                     children: [
                                       const Icon(

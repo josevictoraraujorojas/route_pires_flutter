@@ -1,39 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
 import 'package:route_pires_flutter/views/termos_de_uso.dart';
 
 class CadastroMototaxista3Page extends StatefulWidget {
-  final String nome;
-  final String email;
-  final String telefone;
-  final String senha;
-
-  final String cnh;
-  final String dataValidade;
-
-  final String placa;
-  final String renavam;
-  final String modelo;
-  final String ano;
-  final bool aceitouTermos;
-
-  const CadastroMototaxista3Page({
-    super.key,
-    this.nome = "",
-    this.email = "",
-    this.telefone = "",
-    this.senha = "",
-    this.cnh = "",
-    this.dataValidade = "",
-    this.placa = "",
-    this.renavam = "",
-    this.modelo = "",
-    this.ano = "",
-    this.aceitouTermos = false,
-  });
+  const CadastroMototaxista3Page({super.key});
 
   @override
   State<CadastroMototaxista3Page> createState() =>
@@ -53,13 +25,12 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
   @override
   void initState() {
     super.initState();
-
-    _placaController.text = widget.placa;
-    _renavamController.text = widget.renavam;
-    _modeloController.text = widget.modelo;
-    _anoController.text = widget.ano;
-
-    aceitouTermos = widget.aceitouTermos;
+    final rascunho = context.read<MototaxistaViewModel>().rascunho;
+    _placaController.text = rascunho.placa;
+    _renavamController.text = rascunho.renavam;
+    _modeloController.text = rascunho.modelo;
+    _anoController.text = rascunho.ano;
+    aceitouTermos = rascunho.aceitouTermos;
   }
 
   @override
@@ -82,27 +53,22 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
     return valor;
   }
 
+  void _salvarRascunho() {
+    final rascunho = context.read<MototaxistaViewModel>().rascunho;
+    rascunho.placa = _placaController.text;
+    rascunho.renavam = _renavamController.text;
+    rascunho.modelo = _modeloController.text;
+    rascunho.ano = _anoController.text;
+    rascunho.aceitouTermos = aceitouTermos;
+  }
+
   Future<void> finalizarCadastro() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    final cadastro = MototaxistaCadastro(
-      nome: widget.nome.trim(),
-      email: widget.email.trim(),
-      senha: widget.senha,
-      telefone: widget.telefone,
-      cnh: widget.cnh.trim(),
-      dataValidade: widget.dataValidade.trim(),
-      placa: _placaController.text.trim(),
-      renavam: _renavamController.text.trim(),
-      modelo: _modeloController.text.trim(),
-      ano: _anoController.text.trim(),
-    );
-
+    _salvarRascunho();
     final cadastroViewModel = context.read<MototaxistaViewModel>();
-
-    final cadastrou = await cadastroViewModel.cadastrar(cadastro);
+    final cadastrou = await cadastroViewModel.cadastrar();
 
     if (!mounted) {
       return;
@@ -135,13 +101,8 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
   }
 
   void voltar() {
-    Navigator.pop(context, {
-      "placa": _placaController.text,
-      "renavam": _renavamController.text,
-      "modelo": _modeloController.text,
-      "ano": _anoController.text,
-      "aceitouTermos": aceitouTermos,
-    });
+    _salvarRascunho();
+    Navigator.pop(context);
   }
 
   @override

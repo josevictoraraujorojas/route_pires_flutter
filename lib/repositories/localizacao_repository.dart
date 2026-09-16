@@ -14,7 +14,10 @@ class LocalizacaoRepository {
               ),
               connectTimeout: const Duration(seconds: 10),
               receiveTimeout: const Duration(seconds: 10),
-              headers: const {'Accept': 'application/json'},
+              headers: const {
+                'Accept': 'application/json',
+                'User-Agent': 'RoutePiresFlutter/1.0',
+              },
             ),
           );
 
@@ -41,7 +44,10 @@ class LocalizacaoRepository {
     final resultado = features is List
         ? features.map(_ponto).whereType<LocalizacaoPonto>().toList()
         : <LocalizacaoPonto>[];
-    return _buscas[chave] = resultado;
+    if (resultado.isNotEmpty) {
+      _buscas[chave] = resultado;
+    }
+    return resultado;
   }
 
   Future<LocalizacaoPonto> endereco(LatLng ponto) async {

@@ -1,26 +1,23 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/safe_change_notifier.dart';
 import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/repositories/cadastro_passageiro_repository.dart';
 
-class CadastroPassageiroViewModel extends ChangeNotifier {
+class CadastroPassageiroViewModel extends ChangeNotifier
+    with SafeChangeNotifier {
   final CadastroPassageiroRepository _repository;
 
   CadastroPassageiroViewModel({CadastroPassageiroRepository? repository})
     : _repository = repository ?? CadastroPassageiroRepository();
 
   bool _carregando = false;
-  bool _disposed = false;
   String? _erro;
 
   bool get carregando => _carregando;
 
   String? get erro => _erro;
-
-  void _avisar() {
-    if (!_disposed) notifyListeners();
-  }
 
   Future<bool> cadastrar({
     required String nome,
@@ -33,19 +30,19 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
 
     if (!senhaValida(senha)) {
       _erro = mensagemSenhaInvalida;
-      _avisar();
+      avisar();
       return false;
     }
 
     if (telefoneDigitos.length < 10 || telefoneDigitos.length > 11) {
       _erro = 'Informe um telefone com DDD (10 ou 11 dígitos).';
-      _avisar();
+      avisar();
       return false;
     }
 
     _carregando = true;
     _erro = null;
-    _avisar();
+    avisar();
 
     try {
       await _repository.cadastrar(
@@ -70,13 +67,7 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
       return false;
     } finally {
       _carregando = false;
-      _avisar();
+      avisar();
     }
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
   }
 }

@@ -7,7 +7,24 @@ class FalhaLocalizacao implements Exception {
   final String mensagem;
 }
 
-Future<LatLng> posicaoAtual() async {
+Future<LatLng>? _emVoo;
+LatLng? _cache;
+DateTime? _cacheEm;
+
+Future<LatLng> posicaoAtual() {
+  final cache = _cache;
+  final cacheEm = _cacheEm;
+  if (cache != null &&
+      cacheEm != null &&
+      DateTime.now().difference(cacheEm) < const Duration(seconds: 8)) {
+    return Future.value(cache);
+  }
+  return _emVoo ??= _lerPosicao().whenComplete(() {
+    _emVoo = null;
+  });
+}
+
+Future<LatLng> _lerPosicao() async {
   final servicoAtivo = await Geolocator.isLocationServiceEnabled();
   if (!servicoAtivo) {
     throw FalhaLocalizacao('Ative a localização do aparelho.');
@@ -33,8 +50,12 @@ Future<LatLng> posicaoAtual() async {
         timeLimit: Duration(seconds: 15),
       ),
     );
-    return LatLng(posicao.latitude, posicao.longitude);
-  } catch (_) {
+    final ponto = LatLng(posicao.latitude, posicao.longitude);
+    _cache = ponto;
+    _cacheEm = DateTime.now();
+    return ponto;
+  } catch (erro) {
+    if (erro is FalhaLocalizacao) rethrow;
     throw FalhaLocalizacao('Não foi possível obter sua localização.');
   }
 }

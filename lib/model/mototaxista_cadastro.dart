@@ -49,3 +49,32 @@ class MototaxistaCadastro {
     };
   }
 }
+
+class MototaxistaRascunho {
+  String nome = '';
+  String email = '';
+  String senha = '';
+  String telefone = '';
+  String cnh = '';
+  String dataValidade = '';
+  String placa = '';
+  String renavam = '';
+  String modelo = '';
+  String ano = '';
+  bool aceitouTermos = false;
+
+  MototaxistaCadastro paraCadastro() {
+    return MototaxistaCadastro(
+      nome: nome,
+      email: email,
+      senha: senha,
+      telefone: telefone,
+      cnh: cnh,
+      dataValidade: dataValidade,
+      placa: placa,
+      renavam: renavam,
+      modelo: modelo,
+      ano: ano,
+    );
+  }
+}

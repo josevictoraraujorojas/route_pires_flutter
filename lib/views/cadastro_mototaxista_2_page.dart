@@ -1,36 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_3_page.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
 
 class CadastroMototaxista2Page extends StatefulWidget {
-  final String nome;
-  final String email;
-  final String telefone;
-  final String senha;
-
-  final String cnh;
-  final String dataValidade;
-
-  final String placa;
-  final String renavam;
-  final String modelo;
-  final String ano;
-  final bool aceitouTermos;
-
-  const CadastroMototaxista2Page({
-    super.key,
-    required this.nome,
-    required this.email,
-    required this.telefone,
-    required this.senha,
-    this.cnh = "",
-    this.dataValidade = "",
-    this.placa = "",
-    this.renavam = "",
-    this.modelo = "",
-    this.ano = "",
-    this.aceitouTermos = false,
-  });
+  const CadastroMototaxista2Page({super.key});
 
   @override
   State<CadastroMototaxista2Page> createState() =>
@@ -43,24 +18,12 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
   final _cnhController = TextEditingController();
   final _dataValidadeController = TextEditingController();
 
-  String placa = "";
-  String renavam = "";
-  String modelo = "";
-  String ano = "";
-  bool aceitouTermos = false;
-
   @override
   void initState() {
     super.initState();
-
-    _cnhController.text = widget.cnh;
-    _dataValidadeController.text = widget.dataValidade;
-
-    placa = widget.placa;
-    renavam = widget.renavam;
-    modelo = widget.modelo;
-    ano = widget.ano;
-    aceitouTermos = widget.aceitouTermos;
+    final rascunho = context.read<MototaxistaViewModel>().rascunho;
+    _cnhController.text = rascunho.cnh;
+    _dataValidadeController.text = rascunho.dataValidade;
   }
 
   @override
@@ -91,52 +54,24 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
         '${valor.substring(4)}';
   }
 
+  void _salvarRascunho() {
+    final rascunho = context.read<MototaxistaViewModel>().rascunho;
+    rascunho.cnh = _cnhController.text;
+    rascunho.dataValidade = _dataValidadeController.text;
+  }
+
   Future<void> irParaProximoPasso() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final resultado = await Navigator.push(
+    if (!_formKey.currentState!.validate()) return;
+    _salvarRascunho();
+    await Navigator.push(
       context,
-      CupertinoPageRoute(
-        builder: (context) => CadastroMototaxista3Page(
-          nome: widget.nome,
-          email: widget.email,
-          telefone: widget.telefone,
-          senha: widget.senha,
-          cnh: _cnhController.text,
-          dataValidade: _dataValidadeController.text,
-          placa: placa,
-          renavam: renavam,
-          modelo: modelo,
-          ano: ano,
-          aceitouTermos: aceitouTermos,
-        ),
-      ),
+      CupertinoPageRoute(builder: (_) => const CadastroMototaxista3Page()),
     );
-
-    if (resultado != null) {
-      setState(() {
-        placa = resultado["placa"];
-        renavam = resultado["renavam"];
-        modelo = resultado["modelo"];
-        ano = resultado["ano"];
-        aceitouTermos = resultado["aceitouTermos"];
-      });
-    }
   }
 
   void voltar() {
-    Navigator.pop(context, {
-      "cnh": _cnhController.text,
-      "dataValidade": _dataValidadeController.text,
-
-      "placa": placa,
-      "renavam": renavam,
-      "modelo": modelo,
-      "ano": ano,
-      "aceitouTermos": aceitouTermos,
-    });
+    _salvarRascunho();
+    Navigator.pop(context);
   }
 
   @override

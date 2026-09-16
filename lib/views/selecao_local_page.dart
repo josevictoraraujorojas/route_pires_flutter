@@ -96,6 +96,7 @@ class _SelecaoLocalPageState extends State<SelecaoLocalPage> {
   Widget build(BuildContext context) {
     return PesquisarLocalizacaoPage(
       titulo: 'Local de Término',
+      repository: repository,
       onSelecionar: aoSelecionarDestino,
     );
   }

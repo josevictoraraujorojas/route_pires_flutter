@@ -1,8 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart';
-import 'package:route_pires_flutter/views/campo_formulario.dart';
+import 'package:route_pires_flutter/views/dados_pessoais_form.dart';
 import 'package:route_pires_flutter/views/termos_de_uso.dart';
 
 class CadastroPassageiroPage extends StatefulWidget {
@@ -14,48 +13,23 @@ class CadastroPassageiroPage extends StatefulWidget {
 
 class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
   final _formKey = GlobalKey<FormState>();
-
-  final nomeController = TextEditingController();
-  final emailController = TextEditingController();
-  final telefoneController = TextEditingController();
-  final senhaController = TextEditingController();
-  final confirmarSenhaController = TextEditingController();
+  final _dadosKey = GlobalKey<DadosPessoaisFormState>();
 
   bool termosAceitos = false;
-  bool termosErro = false;
-
-  bool senhaVisivel = false;
-  bool confirmarSenhaVisivel = false;
-
-  @override
-  void dispose() {
-    nomeController.dispose();
-    emailController.dispose();
-    telefoneController.dispose();
-    senhaController.dispose();
-    confirmarSenhaController.dispose();
-
-    super.dispose();
-  }
 
   Future<void> finalizarCadastro() async {
     final formValido = _formKey.currentState!.validate();
-
-    setState(() {
-      termosErro = !termosAceitos;
-    });
-
-    if (!formValido || !termosAceitos) {
-      return;
-    }
+    if (!formValido) return;
+    final dados = _dadosKey.currentState;
+    if (dados == null) return;
 
     final viewModel = context.read<CadastroPassageiroViewModel>();
 
     final ok = await viewModel.cadastrar(
-      nome: nomeController.text.trim(),
-      email: emailController.text.trim(),
-      telefone: telefoneController.text,
-      senha: senhaController.text,
+      nome: dados.nome.trim(),
+      email: dados.email.trim(),
+      telefone: dados.telefone,
+      senha: dados.senha,
     );
 
     if (!mounted) return;
@@ -67,7 +41,7 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
           title: const Text('Cadastro'),
           content: Text(
             'Cadastro realizado. Bem-vindo, '
-            '${nomeController.text.trim()}!',
+            '${dados.nome.trim()}!',
           ),
           actions: [
             CupertinoDialogAction(
@@ -105,27 +79,6 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
         ],
       ),
     );
-  }
-
-  String formatarTelefone(String valor) {
-    valor = valor.replaceAll(RegExp(r'\D'), '');
-
-    if (valor.length > 11) {
-      valor = valor.substring(0, 11);
-    }
-
-    if (valor.length <= 2) {
-      return '($valor';
-    }
-
-    if (valor.length <= 7) {
-      return '(${valor.substring(0, 2)}) '
-          '${valor.substring(2)}';
-    }
-
-    return '(${valor.substring(0, 2)}) '
-        '${valor.substring(2, 7)}-'
-        '${valor.substring(7)}';
   }
 
   @override
@@ -175,124 +128,7 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
 
                   const SizedBox(height: 24),
 
-                  CampoFormulario(
-                    label: 'Nome completo',
-                    placeholder: 'Digite seu nome completo',
-                    controller: nomeController,
-
-                    validator: (valor) {
-                      if (valor == null || valor.trim().isEmpty) {
-                        return 'Informe seu nome';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  CampoFormulario(
-                    label: 'E-mail',
-                    placeholder: 'nome@email.com',
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-
-                    validator: (valor) {
-                      if (valor == null || valor.trim().isEmpty) {
-                        return 'Informe seu e-mail';
-                      }
-
-                      if (!valor.contains('@')) {
-                        return 'Informe um e-mail válido';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  CampoFormulario(
-                    label: 'Número de telefone',
-                    placeholder: '(64) 91234-5678',
-                    controller: telefoneController,
-                    keyboardType: TextInputType.phone,
-
-                    onChanged: (valor) {
-                      final telefone = formatarTelefone(valor);
-
-                      telefoneController.value = TextEditingValue(
-                        text: telefone,
-                        selection: TextSelection.collapsed(
-                          offset: telefone.length,
-                        ),
-                      );
-                    },
-
-                    validator: (valor) {
-                      if (valor == null || valor.trim().isEmpty) {
-                        return 'Informe seu telefone';
-                      }
-
-                      if (!RegExp(r'^\(\d{2}\) \d{5}-\d{4}$').hasMatch(valor)) {
-                        return 'Informe um telefone válido';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  CampoFormulario(
-                    label: 'Senha',
-                    placeholder: 'Crie uma senha',
-                    controller: senhaController,
-
-                    senha: true,
-
-                    obscureText: !senhaVisivel,
-
-                    onTap: () {
-                      setState(() {
-                        senhaVisivel = !senhaVisivel;
-                      });
-                    },
-
-                    validator: (valor) {
-                      if (valor == null || valor.trim().isEmpty) {
-                        return 'Crie a senha';
-                      }
-
-                      if (!senhaValida(valor)) {
-                        return mensagemSenhaInvalida;
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  CampoFormulario(
-                    label: 'Confirmar senha',
-                    placeholder: 'Confirme a senha',
-                    controller: confirmarSenhaController,
-
-                    senha: true,
-
-                    obscureText: !confirmarSenhaVisivel,
-
-                    onTap: () {
-                      setState(() {
-                        confirmarSenhaVisivel = !confirmarSenhaVisivel;
-                      });
-                    },
-
-                    validator: (valor) {
-                      if (valor == null || valor.trim().isEmpty) {
-                        return 'Confirme sua senha';
-                      }
-
-                      if (valor != senhaController.text) {
-                        return 'As senhas não coincidem';
-                      }
-
-                      return null;
-                    },
-                  ),
+                  DadosPessoaisForm(key: _dadosKey),
 
                   const SizedBox(height: 8),
 
@@ -302,27 +138,9 @@ class _CadastroPassageiroPageState extends State<CadastroPassageiroPage> {
                     onChanged: (valor) {
                       setState(() {
                         termosAceitos = valor;
-                        termosErro = false;
                       });
                     },
                   ),
-
-                  if (termosErro)
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(
-                        left: 29,
-                        right: 24,
-                        top: 5,
-                      ),
-                      child: const Text(
-                        'Você precisa aceitar os termos de uso',
-                        style: TextStyle(
-                          color: CupertinoColors.systemRed,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
 
                   const SizedBox(height: 20),
 
