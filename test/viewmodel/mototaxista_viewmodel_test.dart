@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -69,6 +71,23 @@ void main() {
       expect(viewModel.erro, isNull);
       expect(viewModel.carregando, isFalse);
     });
+
+    test(
+      'Não deve chamar o repositório duas vezes se já estiver cadastrando',
+      () async {
+        final espera = Completer<void>();
+        when(() => mockRepository.cadastrar(mototaxista))
+            .thenAnswer((_) => espera.future);
+
+        final primeiro = viewModel.cadastrar(mototaxista);
+        final segundo = await viewModel.cadastrar(mototaxista);
+        espera.complete();
+
+        expect(segundo, isFalse);
+        expect(await primeiro, isTrue);
+        verify(() => mockRepository.cadastrar(mototaxista)).called(1);
+      },
+    );
 
     test('Deve retornar dados inválidos no erro 400', () async {
       final erroDio400 = DioException(

@@ -26,6 +26,7 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
   }
 
   Future<bool> cadastrar([MototaxistaCadastro? mototaxista]) async {
+    if (_carregando) return false;
     final cadastro = mototaxista ?? rascunho.paraCadastro();
     if (!senhaValida(cadastro.senha)) {
       _erro = mensagemSenhaInvalida;

@@ -25,6 +25,7 @@ class CadastroPassageiroViewModel extends ChangeNotifier
     required String telefone,
     required String senha,
   }) async {
+    if (_carregando) return false;
     final telefoneDigitos = telefone.replaceAll(RegExp(r'\D'), '');
     final emailLimpo = emailNormalizado(email);
 

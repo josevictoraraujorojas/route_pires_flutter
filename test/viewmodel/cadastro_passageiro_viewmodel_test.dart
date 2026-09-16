@@ -67,6 +67,46 @@ void main() {
       },
     );
 
+    test(
+      'Não deve chamar o repositório duas vezes se já estiver cadastrando',
+      () async {
+        final espera = Completer<void>();
+        when(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).thenAnswer((_) => espera.future);
+
+        final primeiro = viewModel.cadastrar(
+          nome: 'Ana Teste',
+          email: 'Ana@Teste.com',
+          telefone: '(64) 99955-8833',
+          senha: 'senh4b0a',
+        );
+        final segundo = await viewModel.cadastrar(
+          nome: 'Ana Teste',
+          email: 'Ana@Teste.com',
+          telefone: '(64) 99955-8833',
+          senha: 'senh4b0a',
+        );
+        espera.complete();
+
+        expect(segundo, isFalse);
+        expect(await primeiro, isTrue);
+        verify(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).called(1);
+      },
+    );
+
     test('Não deve chamar o repositório quando a senha for fraca', () async {
       final resultado = await viewModel.cadastrar(
         nome: 'Ana Teste',
