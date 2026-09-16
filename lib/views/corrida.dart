@@ -8,18 +8,16 @@ import 'package:route_pires_flutter/views/lista_passageiros.dart';
 
 enum TipoSolicitacao { corrida, entrega }
 
-class TesteNavegacaoPage extends StatefulWidget {
-  const TesteNavegacaoPage({super.key});
+class Corrida extends StatefulWidget {
+  final Function(String) onTituloChanged;
+
+  const Corrida({super.key, required this.onTituloChanged});
 
   @override
-  State<TesteNavegacaoPage> createState() => _TesteNavegacaoPageState();
+  State<Corrida> createState() => _CorridaState();
 }
 
-class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
-  // ============================================================
-  // ESTADOS
-  // ============================================================
-
+class _CorridaState extends State<Corrida> {
   bool navegacaoInicializada = false;
 
   bool iniciandoNavegacao = false;
@@ -30,31 +28,15 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
   bool listaExpandida = true;
 
-  // ============================================================
-  // SOLICITAÇÃO SELECIONADA
-  // ============================================================
-
   Map<String, dynamic>? solicitacaoSelecionada;
 
   TipoSolicitacao? tipoSolicitacao;
-
-  // ============================================================
-  // DESTINOS
-  // ============================================================
 
   NavigationWaypoint? destinoCliente;
 
   NavigationWaypoint? destinoFinal;
 
-  // ============================================================
-  // CONTROLLER DO MAPA
-  // ============================================================
-
   GoogleNavigationViewController? mapController;
-
-  // ============================================================
-  // INICIALIZAR NAVEGAÇÃO
-  // ============================================================
 
   Future<void> inicializarNavegacao() async {
     final termosAceitos = await GoogleMapsNavigator.areTermsAccepted();
@@ -77,20 +59,14 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
     setState(() {
       navegacaoInicializada = true;
     });
-  }
 
-  // ============================================================
-  // CRIAR DESTINOS
-  // ============================================================
+    widget.onTituloChanged('Procurando Corrida');
+  }
 
   Destinations criarDestinos() {
     if (solicitacaoSelecionada == null) {
       throw Exception('Nenhuma solicitação selecionada.');
     }
-
-    // ==========================================================
-    // DADOS DO CLIENTE
-    // ==========================================================
 
     final double latitudeCliente = double.parse(
       solicitacaoSelecionada!['latitude_cliente'].toString(),
@@ -99,10 +75,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
     final double longitudeCliente = double.parse(
       solicitacaoSelecionada!['longitude_cliente'].toString(),
     );
-
-    // ==========================================================
-    // DADOS DO DESTINO FINAL
-    // ==========================================================
 
     final double latitudeDestino = double.parse(
       solicitacaoSelecionada!['latitude_destino'].toString(),
@@ -115,29 +87,15 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
     final String nome =
         solicitacaoSelecionada!['nome']?.toString() ?? 'Cliente';
 
-    // ==========================================================
-    // WAYPOINT DO CLIENTE
-    // ==========================================================
-
     destinoCliente = NavigationWaypoint.withLatLngTarget(
       title: nome,
-
       target: LatLng(latitude: latitudeCliente, longitude: longitudeCliente),
     );
 
-    // ==========================================================
-    // WAYPOINT DO DESTINO FINAL
-    // ==========================================================
-
     destinoFinal = NavigationWaypoint.withLatLngTarget(
       title: 'Destino final',
-
       target: LatLng(latitude: latitudeDestino, longitude: longitudeDestino),
     );
-
-    // ==========================================================
-    // LOG
-    // ==========================================================
 
     print('=================================');
     print('DESTINOS DA SOLICITAÇÃO');
@@ -157,30 +115,16 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
     print('=================================');
 
-    // ==========================================================
-    // RETORNA OS DOIS DESTINOS
-    // ==========================================================
-
     return Destinations(
       waypoints: [destinoCliente!, destinoFinal!],
-
       displayOptions: NavigationDisplayOptions(),
-
       routingOptions: criarOpcoesDeRota(),
     );
   }
 
-  // ============================================================
-  // OPÇÕES DA ROTA
-  // ============================================================
-
   RoutingOptions criarOpcoesDeRota() {
     return RoutingOptions(travelMode: NavigationTravelMode.driving);
   }
-
-  // ============================================================
-  // INICIAR NAVEGAÇÃO
-  // ============================================================
 
   Future<void> iniciarNavegacao() async {
     if (iniciandoNavegacao) return;
@@ -198,25 +142,13 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
       print('Solicitação: $solicitacaoSelecionada');
       print('=================================');
 
-      // ========================================================
-      // CRIAR OS DOIS DESTINOS
-      // ========================================================
-
       print('Criando destinos...');
 
       final destinos = criarDestinos();
 
-      // ========================================================
-      // CALCULAR ROTA
-      // ========================================================
-
       print('Calculando rota...');
 
       final status = await GoogleMapsNavigator.setDestinations(destinos);
-
-      // ========================================================
-      // VERIFICAR STATUS
-      // ========================================================
 
       if (status != NavigationRouteStatus.statusOk) {
         print('Erro ao calcular rota: $status');
@@ -232,17 +164,9 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
       print('Rota calculada com sucesso!');
 
-      // ========================================================
-      // INICIAR GUIDANCE
-      // ========================================================
-
       await GoogleMapsNavigator.startGuidance();
 
       print('Navegação iniciada!');
-
-      // ========================================================
-      // ESCONDER LISTA E DRAWER
-      // ========================================================
 
       if (!mounted) return;
 
@@ -256,6 +180,8 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
         listaExpandida = false;
       });
 
+      widget.onTituloChanged('Em Navegação');
+
       print('Lista e drawer escondidos.');
     } catch (e) {
       print('Erro ao iniciar navegação: $e');
@@ -268,35 +194,19 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
     }
   }
 
-  // ============================================================
-  // FINALIZAR NAVEGAÇÃO
-  // ============================================================
-
   Future<void> finalizarNavegacao() async {
     print('=================================');
     print('FINALIZANDO NAVEGAÇÃO');
     print('=================================');
 
     try {
-      // ========================================================
-      // PARAR NAVEGAÇÃO
-      // ========================================================
-
       await GoogleMapsNavigator.stopGuidance();
 
       print('Guidance finalizado.');
 
-      // ========================================================
-      // REMOVER ROTA
-      // ========================================================
-
       await GoogleMapsNavigator.clearDestinations();
 
       print('Rota removida do mapa.');
-
-      // ========================================================
-      // LIMPAR ESTADOS
-      // ========================================================
 
       if (!mounted) return;
 
@@ -318,29 +228,19 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
         destinoFinal = null;
       });
 
+      widget.onTituloChanged('Procurando Corrida');
+
       print('Lista voltou.');
     } catch (e) {
       print('Erro ao finalizar navegação: $e');
     }
   }
 
-  // ============================================================
-  // ABRIR SOLICITAÇÃO
-  // ============================================================
-
   void abrirPassageiro(Map<String, dynamic> solicitacao) {
     final String tipo =
         solicitacao['tipo']?.toString().toLowerCase() ?? 'corrida';
 
     setState(() {
-      // Aqui guardamos TODOS os dados.
-      //
-      // Isso inclui:
-      // latitude_cliente
-      // longitude_cliente
-      // latitude_destino
-      // longitude_destino
-
       solicitacaoSelecionada = solicitacao;
 
       mostrandoPassageiro = true;
@@ -352,6 +252,12 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
       }
     });
 
+    if (tipo == 'entrega') {
+      widget.onTituloChanged('Detalhes da Entrega');
+    } else {
+      widget.onTituloChanged('Detalhes da Corrida');
+    }
+
     print(
       'Solicitação selecionada: '
       '$tipoSolicitacao',
@@ -359,10 +265,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
     print('Dados: $solicitacao');
   }
-
-  // ============================================================
-  // VOLTAR PARA LISTA
-  // ============================================================
 
   void voltarParaLista() {
     setState(() {
@@ -372,11 +274,9 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
       tipoSolicitacao = null;
     });
-  }
 
-  // ============================================================
-  // INIT STATE
-  // ============================================================
+    widget.onTituloChanged('Procurando Corrida');
+  }
 
   @override
   void initState() {
@@ -385,20 +285,12 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
     inicializarNavegacao();
   }
 
-  // ============================================================
-  // INTERFACE
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     return navegacaoInicializada
         ? SafeArea(
             child: Stack(
               children: [
-                // ==================================================
-                // MAPA
-                // ==================================================
-
                 Positioned.fill(
                   child: GoogleMapsNavigationView(
                     onViewCreated: (controller) async {
@@ -416,15 +308,11 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
                   ),
                 ),
 
-                // ==================================================
-                // PAINEL INFERIOR
-                // ==================================================
                 if (!navegacaoAtiva)
                   Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
-
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
 
@@ -454,10 +342,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
                       child: Column(
                         children: [
-                          // ========================================
-                          // SETA
-                          // ========================================
-
                           SizedBox(
                             height: 45,
                             width: double.infinity,
@@ -473,6 +357,10 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
                                     solicitacaoSelecionada = null;
 
                                     tipoSolicitacao = null;
+
+                                    widget.onTituloChanged(
+                                      'Procurando Corrida',
+                                    );
                                   }
                                 });
                               },
@@ -491,9 +379,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
                             ),
                           ),
 
-                          // ========================================
-                          // CONTEÚDO
-                          // ========================================
                           Expanded(
                             child:
                                 mostrandoPassageiro &&
@@ -510,9 +395,6 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
                     ),
                   ),
 
-                // ==================================================
-                // BOTÃO FINALIZAR
-                // ==================================================
                 if (navegacaoAtiva)
                   Positioned(
                     left: 12,
@@ -524,15 +406,11 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
 
                       child: const Text(
                         'Finalizar navegação',
-
                         style: TextStyle(color: CupertinoColors.white),
                       ),
                     ),
                   ),
 
-                // ==================================================
-                // LOADING
-                // ==================================================
                 if (iniciandoNavegacao)
                   Positioned.fill(
                     child: Container(
@@ -549,33 +427,21 @@ class _TesteNavegacaoPageState extends State<TesteNavegacaoPage> {
         : const Center(child: CupertinoActivityIndicator());
   }
 
-  // ============================================================
-  // CONSTRUIR DRAWER
-  // ============================================================
-
   Widget _construirDrawer() {
     if (tipoSolicitacao == TipoSolicitacao.entrega) {
       return DrawerEntrega(
         entrega: solicitacaoSelecionada!,
-
         onIniciar: iniciarNavegacao,
-
         onVoltar: voltarParaLista,
       );
     }
 
     return DrawerCorrida(
       corrida: solicitacaoSelecionada!,
-
       onIniciar: iniciarNavegacao,
-
       onVoltar: voltarParaLista,
     );
   }
-
-  // ============================================================
-  // DISPOSE
-  // ============================================================
 
   @override
   void dispose() {
