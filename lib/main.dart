@@ -34,7 +34,7 @@ class MeuApp extends StatelessWidget {
         textTheme: CupertinoTextThemeData(textStyle: GoogleFonts.inter()),
       ),
 
-      home: const PrincipalPage(),
+      home: const LoginPage(),
     );
   }
 }
