@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
+import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
 import 'package:route_pires_flutter/views/drawer_corrida.dart';
 import 'package:route_pires_flutter/views/drawer_entrega.dart';
 import 'package:route_pires_flutter/views/lista_passageiros.dart';
@@ -10,8 +12,9 @@ enum TipoSolicitacao { corrida, entrega }
 
 class Corrida extends StatefulWidget {
   final Function(String) onTituloChanged;
+  final String? mototaxistaId;
 
-  const Corrida({super.key, required this.onTituloChanged});
+  const Corrida({super.key, required this.onTituloChanged, this.mototaxistaId});
 
   @override
   State<Corrida> createState() => _CorridaState();
@@ -28,9 +31,11 @@ class _CorridaState extends State<Corrida> {
 
   bool listaExpandida = true;
 
-  Map<String, dynamic>? solicitacaoSelecionada;
+  SolicitacaoCorrida? solicitacaoSelecionada;
 
   TipoSolicitacao? tipoSolicitacao;
+
+  SolicitacoesViewModel? solicitacoesViewModel;
 
   NavigationWaypoint? destinoCliente;
 
@@ -64,56 +69,26 @@ class _CorridaState extends State<Corrida> {
   }
 
   Destinations criarDestinos() {
-    if (solicitacaoSelecionada == null) {
+    final solicitacao = solicitacaoSelecionada;
+    if (solicitacao == null) {
       throw Exception('Nenhuma solicitação selecionada.');
     }
 
-    final double latitudeCliente = double.parse(
-      solicitacaoSelecionada!['latitude_cliente'].toString(),
-    );
-
-    final double longitudeCliente = double.parse(
-      solicitacaoSelecionada!['longitude_cliente'].toString(),
-    );
-
-    final double latitudeDestino = double.parse(
-      solicitacaoSelecionada!['latitude_destino'].toString(),
-    );
-
-    final double longitudeDestino = double.parse(
-      solicitacaoSelecionada!['longitude_destino'].toString(),
-    );
-
-    final String nome =
-        solicitacaoSelecionada!['nome']?.toString() ?? 'Cliente';
-
     destinoCliente = NavigationWaypoint.withLatLngTarget(
-      title: nome,
-      target: LatLng(latitude: latitudeCliente, longitude: longitudeCliente),
+      title: solicitacao.passageiroNome,
+      target: LatLng(
+        latitude: solicitacao.origem.latitude,
+        longitude: solicitacao.origem.longitude,
+      ),
     );
 
     destinoFinal = NavigationWaypoint.withLatLngTarget(
       title: 'Destino final',
-      target: LatLng(latitude: latitudeDestino, longitude: longitudeDestino),
+      target: LatLng(
+        latitude: solicitacao.destino.latitude,
+        longitude: solicitacao.destino.longitude,
+      ),
     );
-
-    print('=================================');
-    print('DESTINOS DA SOLICITAÇÃO');
-    print('=================================');
-
-    print('Cliente: $nome');
-
-    print('Latitude cliente: $latitudeCliente');
-
-    print('Longitude cliente: $longitudeCliente');
-
-    print('---------------------------------');
-
-    print('Latitude destino: $latitudeDestino');
-
-    print('Longitude destino: $longitudeDestino');
-
-    print('=================================');
 
     return Destinations(
       waypoints: [destinoCliente!, destinoFinal!],
@@ -236,34 +211,51 @@ class _CorridaState extends State<Corrida> {
     }
   }
 
-  void abrirPassageiro(Map<String, dynamic> solicitacao) {
-    final String tipo =
-        solicitacao['tipo']?.toString().toLowerCase() ?? 'corrida';
-
+  void abrirPassageiro(SolicitacaoCorrida solicitacao) {
     setState(() {
       solicitacaoSelecionada = solicitacao;
 
       mostrandoPassageiro = true;
 
-      if (tipo == 'entrega') {
-        tipoSolicitacao = TipoSolicitacao.entrega;
-      } else {
-        tipoSolicitacao = TipoSolicitacao.corrida;
-      }
+      tipoSolicitacao = solicitacao.ehEntrega
+          ? TipoSolicitacao.entrega
+          : TipoSolicitacao.corrida;
     });
 
-    if (tipo == 'entrega') {
-      widget.onTituloChanged('Detalhes da Entrega');
-    } else {
-      widget.onTituloChanged('Detalhes da Corrida');
+    widget.onTituloChanged(
+      solicitacao.ehEntrega ? 'Detalhes da Entrega' : 'Detalhes da Corrida',
+    );
+  }
+
+  Future<void> cancelarSolicitacao() async {
+    final viewModel = solicitacoesViewModel;
+    final atual = solicitacaoSelecionada;
+    if (viewModel == null || atual == null) return;
+
+    final cancelou = await viewModel.cancelar(atual);
+
+    if (!mounted) return;
+
+    if (cancelou) {
+      voltarParaLista();
+      return;
     }
 
-    print(
-      'Solicitação selecionada: '
-      '$tipoSolicitacao',
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Erro'),
+        content: Text(
+          viewModel.erro ?? 'Não foi possível cancelar a solicitação',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
     );
-
-    print('Dados: $solicitacao');
   }
 
   void voltarParaLista() {
@@ -283,6 +275,18 @@ class _CorridaState extends State<Corrida> {
     super.initState();
 
     inicializarNavegacao();
+
+    final mototaxistaId = widget.mototaxistaId;
+    if (mototaxistaId != null && mototaxistaId.isNotEmpty) {
+      solicitacoesViewModel = SolicitacoesViewModel(
+        mototaxistaId: mototaxistaId,
+      )..addListener(_aoAtualizarSolicitacoes);
+      solicitacoesViewModel!.carregar();
+    }
+  }
+
+  void _aoAtualizarSolicitacoes() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -386,6 +390,18 @@ class _CorridaState extends State<Corrida> {
                                 ? _construirDrawer()
                                 : listaExpandida
                                 ? ListaPassageiros(
+                                    solicitacoes:
+                                        solicitacoesViewModel?.solicitacoes ??
+                                        const [],
+                                    carregando:
+                                        solicitacoesViewModel?.carregando ??
+                                        false,
+                                    erro:
+                                        solicitacoesViewModel?.erro ??
+                                        (widget.mototaxistaId == null ||
+                                                widget.mototaxistaId!.isEmpty
+                                            ? 'Faça login como mototaxista para ver solicitações'
+                                            : null),
                                     onPassageiroSelecionado: abrirPassageiro,
                                   )
                                 : const SizedBox(),
@@ -428,23 +444,33 @@ class _CorridaState extends State<Corrida> {
   }
 
   Widget _construirDrawer() {
+    final carregando = solicitacoesViewModel?.atualizandoStatus ?? false;
+
     if (tipoSolicitacao == TipoSolicitacao.entrega) {
       return DrawerEntrega(
         entrega: solicitacaoSelecionada!,
         onIniciar: iniciarNavegacao,
-        onVoltar: voltarParaLista,
+        onVoltar: cancelarSolicitacao,
+        carregando: carregando,
       );
     }
 
     return DrawerCorrida(
       corrida: solicitacaoSelecionada!,
       onIniciar: iniciarNavegacao,
-      onVoltar: voltarParaLista,
+      onVoltar: cancelarSolicitacao,
+      carregando: carregando,
     );
   }
 
   @override
   void dispose() {
+    final viewModel = solicitacoesViewModel;
+    if (viewModel != null) {
+      viewModel.removeListener(_aoAtualizarSolicitacoes);
+      viewModel.dispose();
+    }
+
     if (navegacaoInicializada) {
       GoogleMapsNavigator.cleanup();
     }

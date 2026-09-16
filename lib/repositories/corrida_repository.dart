@@ -4,6 +4,7 @@ import 'package:route_pires_flutter/config/api_config.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 
 class CorridaRepository {
   CorridaRepository({Dio? dio}) : _dio = dio ?? ApiClient().dio;
@@ -11,6 +12,12 @@ class CorridaRepository {
   final Dio _dio;
 
   static const statusInicial = 'ANDAMENTO';
+  static const _statusFinalizados = {
+    'FINALIZADA',
+    'CONCLUIDA',
+    'CONCLUÍDA',
+    'CANCELADA',
+  };
 
   Future<CorridaResponse> criar({
     required CategoriaCorrida categoria,
@@ -109,4 +116,129 @@ class CorridaRepository {
     }
     throw StateError('Resposta da corrida sem id');
   }
+
+  Future<List<SolicitacaoCorrida>> listarPendentes({
+    required String mototaxistaId,
+    CancelToken? cancelToken,
+  }) async {
+    final respostas = await Future.wait([
+      _dio.get(ApiConfig.corridasPassageiro, cancelToken: cancelToken),
+      _dio.get(ApiConfig.corridaFrete, cancelToken: cancelToken),
+    ]);
+
+    final solicitacoes = [
+      ..._extrairSolicitacoes(
+        respostas[0].data,
+        categoria: CategoriaCorrida.corrida,
+      ),
+      ..._extrairSolicitacoes(
+        respostas[1].data,
+        categoria: CategoriaCorrida.frete,
+      ),
+    ];
+
+    final pendentes = solicitacoes
+        .where((solicitacao) => solicitacao.id.isNotEmpty)
+        .where((solicitacao) => solicitacao.mototaxistaId == mototaxistaId)
+        .where(
+          (solicitacao) =>
+              !_statusFinalizados.contains(solicitacao.status.toUpperCase()),
+        )
+        .toList();
+
+    final idsPassageiros = pendentes
+        .map((solicitacao) => solicitacao.passageiroId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    final passageiros = await _buscarPassageiros(
+      idsPassageiros,
+      cancelToken: cancelToken,
+    );
+
+    return pendentes.map((solicitacao) {
+      final dados = passageiros[solicitacao.passageiroId];
+      if (dados == null) return solicitacao;
+      return solicitacao.copyWith(
+        passageiroNome: dados.nome,
+        passageiroAvaliacao: dados.avaliacaoMedia,
+      );
+    }).toList();
+  }
+
+  Future<Map<String, _PassageiroResumo>> _buscarPassageiros(
+    Set<String> ids, {
+    CancelToken? cancelToken,
+  }) async {
+    final resultado = <String, _PassageiroResumo>{};
+
+    await Future.wait(
+      ids.map((id) async {
+        try {
+          final response = await _dio.get(
+            '${ApiConfig.passageiros}/$id',
+            cancelToken: cancelToken,
+          );
+
+          final data = response.data;
+          if (data is Map) {
+            final mapa = Map<String, dynamic>.from(data);
+            resultado[id] = _PassageiroResumo(
+              nome: mapa['nome']?.toString() ?? 'Passageiro',
+              avaliacaoMedia: switch (mapa['avaliacaoMedia']) {
+                num valor => valor.toDouble(),
+                _ => null,
+              },
+            );
+          }
+        } catch (_) {
+          // Melhor esforço: se a busca falhar, mantém o nome padrão.
+        }
+      }),
+    );
+
+    return resultado;
+  }
+
+  List<SolicitacaoCorrida> _extrairSolicitacoes(
+    dynamic data, {
+    required CategoriaCorrida categoria,
+  }) {
+    if (data is! List) return const [];
+
+    return data
+        .whereType<Map>()
+        .map(
+          (item) => SolicitacaoCorrida.fromJson(
+            Map<String, dynamic>.from(item),
+            categoria: categoria,
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> atualizarStatus({
+    required CategoriaCorrida categoria,
+    required String id,
+    required String status,
+    String? motivoCancelamento,
+    CancelToken? cancelToken,
+  }) async {
+    final path = categoria == CategoriaCorrida.corrida
+        ? ApiConfig.corridasPassageiro
+        : ApiConfig.corridaFrete;
+
+    await _dio.put(
+      '$path/$id',
+      cancelToken: cancelToken,
+      data: {'status': status, 'motivoCancelamento': ?motivoCancelamento},
+    );
+  }
+}
+
+class _PassageiroResumo {
+  const _PassageiroResumo({required this.nome, this.avaliacaoMedia});
+
+  final String nome;
+  final double? avaliacaoMedia;
 }

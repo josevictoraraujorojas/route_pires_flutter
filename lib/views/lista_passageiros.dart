@@ -1,89 +1,59 @@
 import 'package:flutter/cupertino.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 
 class ListaPassageiros extends StatelessWidget {
-  final Function(Map<String, dynamic>) onPassageiroSelecionado;
+  final List<SolicitacaoCorrida> solicitacoes;
+  final ValueChanged<SolicitacaoCorrida> onPassageiroSelecionado;
+  final bool carregando;
+  final String? erro;
 
-  const ListaPassageiros({super.key, required this.onPassageiroSelecionado});
-
-  final List<Map<String, dynamic>> passageiros = const [
-    {
-      'nome': 'Haley James',
-      'avaliacao': 5,
-      'tipo': 'corrida',
-      'latitude_cliente': -17.3015,
-      'longitude_cliente': -48.2765,
-      'latitude_destino': -17.3075,
-      'longitude_destino': -48.2705,
-    },
-
-    {
-      'nome': 'Nathan Scott',
-      'avaliacao': 5,
-      'tipo': 'entrega',
-      'latitude_cliente': -17.2958,
-      'longitude_cliente': -48.2740,
-      'latitude_destino': -17.3105,
-      'longitude_destino': -48.2835,
-    },
-
-    {
-      'nome': 'Brooke Davis',
-      'avaliacao': 3,
-      'tipo': 'corrida',
-      'latitude_cliente': -17.3075,
-      'longitude_cliente': -48.2705,
-      'latitude_destino': -17.2965,
-      'longitude_destino': -48.2860,
-    },
-
-    {
-      'nome': 'Jamie Scott',
-      'avaliacao': 5,
-      'tipo': 'entrega',
-      'latitude_cliente': -17.3105,
-      'longitude_cliente': -48.2835,
-      'latitude_destino': -17.3135,
-      'longitude_destino': -48.2725,
-    },
-
-    {
-      'nome': 'Marvin McFadden',
-      'avaliacao': 5,
-      'tipo': 'corrida',
-      'latitude_cliente': -17.2965,
-      'longitude_cliente': -48.2860,
-      'latitude_destino': -17.3015,
-      'longitude_destino': -48.2765,
-    },
-
-    {
-      'nome': 'Antwon Taylor',
-      'avaliacao': 5,
-      'tipo': 'entrega',
-      'latitude_cliente': -17.3135,
-      'longitude_cliente': -48.2725,
-      'latitude_destino': -17.2958,
-      'longitude_destino': -48.2740,
-    },
-  ];
+  const ListaPassageiros({
+    super.key,
+    required this.solicitacoes,
+    required this.onPassageiroSelecionado,
+    this.carregando = false,
+    this.erro,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (carregando) {
+      return const Center(child: CupertinoActivityIndicator());
+    }
+
+    if (erro != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            erro!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: CupertinoColors.systemRed),
+          ),
+        ),
+      );
+    }
+
+    if (solicitacoes.isEmpty) {
+      return const Center(
+        child: Text(
+          'Nenhuma solicitação no momento',
+          style: TextStyle(color: CupertinoColors.systemGrey),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.only(top: 0, bottom: 20),
 
-      itemCount: passageiros.length,
+      itemCount: solicitacoes.length,
 
       itemBuilder: (context, index) {
-        final passageiro = passageiros[index];
-
-        final String nome = passageiro['nome'];
-        final int avaliacao = passageiro['avaliacao'];
-        final String tipo = passageiro['tipo'];
+        final solicitacao = solicitacoes[index];
 
         return GestureDetector(
           onTap: () {
-            onPassageiroSelecionado(passageiro);
+            onPassageiroSelecionado(solicitacao);
           },
 
           child: Padding(
@@ -101,9 +71,9 @@ class ListaPassageiros extends StatelessWidget {
                   ),
 
                   child: Icon(
-                    tipo == 'corrida'
-                        ? CupertinoIcons.person_fill
-                        : CupertinoIcons.cube_box_fill,
+                    solicitacao.ehEntrega
+                        ? CupertinoIcons.cube_box_fill
+                        : CupertinoIcons.person_fill,
 
                     size: 30,
 
@@ -119,7 +89,7 @@ class ListaPassageiros extends StatelessWidget {
 
                     children: [
                       Text(
-                        nome,
+                        solicitacao.passageiroNome,
 
                         style: const TextStyle(
                           fontSize: 13,
@@ -131,7 +101,7 @@ class ListaPassageiros extends StatelessWidget {
                       const SizedBox(height: 4),
 
                       Text(
-                        tipo == 'corrida' ? 'Corrida' : 'Entrega',
+                        solicitacao.ehEntrega ? 'Entrega' : 'Corrida',
 
                         style: const TextStyle(
                           fontSize: 11,
@@ -142,17 +112,19 @@ class ListaPassageiros extends StatelessWidget {
                   ),
                 ),
 
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                if (solicitacao.passageiroAvaliacao != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
 
-                  children: List.generate(avaliacao, (index) {
-                    return const Icon(
-                      CupertinoIcons.star_fill,
-                      size: 11,
-                      color: CupertinoColors.systemBlue,
-                    );
-                  }),
-                ),
+                    children: List.generate(
+                      solicitacao.passageiroAvaliacao!.round().clamp(0, 5),
+                      (index) => const Icon(
+                        CupertinoIcons.star_fill,
+                        size: 11,
+                        color: CupertinoColors.systemBlue,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

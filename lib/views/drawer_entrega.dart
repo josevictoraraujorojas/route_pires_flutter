@@ -1,28 +1,32 @@
 import 'package:flutter/cupertino.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 
 class DrawerEntrega extends StatelessWidget {
-  final Map<String, dynamic> entrega;
+  final SolicitacaoCorrida entrega;
 
   final VoidCallback onIniciar;
   final VoidCallback onVoltar;
+  final bool carregando;
 
   const DrawerEntrega({
     super.key,
     required this.entrega,
     required this.onIniciar,
     required this.onVoltar,
+    this.carregando = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final String descricao =
-        entrega['descricao'] ?? 'Perfeito, fácil de encontrar e perto de tudo.';
+    final String? descricao = entrega.descricaoCarga?.trim();
 
-    final String peso = entrega['peso']?.toString() ?? '10KG';
+    final double? peso = entrega.pesoCarga;
 
-    final String nome = entrega['nome'] ?? 'Passageiro';
+    final bool fragil = entrega.cargaFragil ?? false;
 
-    final String avaliacao = entrega['avaliacao']?.toString() ?? '4.8';
+    final String nome = entrega.passageiroNome;
+
+    final double? avaliacao = entrega.passageiroAvaliacao;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
@@ -42,66 +46,64 @@ class DrawerEntrega extends StatelessWidget {
 
           const SizedBox(height: 22),
 
-          const Text(
-            'SOBRE',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.systemGrey,
+          if (descricao != null && descricao.isNotEmpty) ...[
+            const Text(
+              'SOBRE',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.systemGrey,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-          Text(
-            descricao,
-            style: const TextStyle(
-              fontSize: 12,
-              color: CupertinoColors.systemGrey,
+            Text(
+              descricao,
+              style: const TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.systemGrey,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
           Row(
             children: [
-              _TipoEntrega(
-                selecionado: entrega['fragil'] == true,
-                texto: 'Frágil',
-              ),
+              _TipoEntrega(selecionado: fragil, texto: 'Frágil'),
 
               const SizedBox(width: 28),
 
-              _TipoEntrega(
-                selecionado: entrega['fragil'] != true,
-                texto: 'Comum',
-              ),
+              _TipoEntrega(selecionado: !fragil, texto: 'Comum'),
             ],
           ),
 
           const SizedBox(height: 18),
 
-          const Text(
-            'PESO',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.systemGrey,
+          if (peso != null) ...[
+            const Text(
+              'PESO',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.systemGrey,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 4),
+            const SizedBox(height: 4),
 
-          Text(
-            peso,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.black,
+            Text(
+              '${peso.toStringAsFixed(peso == peso.roundToDouble() ? 0 : 1)}KG',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.black,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 18),
+            const SizedBox(height: 18),
+          ],
 
           const Text(
             'SOLICITANTE',
@@ -149,25 +151,26 @@ class DrawerEntrega extends StatelessWidget {
 
                   const SizedBox(height: 3),
 
-                  Row(
-                    children: [
-                      const Icon(
-                        CupertinoIcons.star_fill,
-                        size: 13,
-                        color: CupertinoColors.systemBlue,
-                      ),
-
-                      const SizedBox(width: 4),
-
-                      Text(
-                        avaliacao,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: CupertinoColors.systemGrey,
+                  if (avaliacao != null)
+                    Row(
+                      children: [
+                        const Icon(
+                          CupertinoIcons.star_fill,
+                          size: 13,
+                          color: CupertinoColors.systemBlue,
                         ),
-                      ),
-                    ],
-                  ),
+
+                        const SizedBox(width: 4),
+
+                        Text(
+                          avaliacao.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: CupertinoColors.systemGrey,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ],
@@ -178,15 +181,15 @@ class DrawerEntrega extends StatelessWidget {
           _BotaoEntrega(
             texto: 'Aceitar Entrega',
             cor: CupertinoColors.systemBlue,
-            onPressed: onIniciar,
+            onPressed: carregando ? null : onIniciar,
           ),
 
           const SizedBox(height: 24),
 
           _BotaoEntrega(
-            texto: 'Cancelar Entrega',
+            texto: carregando ? 'Cancelando...' : 'Cancelar Entrega',
             cor: CupertinoColors.systemOrange,
-            onPressed: onVoltar,
+            onPressed: carregando ? null : onVoltar,
           ),
 
           const SizedBox(height: 8),
@@ -235,7 +238,7 @@ class _TipoEntrega extends StatelessWidget {
 class _BotaoEntrega extends StatelessWidget {
   final String texto;
   final Color cor;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const _BotaoEntrega({
     required this.texto,
@@ -245,6 +248,8 @@ class _BotaoEntrega extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final corEfetiva = onPressed == null ? CupertinoColors.systemGrey3 : cor;
+
     return SizedBox(
       width: double.infinity,
       height: 44,
@@ -259,7 +264,7 @@ class _BotaoEntrega extends StatelessWidget {
 
           decoration: BoxDecoration(
             color: CupertinoColors.white,
-            border: Border.all(color: cor, width: 1.5),
+            border: Border.all(color: corEfetiva, width: 1.5),
             borderRadius: BorderRadius.circular(12),
           ),
 
@@ -270,7 +275,7 @@ class _BotaoEntrega extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: cor,
+              color: corEfetiva,
             ),
           ),
         ),

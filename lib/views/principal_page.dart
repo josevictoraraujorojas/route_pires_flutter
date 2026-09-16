@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
 
 class PrincipalPage extends StatefulWidget {
@@ -19,6 +21,8 @@ class _PrincipalPageState extends State<PrincipalPage> {
 
   @override
   Widget build(BuildContext context) {
+    final mototaxistaId = context.watch<LoginViewModel>().usuario?.id;
+
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
         activeColor: CupertinoColors.systemBlue,
@@ -54,7 +58,10 @@ class _PrincipalPageState extends State<PrincipalPage> {
                     middle: Text(tituloCorrida),
                   ),
 
-                  child: Corrida(onTituloChanged: alterarTituloCorrida),
+                  child: Corrida(
+                    onTituloChanged: alterarTituloCorrida,
+                    mototaxistaId: mototaxistaId,
+                  ),
                 );
               },
             );
@@ -100,7 +107,10 @@ class _PrincipalPageState extends State<PrincipalPage> {
                   navigationBar: CupertinoNavigationBar(
                     middle: Text(tituloCorrida),
                   ),
-                  child: Corrida(onTituloChanged: alterarTituloCorrida),
+                  child: Corrida(
+                    onTituloChanged: alterarTituloCorrida,
+                    mototaxistaId: mototaxistaId,
+                  ),
                 );
               },
             );
