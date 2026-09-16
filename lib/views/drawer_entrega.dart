@@ -31,10 +31,6 @@ class DrawerEntrega extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-          // ==================================================
-          // TÍTULO
-          // ==================================================
-
           const Text(
             'Entrega',
             style: TextStyle(
@@ -46,9 +42,6 @@ class DrawerEntrega extends StatelessWidget {
 
           const SizedBox(height: 22),
 
-          // ==================================================
-          // SOBRE
-          // ==================================================
           const Text(
             'SOBRE',
             style: TextStyle(
@@ -70,9 +63,6 @@ class DrawerEntrega extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // ==================================================
-          // FRÁGIL / COMUM
-          // ==================================================
           Row(
             children: [
               _TipoEntrega(
@@ -91,9 +81,6 @@ class DrawerEntrega extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // ==================================================
-          // PESO
-          // ==================================================
           const Text(
             'PESO',
             style: TextStyle(
@@ -116,9 +103,6 @@ class DrawerEntrega extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // ==================================================
-          // SOLICITANTE
-          // ==================================================
           const Text(
             'SOLICITANTE',
             style: TextStyle(
@@ -191,9 +175,6 @@ class DrawerEntrega extends StatelessWidget {
 
           const Spacer(),
 
-          // ==================================================
-          // ACEITAR ENTREGA
-          // ==================================================
           _BotaoEntrega(
             texto: 'Aceitar Entrega',
             cor: CupertinoColors.systemBlue,
@@ -202,9 +183,6 @@ class DrawerEntrega extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // ==================================================
-          // CANCELAR
-          // ==================================================
           _BotaoEntrega(
             texto: 'Cancelar Entrega',
             cor: CupertinoColors.systemOrange,
