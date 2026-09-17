@@ -73,7 +73,7 @@ void main() {
     expect(data['destino']['localizacao']['longitude'], destino.longitude);
     expect(data['origem']['timestamp'], data['dataHoraSolicitacao']);
     expect(data['destino']['timestamp'], data['dataHoraSolicitacao']);
-    expect(data['status'], 'ANDAMENTO');
+    expect(data['status'], 'PENDENTE');
   }
 
   group('CorridaRepository Tests |', () {

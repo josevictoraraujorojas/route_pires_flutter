@@ -104,6 +104,41 @@ class _CorridaState extends State<Corrida> {
   Future<void> iniciarNavegacao() async {
     if (iniciandoNavegacao) return;
 
+    final viewModel = solicitacoesViewModel;
+    final atual = solicitacaoSelecionada;
+
+    if (viewModel == null || atual == null) {
+      return;
+    }
+
+    final aceitou = await viewModel.aceitar(atual);
+
+    if (!aceitou) {
+      if (!mounted) return;
+
+      showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Erro'),
+          content: Text(viewModel.erro ?? 'Não foi possível aceitar a corrida'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        iniciandoNavegacao = false;
+      });
+
+      return;
+    }
+
     if (!mounted) return;
 
     setState(() {
@@ -232,11 +267,11 @@ class _CorridaState extends State<Corrida> {
     final atual = solicitacaoSelecionada;
     if (viewModel == null || atual == null) return;
 
-    final cancelou = await viewModel.cancelar(atual);
+    final recusou = await viewModel.recusar(atual);
 
     if (!mounted) return;
 
-    if (cancelou) {
+    if (recusou) {
       voltarParaLista();
       return;
     }
@@ -246,7 +281,7 @@ class _CorridaState extends State<Corrida> {
       builder: (context) => CupertinoAlertDialog(
         title: const Text('Erro'),
         content: Text(
-          viewModel.erro ?? 'Não foi possível cancelar a solicitação',
+          viewModel.erro ?? 'Não foi possível recusar a solicitação',
         ),
         actions: [
           CupertinoDialogAction(
