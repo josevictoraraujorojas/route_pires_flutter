@@ -1,7 +1,15 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
+import 'package:route_pires_flutter/config/localizacao_atual.dart';
+
+gmaps.LatLng pontoParaGoogle(LatLng ponto) {
+  return gmaps.LatLng(ponto.latitude, ponto.longitude);
+}
+
+LatLng pontoDeGoogle(gmaps.LatLng ponto) {
+  return LatLng(ponto.latitude, ponto.longitude);
+}
 
 class MapaCorrida extends StatefulWidget {
   const MapaCorrida({
@@ -21,8 +29,10 @@ class MapaCorrida extends StatefulWidget {
 
 class _MapaCorridaState extends State<MapaCorrida> {
   static const centroPadrao = LatLng(-17.29972, -48.27944);
+  static const zoomPadrao = 14.5;
+  static const zoomLocal = 16.0;
 
-  final mapController = MapController();
+  gmaps.GoogleMapController? mapController;
   late LatLng? pontoSelecionado = widget.pontoInicial;
   bool localizando = false;
   int versaoLocalizacao = 0;
@@ -31,7 +41,10 @@ class _MapaCorridaState extends State<MapaCorrida> {
   void initState() {
     super.initState();
     if (pontoSelecionado == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => localizar());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        localizar(selecionar: false);
+      });
     }
   }
 
@@ -43,15 +56,9 @@ class _MapaCorridaState extends State<MapaCorrida> {
       versaoLocalizacao++;
       pontoSelecionado = novo;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) mapController.move(novo, 16);
+        if (mounted) _mover(novo, zoomLocal);
       });
     }
-  }
-
-  @override
-  void dispose() {
-    mapController.dispose();
-    super.dispose();
   }
 
   bool _mesmoPonto(LatLng a, LatLng? b) {
@@ -72,44 +79,38 @@ class _MapaCorridaState extends State<MapaCorrida> {
     if (mounted) widget.onErro?.call(mensagem);
   }
 
-  Future<void> localizar() async {
-    if (localizando) return;
+  Future<void> _mover(LatLng ponto, double zoom) async {
+    final controller = mapController;
+    if (controller == null) return;
+    await controller.animateCamera(
+      gmaps.CameraUpdate.newLatLngZoom(pontoParaGoogle(ponto), zoom),
+    );
+  }
+
+  void _onMapCreated(gmaps.GoogleMapController controller) {
+    mapController = controller;
+    final ponto = pontoSelecionado;
+    if (ponto != null) {
+      _mover(ponto, zoomLocal);
+    }
+  }
+
+  Future<void> localizar({bool selecionar = true}) async {
+    if (!mounted || localizando) return;
     final versao = ++versaoLocalizacao;
     setState(() => localizando = true);
 
     try {
-      final servicoAtivo = await Geolocator.isLocationServiceEnabled();
+      final ponto = await posicaoAtual();
       if (!mounted || versao != versaoLocalizacao) return;
-      if (!servicoAtivo) {
-        _mostrarErro('Ative a localização do aparelho.');
-        return;
+      if (selecionar) {
+        _aplicarPonto(ponto);
       }
-
-      var permissao = await Geolocator.checkPermission();
-      if (!mounted || versao != versaoLocalizacao) return;
-      if (permissao == LocationPermission.denied) {
-        permissao = await Geolocator.requestPermission();
-        if (!mounted || versao != versaoLocalizacao) return;
+      await _mover(ponto, zoomLocal);
+    } on FalhaLocalizacao catch (erro) {
+      if (versao == versaoLocalizacao) {
+        _mostrarErro(erro.mensagem);
       }
-      if (permissao == LocationPermission.denied) {
-        _mostrarErro('Permissão de localização negada.');
-        return;
-      }
-      if (permissao == LocationPermission.deniedForever) {
-        _mostrarErro('Libere a localização nas configurações do aplicativo.');
-        return;
-      }
-
-      final posicao = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-      if (!mounted || versao != versaoLocalizacao) return;
-      final ponto = LatLng(posicao.latitude, posicao.longitude);
-      _aplicarPonto(ponto);
-      mapController.move(ponto, 16);
     } catch (_) {
       if (versao == versaoLocalizacao) {
         _mostrarErro('Não foi possível obter sua localização.');
@@ -119,48 +120,42 @@ class _MapaCorridaState extends State<MapaCorrida> {
     }
   }
 
+  Set<gmaps.Marker> get _marcadores {
+    final ponto = pontoSelecionado;
+    if (ponto == null) return {};
+    return {
+      gmaps.Marker(
+        markerId: const gmaps.MarkerId('selecionado'),
+        position: pontoParaGoogle(ponto),
+        icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(
+          gmaps.BitmapDescriptor.hueRed,
+        ),
+      ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
+    final centro = pontoSelecionado ?? centroPadrao;
     return Semantics(
       label: 'Mapa para selecionar uma localização',
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
-            FlutterMap(
-              mapController: mapController,
-              options: MapOptions(
-                initialCenter: pontoSelecionado ?? centroPadrao,
-                initialZoom: 14.5,
-                onTap: (_, ponto) => selecionar(ponto),
+            gmaps.GoogleMap(
+              initialCameraPosition: gmaps.CameraPosition(
+                target: pontoParaGoogle(centro),
+                zoom: pontoSelecionado == null ? zoomPadrao : zoomLocal,
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.route_pires_flutter',
-                ),
-                if (pontoSelecionado case final ponto?)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: ponto,
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.topCenter,
-                        child: const Icon(
-                          CupertinoIcons.location_solid,
-                          color: Color(0xFFFF3B4E),
-                          size: 44,
-                        ),
-                      ),
-                    ],
-                  ),
-                const RichAttributionWidget(
-                  attributions: [
-                    TextSourceAttribution('OpenStreetMap contributors'),
-                  ],
-                ),
-              ],
+              onMapCreated: _onMapCreated,
+              onTap: (ponto) => selecionar(pontoDeGoogle(ponto)),
+              style: '[{"featureType":"poi","stylers":[{"visibility":"off"}]}]',
+              markers: _marcadores,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: false,
             ),
             Positioned(
               right: 12,

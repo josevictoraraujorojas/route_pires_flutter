@@ -1,9 +1,12 @@
+import 'package:route_pires_flutter/config/validacao.dart';
+
 class MototaxistaCadastro {
   final String nome;
   final String email;
   final String senha;
   final String telefone;
   final String cnh;
+  final String dataValidade;
   final String placa;
   final String renavam;
   final String modelo;
@@ -15,6 +18,7 @@ class MototaxistaCadastro {
     required this.senha,
     required this.telefone,
     required this.cnh,
+    required this.dataValidade,
     required this.placa,
     required this.renavam,
     required this.modelo,
@@ -24,7 +28,7 @@ class MototaxistaCadastro {
   Map<String, dynamic> toJson() {
     return {
       'nome': nome,
-      'email': email,
+      'email': emailNormalizado(email),
       'senha': senha,
       'telefone': telefone.replaceAll(RegExp(r'\D'), ''),
       'dataCadastro': DateTime.now().toUtc().toIso8601String(),
@@ -37,10 +41,40 @@ class MototaxistaCadastro {
         'placa': placa,
         'renavam': renavam,
         'modelo': modelo,
-        'ano': ano,
+        'ano': int.parse(ano),
       },
       'servicosOferecidos': [],
       'cnh': cnh,
+      'dataValidade': dataValidade,
     };
+  }
+}
+
+class MototaxistaRascunho {
+  String nome = '';
+  String email = '';
+  String senha = '';
+  String telefone = '';
+  String cnh = '';
+  String dataValidade = '';
+  String placa = '';
+  String renavam = '';
+  String modelo = '';
+  String ano = '';
+  bool aceitouTermos = false;
+
+  MototaxistaCadastro paraCadastro() {
+    return MototaxistaCadastro(
+      nome: nome,
+      email: email,
+      senha: senha,
+      telefone: telefone,
+      cnh: cnh,
+      dataValidade: dataValidade,
+      placa: placa,
+      renavam: renavam,
+      modelo: modelo,
+      ano: ano,
+    );
   }
 }

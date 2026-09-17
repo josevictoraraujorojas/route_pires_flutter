@@ -1,5 +1,5 @@
 class ApiConfig {
-  /// Só use dart-define se a API publicada estiver fora do ar.
+  /// Default é a API publicada. Use dart-define só para apontar para o PC.
   static const String _fromEnv = String.fromEnvironment('API_BASE_URL');
 
   static String get baseUrl {

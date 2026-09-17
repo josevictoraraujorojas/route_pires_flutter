@@ -109,6 +109,22 @@ void main() {
     });
 
     test(
+      'Deve omitir mototaxistas indisponíveis da lista da corrida',
+      () async {
+        const indisponivel = MototaxistaResumo(
+          id: 'offline-1',
+          nome: 'Offline',
+          disponivel: false,
+        );
+        mockListar([joa, indisponivel]);
+
+        await viewModel.buscarMotoristas();
+
+        expect(viewModel.motoristas, [joa]);
+      },
+    );
+
+    test(
       'Deve ir para a lista vazia quando a API não retornar motoristas',
       () async {
         mockListar([]);

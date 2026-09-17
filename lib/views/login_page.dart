@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:route_pires_flutter/viewmodel/cadastro_passageiro_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_1_page.dart';
@@ -194,11 +193,11 @@ class _LoginPageState extends State<LoginPage> {
                             color: const Color(0xFF006FFD),
                             borderRadius: BorderRadius.circular(10),
 
-                            onPressed: loginViewModel.Carregando
+                            onPressed: loginViewModel.carregando
                                 ? null
                                 : realizarLogin,
 
-                            child: loginViewModel.Carregando
+                            child: loginViewModel.carregando
                                 ? const CupertinoActivityIndicator(
                                     color: CupertinoColors.white,
                                   )
@@ -243,24 +242,21 @@ class _LoginPageState extends State<LoginPage> {
                                     Navigator.push(
                                       context,
                                       CupertinoPageRoute(
-                                        builder: (_) => ChangeNotifierProvider(
-                                          create: (_) =>
-                                              CadastroPassageiroViewModel(),
-                                          child: const CadastroPassageiroPage(),
-                                        ),
+                                        builder: (_) =>
+                                            const CadastroPassageiroPage(),
                                       ),
                                     );
                                   }
 
                                   if (tipo == TipoCadastro.mototaxista) {
+                                    context
+                                        .read<MototaxistaViewModel>()
+                                        .limparRascunho();
                                     Navigator.push(
                                       context,
                                       CupertinoPageRoute(
-                                        builder: (_) => ChangeNotifierProvider(
-                                          create: (_) => MototaxistaViewModel(),
-                                          child:
-                                              const CadastroMototaxista1Page(),
-                                        ),
+                                        builder: (_) =>
+                                            const CadastroMototaxista1Page(),
                                       ),
                                     );
                                   }

@@ -4,12 +4,14 @@ class MototaxistaResumo {
     required this.nome,
     this.avaliacaoMedia = 0,
     this.fotoUrl,
+    this.disponivel = true,
   });
 
   final String id;
   final String nome;
   final double avaliacaoMedia;
   final String? fotoUrl;
+  final bool disponivel;
 
   int get estrelas {
     final valor = avaliacaoMedia.round();
@@ -24,6 +26,7 @@ class MototaxistaResumo {
       nome: json['nome']?.toString() ?? '',
       avaliacaoMedia: (json['avaliacaoMedia'] as num?)?.toDouble() ?? 0,
       fotoUrl: json['fotoUrl'] as String?,
+      disponivel: json['disponivel'] as bool? ?? true,
     );
   }
 
@@ -33,9 +36,11 @@ class MototaxistaResumo {
         other.id == id &&
         other.nome == nome &&
         other.avaliacaoMedia == avaliacaoMedia &&
-        other.fotoUrl == fotoUrl;
+        other.fotoUrl == fotoUrl &&
+        other.disponivel == disponivel;
   }
 
   @override
-  int get hashCode => Object.hash(id, nome, avaliacaoMedia, fotoUrl);
+  int get hashCode =>
+      Object.hash(id, nome, avaliacaoMedia, fotoUrl, disponivel);
 }

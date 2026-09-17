@@ -14,7 +14,6 @@ class CampoFormulario extends StatelessWidget {
   final bool obscureText;
   final VoidCallback? onTap;
 
-  // NOVO
   final Function(String)? onChanged;
 
   final String? Function(String?)? validator;
@@ -28,10 +27,7 @@ class CampoFormulario extends StatelessWidget {
     this.senha = false,
     this.obscureText = true,
     this.onTap,
-
-    // NOVO
     this.onChanged,
-
     this.validator,
   });
 
@@ -66,11 +62,9 @@ class CampoFormulario extends StatelessWidget {
                       controller: controller,
                       placeholder: placeholder,
                       obscureText: obscureText,
-                      onTap: onTap!,
+                      onTap: onTap,
                       onChanged: (valor) {
                         campo.didChange(valor);
-
-                        // NOVO
                         onChanged?.call(valor);
                       },
                     )
@@ -80,10 +74,7 @@ class CampoFormulario extends StatelessWidget {
                       placeholder: placeholder,
                       keyboardType: keyboardType,
                       onChanged: (valor) {
-                        // Primeiro executa a função externa
                         onChanged?.call(valor);
-
-                        // Depois pega o valor atualizado do controller
                         campo.didChange(controller.text);
                       },
                     ),

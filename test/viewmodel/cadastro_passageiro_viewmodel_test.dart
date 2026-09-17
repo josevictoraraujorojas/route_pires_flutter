@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -39,6 +41,72 @@ void main() {
       expect(viewModel.carregando, isFalse);
     });
 
+    test(
+      'Não deve quebrar se o ViewModel for disposed no meio do POST',
+      () async {
+        final espera = Completer<void>();
+        when(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).thenAnswer((_) => espera.future);
+
+        final futuro = viewModel.cadastrar(
+          nome: 'Ana Teste',
+          email: 'Ana@Teste.com',
+          telefone: '(64) 99955-8833',
+          senha: 'senh4b0a',
+        );
+        viewModel.dispose();
+        espera.complete();
+
+        expect(await futuro, isTrue);
+      },
+    );
+
+    test(
+      'Não deve chamar o repositório duas vezes se já estiver cadastrando',
+      () async {
+        final espera = Completer<void>();
+        when(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).thenAnswer((_) => espera.future);
+
+        final primeiro = viewModel.cadastrar(
+          nome: 'Ana Teste',
+          email: 'Ana@Teste.com',
+          telefone: '(64) 99955-8833',
+          senha: 'senh4b0a',
+        );
+        final segundo = await viewModel.cadastrar(
+          nome: 'Ana Teste',
+          email: 'Ana@Teste.com',
+          telefone: '(64) 99955-8833',
+          senha: 'senh4b0a',
+        );
+        espera.complete();
+
+        expect(segundo, isFalse);
+        expect(await primeiro, isTrue);
+        verify(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).called(1);
+      },
+    );
+
     test('Não deve chamar o repositório quando a senha for fraca', () async {
       final resultado = await viewModel.cadastrar(
         nome: 'Ana Teste',
@@ -50,86 +118,97 @@ void main() {
       expect(resultado, isFalse);
       expect(
         viewModel.erro,
-        equals('A senha deve ter no mínimo 8 caracteres, com letras e números.'),
+        equals(
+          'A senha deve ter no mínimo 8 caracteres, com letras e números.',
+        ),
       );
       expect(viewModel.carregando, isFalse);
       verifyZeroInteractions(mockRepository);
     });
 
-    test('Não deve chamar o repositório quando o telefone for inválido', () async {
-      final resultado = await viewModel.cadastrar(
-        nome: 'Ana Teste',
-        email: 'ana@teste.com',
-        telefone: '123',
-        senha: 'senh4b0a',
-      );
+    test(
+      'Não deve chamar o repositório quando o telefone for inválido',
+      () async {
+        final resultado = await viewModel.cadastrar(
+          nome: 'Ana Teste',
+          email: 'ana@teste.com',
+          telefone: '123',
+          senha: 'senh4b0a',
+        );
 
-      expect(resultado, isFalse);
-      expect(
-        viewModel.erro,
-        equals('Informe um telefone com DDD (10 ou 11 dígitos).'),
-      );
-      verifyZeroInteractions(mockRepository);
-    });
+        expect(resultado, isFalse);
+        expect(
+          viewModel.erro,
+          equals('Informe um telefone com DDD (10 ou 11 dígitos).'),
+        );
+        verifyZeroInteractions(mockRepository);
+      },
+    );
 
-    test('Deve retornar erro 400 e usar a mensagem da API quando existir', () async {
-      final erroDio400 = DioException(
-        requestOptions: RequestOptions(path: '/passageiros'),
-        response: Response(
+    test(
+      'Deve retornar erro 400 e usar a mensagem da API quando existir',
+      () async {
+        final erroDio400 = DioException(
           requestOptions: RequestOptions(path: '/passageiros'),
-          statusCode: 400,
-          data: {'message': 'Email já cadastrado'},
-        ),
-      );
+          response: Response(
+            requestOptions: RequestOptions(path: '/passageiros'),
+            statusCode: 400,
+            data: {'message': 'Email já cadastrado'},
+          ),
+        );
 
-      when(
-        () => mockRepository.cadastrar(
+        when(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).thenThrow(erroDio400);
+
+        final resultado = await viewModel.cadastrar(
           nome: 'Ana Teste',
           email: 'ana@teste.com',
           telefone: '64999558833',
           senha: 'senh4b0a',
-        ),
-      ).thenThrow(erroDio400);
+        );
 
-      final resultado = await viewModel.cadastrar(
-        nome: 'Ana Teste',
-        email: 'ana@teste.com',
-        telefone: '64999558833',
-        senha: 'senh4b0a',
-      );
+        expect(resultado, isFalse);
+        expect(viewModel.erro, equals('Email já cadastrado'));
+      },
+    );
 
-      expect(resultado, isFalse);
-      expect(viewModel.erro, equals('Email já cadastrado'));
-    });
-
-    test('Deve retornar "Dados inválidos" no 400 sem mensagem da API', () async {
-      final erroDio400 = DioException(
-        requestOptions: RequestOptions(path: '/passageiros'),
-        response: Response(
+    test(
+      'Deve retornar "Dados inválidos" no 400 sem mensagem da API',
+      () async {
+        final erroDio400 = DioException(
           requestOptions: RequestOptions(path: '/passageiros'),
-          statusCode: 400,
-        ),
-      );
+          response: Response(
+            requestOptions: RequestOptions(path: '/passageiros'),
+            statusCode: 400,
+          ),
+        );
 
-      when(
-        () => mockRepository.cadastrar(
+        when(
+          () => mockRepository.cadastrar(
+            nome: 'Ana Teste',
+            email: 'ana@teste.com',
+            telefone: '64999558833',
+            senha: 'senh4b0a',
+          ),
+        ).thenThrow(erroDio400);
+
+        final resultado = await viewModel.cadastrar(
           nome: 'Ana Teste',
           email: 'ana@teste.com',
           telefone: '64999558833',
           senha: 'senh4b0a',
-        ),
-      ).thenThrow(erroDio400);
+        );
 
-      final resultado = await viewModel.cadastrar(
-        nome: 'Ana Teste',
-        email: 'ana@teste.com',
-        telefone: '64999558833',
-        senha: 'senh4b0a',
-      );
-
-      expect(resultado, isFalse);
-      expect(viewModel.erro, equals('Dados inválidos'));
-    });
+        expect(resultado, isFalse);
+        expect(viewModel.erro, equals('Dados inválidos'));
+      },
+    );
 
     test('Deve retornar erro 500', () async {
       final erroDio500 = DioException(

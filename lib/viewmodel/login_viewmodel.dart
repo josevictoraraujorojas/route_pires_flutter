@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/repositories/login_repository.dart';
 
 import '../model/usuario_response.dart';
@@ -22,7 +23,7 @@ class LoginViewModel extends ChangeNotifier {
   String? _erro;
   UsuarioResponse? _usuario;
 
-  bool get Carregando => _carregando;
+  bool get carregando => _carregando;
 
   String? get erro => _erro;
 

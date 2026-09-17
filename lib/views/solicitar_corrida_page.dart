@@ -8,9 +8,14 @@ import 'package:route_pires_flutter/views/fluxo_corrida_page.dart';
 import 'package:route_pires_flutter/views/pesquisar_localizacao_page.dart';
 
 class SolicitarCorridaPage extends StatefulWidget {
-  const SolicitarCorridaPage({super.key, required this.inicioInicial});
+  const SolicitarCorridaPage({
+    super.key,
+    required this.inicioInicial,
+    required this.destinoInicial,
+  });
 
   final LocalizacaoPonto inicioInicial;
+  final LocalizacaoPonto destinoInicial;
 
   @override
   State<SolicitarCorridaPage> createState() => _SolicitarCorridaPageState();
@@ -38,10 +43,14 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   void initState() {
     super.initState();
     inicio = widget.inicioInicial;
+    destino = widget.destinoInicial;
   }
 
   bool get formularioValido =>
-      categoria != null && inicio != null && destino != null;
+      categoria != null &&
+      pagamento != null &&
+      inicio != null &&
+      destino != null;
 
   Future<void> pesquisarLocal({required bool ehInicio}) async {
     final atual = ehInicio ? inicio : destino;
@@ -63,9 +72,9 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
 
   void limpar() {
     setState(() {
-      categoria = null;
-      pagamento = null;
-      inicio = null;
+      categoria = CategoriaCorrida.corrida;
+      pagamento = 'PIX';
+      inicio = widget.inicioInicial;
       destino = null;
     });
   }

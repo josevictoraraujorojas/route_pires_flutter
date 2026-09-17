@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/safe_change_notifier.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
@@ -10,7 +11,7 @@ import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
 
 enum EtapaCorrida { motoristas, negociacao }
 
-class CorridaViewModel extends ChangeNotifier {
+class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   CorridaViewModel({
     required this.passageiroId,
     required this.categoria,
@@ -28,7 +29,8 @@ class CorridaViewModel extends ChangeNotifier {
   final LocalizacaoPonto destino;
   final MototaxistaRepository _mototaxistaRepository;
   final CorridaRepository _corridaRepository;
-  final CancelToken _cancelToken = CancelToken();
+  final CancelToken _cancelLista = CancelToken();
+  final CancelToken _cancelCriacao = CancelToken();
 
   EtapaCorrida _etapa = EtapaCorrida.motoristas;
   List<MototaxistaResumo> _motoristas = const [];
@@ -38,7 +40,6 @@ class CorridaViewModel extends ChangeNotifier {
   bool _carregandoCriacao = false;
   String? _erroLista;
   String? _erroCriacao;
-  bool _disposed = false;
 
   EtapaCorrida get etapa => _etapa;
   List<MototaxistaResumo> get motoristas => _motoristas;
@@ -50,25 +51,25 @@ class CorridaViewModel extends ChangeNotifier {
   String? get erroCriacao => _erroCriacao;
   String get titulo => carregando ? 'Buscando Corrida' : 'Corrida';
   String get motorista => _motoristaSelecionado?.nome ?? '';
-
-  void _avisar() {
-    if (!_disposed) notifyListeners();
-  }
+  bool get bloqueiaSaida => _carregandoCriacao || _corridaCriada != null;
 
   bool _foiCancelado(DioException e) {
-    return e.type == DioExceptionType.cancel || _disposed;
+    return e.type == DioExceptionType.cancel || foiDisposed;
   }
 
   Future<void> buscarMotoristas() async {
     _carregandoLista = true;
     _erroLista = null;
     _etapa = EtapaCorrida.motoristas;
-    _avisar();
+    avisar();
 
     try {
-      _motoristas = await _mototaxistaRepository.listar(
-        cancelToken: _cancelToken,
+      final lista = await _mototaxistaRepository.listar(
+        cancelToken: _cancelLista,
       );
+      _motoristas = lista
+          .where((mototaxista) => mototaxista.disponivel)
+          .toList();
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
       _motoristas = const [];
@@ -78,12 +79,12 @@ class CorridaViewModel extends ChangeNotifier {
         porStatus: const {500: 'Erro interno no servidor'},
       );
     } catch (_) {
-      if (_disposed) return;
+      if (foiDisposed) return;
       _motoristas = const [];
       _erroLista = 'Ocorreu um erro inesperado';
     } finally {
       _carregandoLista = false;
-      _avisar();
+      avisar();
     }
   }
 
@@ -91,14 +92,14 @@ class CorridaViewModel extends ChangeNotifier {
     _motoristaSelecionado = mototaxista;
     _erroCriacao = null;
     _etapa = EtapaCorrida.negociacao;
-    _avisar();
+    avisar();
   }
 
   void recusarNegociacao() {
     _motoristaSelecionado = null;
     _erroCriacao = null;
     _etapa = EtapaCorrida.motoristas;
-    _avisar();
+    avisar();
   }
 
   Future<bool> confirmarNegociacao() async {
@@ -108,13 +109,13 @@ class CorridaViewModel extends ChangeNotifier {
     final mototaxista = _motoristaSelecionado;
     if (mototaxista == null) {
       _erroCriacao = 'Selecione um mototaxista';
-      _avisar();
+      avisar();
       return false;
     }
 
     _carregandoCriacao = true;
     _erroCriacao = null;
-    _avisar();
+    avisar();
 
     try {
       _corridaCriada = await _corridaRepository.criar(
@@ -123,9 +124,9 @@ class CorridaViewModel extends ChangeNotifier {
         mototaxistaId: mototaxista.id,
         origem: origem,
         destino: destino,
-        cancelToken: _cancelToken,
+        cancelToken: _cancelCriacao,
       );
-      return !_disposed;
+      return !foiDisposed;
     } on DioException catch (e) {
       if (_foiCancelado(e)) return false;
       _erroCriacao = mensagemErroDio(
@@ -138,22 +139,24 @@ class CorridaViewModel extends ChangeNotifier {
       );
       return false;
     } catch (_) {
-      if (_disposed) return false;
+      if (foiDisposed) return false;
       _erroCriacao = 'Ocorreu um erro inesperado';
       return false;
     } finally {
       if (_corridaCriada == null) {
         _carregandoCriacao = false;
       }
-      _avisar();
+      avisar();
     }
   }
 
   @override
   void dispose() {
-    _disposed = true;
-    if (!_cancelToken.isCancelled) {
-      _cancelToken.cancel();
+    if (!_cancelLista.isCancelled) {
+      _cancelLista.cancel();
+    }
+    if (!_cancelCriacao.isCancelled) {
+      _cancelCriacao.cancel();
     }
     super.dispose();
   }

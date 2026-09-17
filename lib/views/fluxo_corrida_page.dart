@@ -90,22 +90,30 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
     return AnimatedBuilder(
       animation: viewModel,
       builder: (context, _) {
-        return CupertinoPageScaffold(
-          backgroundColor: CupertinoColors.white,
-          navigationBar: CupertinoNavigationBar(
+        final bloquear = viewModel.bloqueiaSaida;
+        return PopScope(
+          canPop: !bloquear,
+          child: CupertinoPageScaffold(
             backgroundColor: CupertinoColors.white,
-            middle: Text(
-              viewModel.titulo,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            navigationBar: CupertinoNavigationBar(
+              automaticallyImplyLeading: !bloquear,
+              backgroundColor: CupertinoColors.white,
+              middle: Text(
+                viewModel.titulo,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Expanded(child: _conteudo()),
-                const RodapeNavegacao(),
-              ],
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Expanded(child: _conteudo()),
+                  const RodapeNavegacao(),
+                ],
+              ),
             ),
           ),
         );
@@ -159,7 +167,9 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
           padding: EdgeInsets.zero,
           color: CupertinoColors.white,
           borderRadius: BorderRadius.circular(10),
-          onPressed: () => Navigator.pop(context),
+          onPressed: viewModel.bloqueiaSaida
+              ? null
+              : () => Navigator.pop(context),
           child: const Text(
             'Cancel',
             style: TextStyle(color: Color(0xFF006FFD), fontSize: 12),

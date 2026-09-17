@@ -1,9 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/safe_change_notifier.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/repositories/cadastro_passageiro_repository.dart';
 
-class CadastroPassageiroViewModel extends ChangeNotifier {
+class CadastroPassageiroViewModel extends ChangeNotifier
+    with SafeChangeNotifier {
   final CadastroPassageiroRepository _repository;
 
   CadastroPassageiroViewModel({CadastroPassageiroRepository? repository})
@@ -22,29 +25,30 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
     required String telefone,
     required String senha,
   }) async {
+    if (_carregando) return false;
     final telefoneDigitos = telefone.replaceAll(RegExp(r'\D'), '');
-    final emailNormalizado = email.trim().toLowerCase();
+    final emailLimpo = emailNormalizado(email);
 
-    if (!_senhaValida(senha)) {
-      _erro = 'A senha deve ter no mínimo 8 caracteres, com letras e números.';
-      notifyListeners();
+    if (!senhaValida(senha)) {
+      _erro = mensagemSenhaInvalida;
+      avisar();
       return false;
     }
 
     if (telefoneDigitos.length < 10 || telefoneDigitos.length > 11) {
       _erro = 'Informe um telefone com DDD (10 ou 11 dígitos).';
-      notifyListeners();
+      avisar();
       return false;
     }
 
     _carregando = true;
     _erro = null;
-    notifyListeners();
+    avisar();
 
     try {
       await _repository.cadastrar(
         nome: nome.trim(),
-        email: emailNormalizado,
+        email: emailLimpo,
         telefone: telefoneDigitos,
         senha: senha,
       );
@@ -64,16 +68,7 @@ class CadastroPassageiroViewModel extends ChangeNotifier {
       return false;
     } finally {
       _carregando = false;
-      notifyListeners();
+      avisar();
     }
-  }
-
-  bool _senhaValida(String senha) {
-    if (senha.length < 8) {
-      return false;
-    }
-    final temLetra = RegExp(r'[A-Za-z]').hasMatch(senha);
-    final temNumero = RegExp(r'\d').hasMatch(senha);
-    return temLetra && temNumero;
   }
 }
