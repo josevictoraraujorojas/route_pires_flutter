@@ -11,11 +11,13 @@ class CorridaRepository {
 
   final Dio _dio;
 
-  static const statusInicial = 'ANDAMENTO';
+  static const statusInicial = 'PENDENTE';
   static const _statusFinalizados = {
+    'FINALIZADO',
     'FINALIZADA',
     'CONCLUIDA',
     'CONCLUÍDA',
+    'CANCELADO',
     'CANCELADA',
   };
 
@@ -228,11 +230,13 @@ class CorridaRepository {
         ? ApiConfig.corridasPassageiro
         : ApiConfig.corridaFrete;
 
-    await _dio.put(
-      '$path/$id',
-      cancelToken: cancelToken,
-      data: {'status': status, 'motivoCancelamento': ?motivoCancelamento},
-    );
+    final data = <String, dynamic>{'status': status};
+
+    if (motivoCancelamento != null && motivoCancelamento.trim().isNotEmpty) {
+      data['motivoCancelamento'] = motivoCancelamento;
+    }
+
+    await _dio.put('$path/$id', cancelToken: cancelToken, data: data);
   }
 }
 
