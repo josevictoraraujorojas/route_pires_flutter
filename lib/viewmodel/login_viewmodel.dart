@@ -1,15 +1,22 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
 import 'package:route_pires_flutter/repositories/login_repository.dart';
 
 import '../model/usuario_response.dart';
 
 class LoginViewModel extends ChangeNotifier {
+  static const _usuarioKey = 'usuario_logado';
+
   final LoginRepository _repository;
 
   LoginViewModel({LoginRepository? repository})
-    : _repository = repository ?? LoginRepository();
+    : _repository = repository ?? LoginRepository() {
+    carregarUsuarioSalvo();
+  }
 
   bool _carregando = false;
   String? _erro;
@@ -20,6 +27,35 @@ class LoginViewModel extends ChangeNotifier {
   String? get erro => _erro;
 
   UsuarioResponse? get usuario => _usuario;
+
+  Future<void> carregarUsuarioSalvo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString(_usuarioKey);
+    if (json == null || json.isEmpty) return;
+
+    try {
+      final map = Map<String, dynamic>.from(
+        jsonDecode(json) as Map? ?? const {},
+      );
+      _usuario = UsuarioResponse.fromJson(map);
+      notifyListeners();
+    } catch (_) {
+      await prefs.remove(_usuarioKey);
+    }
+  }
+
+  Future<void> _salvarUsuario(UsuarioResponse usuario) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_usuarioKey, jsonEncode(usuario.toJson()));
+  }
+
+  Future<void> sair() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_usuarioKey);
+    _usuario = null;
+    _erro = null;
+    notifyListeners();
+  }
 
   Future<bool> realizarLogin({
     required String email,
@@ -32,6 +68,7 @@ class LoginViewModel extends ChangeNotifier {
 
     try {
       _usuario = await _repository.logar(email: email, senha: senha);
+      await _salvarUsuario(_usuario!);
 
       return true;
     } on DioException catch (e) {

@@ -108,6 +108,29 @@ void main() {
       },
     );
 
+    test(
+      'Deve recusar solicitação localmente sem enviar status ao backend',
+      () async {
+        mockCarregar([solicitacao]);
+        await viewModel.carregar();
+
+        final ok = await viewModel.recusar(solicitacao);
+
+        expect(ok, isTrue);
+        expect(viewModel.solicitacoes, isEmpty);
+        expect(viewModel.erro, isNull);
+        verifyNever(
+          () => repository.atualizarStatus(
+            categoria: any(named: 'categoria'),
+            id: any(named: 'id'),
+            status: any(named: 'status'),
+            motivoCancelamento: any(named: 'motivoCancelamento'),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        );
+      },
+    );
+
     test('Deve cancelar solicitação e remover da lista', () async {
       mockCarregar([solicitacao]);
       await viewModel.carregar();
@@ -131,12 +154,45 @@ void main() {
         () => repository.atualizarStatus(
           categoria: CategoriaCorrida.corrida,
           id: 'solicitacao-1',
-          status: 'CANCELADA',
+          status: 'CANCELADO',
           motivoCancelamento: 'Recusada pelo mototaxista',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
     });
+
+    test(
+      'Deve aceitar solicitação e atualizar status para ANDAMENTO',
+      () async {
+        mockCarregar([solicitacao]);
+        await viewModel.carregar();
+
+        when(
+          () => repository.atualizarStatus(
+            categoria: any(named: 'categoria'),
+            id: any(named: 'id'),
+            status: any(named: 'status'),
+            motivoCancelamento: any(named: 'motivoCancelamento'),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer((_) async {});
+
+        final ok = await viewModel.aceitar(solicitacao);
+
+        expect(ok, isTrue);
+        expect(viewModel.solicitacoes, isEmpty);
+        expect(viewModel.erro, isNull);
+        verify(
+          () => repository.atualizarStatus(
+            categoria: CategoriaCorrida.corrida,
+            id: 'solicitacao-1',
+            status: 'ANDAMENTO',
+            motivoCancelamento: null,
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).called(1);
+      },
+    );
 
     test('Deve mapear erro 404 ao cancelar solicitação', () async {
       when(

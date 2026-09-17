@@ -61,6 +61,65 @@ class SolicitacoesViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> recusar(SolicitacaoCorrida solicitacao) async {
+    _atualizandoStatus = true;
+    _erro = null;
+    _avisar();
+
+    try {
+      _solicitacoes = _solicitacoes
+          .where((item) => item.id != solicitacao.id)
+          .toList();
+      return true;
+    } catch (_) {
+      if (_disposed) return false;
+      _erro = 'Ocorreu um erro inesperado';
+      return false;
+    } finally {
+      _atualizandoStatus = false;
+      _avisar();
+    }
+  }
+
+  Future<bool> aceitar(SolicitacaoCorrida solicitacao) async {
+    _atualizandoStatus = true;
+    _erro = null;
+    _avisar();
+
+    try {
+      await _repository.atualizarStatus(
+        categoria: solicitacao.categoria,
+        id: solicitacao.id,
+        status: 'ANDAMENTO',
+        cancelToken: _cancelToken,
+      );
+
+      _solicitacoes = _solicitacoes
+          .where((item) => item.id != solicitacao.id)
+          .toList();
+      return true;
+    } on DioException catch (e) {
+      if (_foiCancelado(e)) return false;
+      _erro = mensagemErroDio(
+        e,
+        fallback: 'Erro ao aceitar solicitação',
+        porStatus: const {
+          400: 'Dados inválidos',
+          404: 'Solicitação não encontrada',
+          500: 'Erro interno no servidor',
+        },
+      );
+      return false;
+    } catch (_) {
+      if (_disposed) return false;
+      _erro = 'Ocorreu um erro inesperado';
+      return false;
+    } finally {
+      _atualizandoStatus = false;
+      _avisar();
+    }
+  }
+
   Future<bool> cancelar(
     SolicitacaoCorrida solicitacao, {
     String motivo = 'Recusada pelo mototaxista',
@@ -73,7 +132,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
       await _repository.atualizarStatus(
         categoria: solicitacao.categoria,
         id: solicitacao.id,
-        status: 'CANCELADA',
+        status: 'CANCELADO',
         motivoCancelamento: motivo,
         cancelToken: _cancelToken,
       );
