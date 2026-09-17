@@ -4,7 +4,6 @@ import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
 import 'package:route_pires_flutter/viewmodel/corrida_viewmodel.dart';
-import 'package:route_pires_flutter/views/rodape_navegacao.dart';
 
 class FluxoCorridaPage extends StatefulWidget {
   const FluxoCorridaPage({
@@ -108,12 +107,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
             ),
             child: SafeArea(
               top: false,
-              child: Column(
-                children: [
-                  Expanded(child: _conteudo()),
-                  const RodapeNavegacao(),
-                ],
-              ),
+              child: Column(children: [Expanded(child: _conteudo())]),
             ),
           ),
         );

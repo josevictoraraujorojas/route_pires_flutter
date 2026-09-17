@@ -61,18 +61,46 @@ class SolicitacoesViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> recusar(SolicitacaoCorrida solicitacao) async {
+  Future<bool> recusar(
+    SolicitacaoCorrida solicitacao, {
+    String motivo = 'Recusada pelo mototaxista',
+  }) async {
     _atualizandoStatus = true;
     _erro = null;
     _avisar();
 
     try {
+      await _repository.atualizarStatus(
+        categoria: solicitacao.categoria,
+        id: solicitacao.id,
+        status: 'CANCELADO',
+        motivoCancelamento: motivo,
+        cancelToken: _cancelToken,
+      );
+
+      // Remove da lista somente depois que o backend confirmar.
       _solicitacoes = _solicitacoes
           .where((item) => item.id != solicitacao.id)
           .toList();
+
       return true;
+    } on DioException catch (e) {
+      if (_foiCancelado(e)) return false;
+
+      _erro = mensagemErroDio(
+        e,
+        fallback: 'Erro ao recusar solicitação',
+        porStatus: const {
+          400: 'Dados inválidos',
+          404: 'Solicitação não encontrada',
+          500: 'Erro interno no servidor',
+        },
+      );
+
+      return false;
     } catch (_) {
       if (_disposed) return false;
+
       _erro = 'Ocorreu um erro inesperado';
       return false;
     } finally {

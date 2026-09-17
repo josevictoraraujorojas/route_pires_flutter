@@ -21,6 +21,14 @@ class CorridaRepository {
     'CANCELADA',
   };
 
+  Map<String, dynamic>? _mapaComId(dynamic data) {
+    if (data is! Map) return null;
+    final mapa = Map<String, dynamic>.from(data);
+    final id = mapa['id']?.toString() ?? '';
+    if (id.isEmpty) return null;
+    return mapa;
+  }
+
   Future<CorridaResponse> criar({
     required CategoriaCorrida categoria,
     required String passageiroId,
@@ -232,6 +240,9 @@ class CorridaRepository {
     required String id,
     required String status,
     String? motivoCancelamento,
+    String? descricaoCarga,
+    double? pesoCarga,
+    bool? cargaFragil,
     CancelToken? cancelToken,
   }) async {
     final path = categoria == CategoriaCorrida.corrida
@@ -244,6 +255,23 @@ class CorridaRepository {
       data['motivoCancelamento'] = motivoCancelamento;
     }
 
+    // Dados específicos da entrega/frete
+    if (categoria != CategoriaCorrida.corrida) {
+      data['descricaoCarga'] = descricaoCarga?.trim().isNotEmpty == true
+          ? descricaoCarga
+          : 'Frete';
+
+      data['pesoCarga'] = pesoCarga ?? 1.0;
+
+      data['cargaFragil'] = cargaFragil ?? false;
+    }
+
+    print('==============================');
+    print('ATUALIZANDO STATUS');
+    print('URL: $path/$id');
+    print('BODY: $data');
+    print('==============================');
+
     await _dio.put('$path/$id', cancelToken: cancelToken, data: data);
   }
 }
@@ -253,12 +281,4 @@ class _PassageiroResumo {
 
   final String nome;
   final double? avaliacaoMedia;
-
-  Map<String, dynamic>? _mapaComId(dynamic data) {
-    if (data is! Map) return null;
-    final mapa = Map<String, dynamic>.from(data);
-    final id = mapa['id']?.toString() ?? '';
-    if (id.isEmpty) return null;
-    return mapa;
-  }
 }

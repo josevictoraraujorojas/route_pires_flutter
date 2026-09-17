@@ -3,14 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
 
-class PrincipalPage extends StatefulWidget {
-  const PrincipalPage({super.key});
+class PrincipalPageMototaxista extends StatefulWidget {
+  const PrincipalPageMototaxista({super.key});
 
   @override
-  State<PrincipalPage> createState() => _PrincipalPageState();
+  State<PrincipalPageMototaxista> createState() => _PrincipalPageState();
 }
 
-class _PrincipalPageState extends State<PrincipalPage> {
+class _PrincipalPageState extends State<PrincipalPageMototaxista> {
   String tituloCorrida = 'Procurando Corrida';
 
   void alterarTituloCorrida(String novoTitulo) {

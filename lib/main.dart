@@ -6,7 +6,7 @@ import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
 import 'package:route_pires_flutter/views/login_page.dart';
-import 'package:route_pires_flutter/views/principal_page.dart';
+import 'package:route_pires_flutter/views/principal_page_mototaxista.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
 
 void main() {

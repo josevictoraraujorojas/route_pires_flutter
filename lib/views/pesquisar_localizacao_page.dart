@@ -6,7 +6,6 @@ import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/repositories/localizacao_repository.dart';
 import 'package:route_pires_flutter/views/botao_primario.dart';
 import 'package:route_pires_flutter/views/mapa_corrida.dart';
-import 'package:route_pires_flutter/views/rodape_navegacao.dart';
 
 class PesquisarLocalizacaoPage extends StatefulWidget {
   const PesquisarLocalizacaoPage({
@@ -232,7 +231,6 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
                               : () => selecionar(pontoMapa!),
                         ),
                       ),
-                      const RodapeNavegacao(),
                     ],
                   ),
                   if (mostrarBusca)
