@@ -7,6 +7,7 @@ import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
 import 'package:route_pires_flutter/views/login_page.dart';
 import 'package:route_pires_flutter/views/principal_page.dart';
+import 'package:route_pires_flutter/views/selecao_local_page.dart';
 
 void main() {
   runApp(
@@ -26,6 +27,15 @@ class MeuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loginViewModel = context.watch<LoginViewModel>();
+    final usuario = loginViewModel.usuario;
+
+    final home = usuario == null
+        ? const LoginPage()
+        : usuario.tipo == 'MOTOTAXISTA'
+        ? const PrincipalPage()
+        : const SelecaoLocalPage();
+
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
 
@@ -34,7 +44,7 @@ class MeuApp extends StatelessWidget {
         textTheme: CupertinoTextThemeData(textStyle: GoogleFonts.inter()),
       ),
 
-      home: const LoginPage(),
+      home: home,
     );
   }
 }
