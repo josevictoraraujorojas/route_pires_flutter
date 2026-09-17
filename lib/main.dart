@@ -30,12 +30,6 @@ class MeuApp extends StatelessWidget {
     final loginViewModel = context.watch<LoginViewModel>();
     final usuario = loginViewModel.usuario;
 
-    final home = usuario == null
-        ? const LoginPage()
-        : usuario.tipo == 'MOTOTAXISTA'
-        ? const PrincipalPage()
-        : const SelecaoLocalPage();
-
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
 
@@ -44,7 +38,7 @@ class MeuApp extends StatelessWidget {
         textTheme: CupertinoTextThemeData(textStyle: GoogleFonts.inter()),
       ),
 
-      home: home,
+      home: LoginPage(),
     );
   }
 }

@@ -37,11 +37,36 @@ class _CorridaState extends State<Corrida> {
 
   SolicitacoesViewModel? solicitacoesViewModel;
 
+  GoogleNavigationViewController? mapController;
+
+  // ============================================================
+  // DESTINOS DA ROTA
+  // ============================================================
+
   NavigationWaypoint? destinoCliente;
 
   NavigationWaypoint? destinoFinal;
 
-  GoogleNavigationViewController? mapController;
+  final List<NavigationWaypoint> pontosDaRota = [];
+
+  // Índice do ponto que está sendo atendido.
+  //
+  // 0 = primeiro ponto
+  // 1 = segundo ponto
+  // 2 = terceiro ponto
+  // etc.
+  int pontoAtual = 0;
+
+  // Evita que o mesmo evento de chegada seja processado
+  // mais de uma vez simultaneamente.
+  bool processandoChegada = false;
+
+  // Listener do evento de chegada.
+  StreamSubscription<OnArrivalEvent>? arrivalSubscription;
+
+  // ============================================================
+  // INICIALIZAÇÃO DA NAVEGAÇÃO
+  // ============================================================
 
   Future<void> inicializarNavegacao() async {
     final termosAceitos = await GoogleMapsNavigator.areTermsAccepted();
@@ -59,6 +84,14 @@ class _CorridaState extends State<Corrida> {
 
     await GoogleMapsNavigator.initializeNavigationSession();
 
+    // ==========================================================
+    // ESCUTA QUANDO O MOTOTAXISTA CHEGA A UM WAYPOINT
+    // ==========================================================
+
+    arrivalSubscription = GoogleMapsNavigator.setOnArrivalListener(
+      _aoChegarNoPonto,
+    );
+
     if (!mounted) return;
 
     setState(() {
@@ -68,11 +101,23 @@ class _CorridaState extends State<Corrida> {
     widget.onTituloChanged('Procurando Corrida');
   }
 
+  // ============================================================
+  // CRIA OS DESTINOS
+  // ============================================================
+
   Destinations criarDestinos() {
     final solicitacao = solicitacaoSelecionada;
+
     if (solicitacao == null) {
       throw Exception('Nenhuma solicitação selecionada.');
     }
+
+    // Limpa a lista antes de criar novamente.
+    pontosDaRota.clear();
+
+    // ==========================================================
+    // PONTO 1 - CLIENTE
+    // ==========================================================
 
     destinoCliente = NavigationWaypoint.withLatLngTarget(
       title: solicitacao.passageiroNome,
@@ -82,6 +127,12 @@ class _CorridaState extends State<Corrida> {
       ),
     );
 
+    pontosDaRota.add(destinoCliente!);
+
+    // ==========================================================
+    // PONTO 2 - DESTINO FINAL
+    // ==========================================================
+
     destinoFinal = NavigationWaypoint.withLatLngTarget(
       title: 'Destino final',
       target: LatLng(
@@ -90,16 +141,118 @@ class _CorridaState extends State<Corrida> {
       ),
     );
 
+    pontosDaRota.add(destinoFinal!);
+
+    pontoAtual = 0;
+
+    print('=================================');
+    print('PONTOS DA ROTA');
+    print('=================================');
+
+    for (int i = 0; i < pontosDaRota.length; i++) {
+      print('Ponto ${i + 1}: ${pontosDaRota[i].title}');
+    }
+
+    print('=================================');
+
     return Destinations(
-      waypoints: [destinoCliente!, destinoFinal!],
+      waypoints: pontosDaRota,
       displayOptions: NavigationDisplayOptions(),
       routingOptions: criarOpcoesDeRota(),
     );
   }
 
+  // ============================================================
+  // OPÇÕES DE ROTA
+  // ============================================================
+
   RoutingOptions criarOpcoesDeRota() {
     return RoutingOptions(travelMode: NavigationTravelMode.driving);
   }
+
+  // ============================================================
+  // EVENTO DE CHEGADA A UM PONTO
+  // ============================================================
+
+  Future<void> _aoChegarNoPonto(OnArrivalEvent evento) async {
+    // Impede processamento duplicado.
+    if (processandoChegada) {
+      print('Chegada já está sendo processada.');
+      return;
+    }
+
+    processandoChegada = true;
+
+    try {
+      print('');
+      print('=================================');
+      print('CHEGOU AO WAYPOINT');
+      print('=================================');
+      print('Ponto atual: ${pontoAtual + 1}');
+      print('Total de pontos: ${pontosDaRota.length}');
+      print('Waypoint recebido: ${evento.waypoint}');
+      print('=================================');
+
+      // ========================================================
+      // AINDA EXISTE OUTRO PONTO?
+      // ========================================================
+
+      if (pontoAtual < pontosDaRota.length - 1) {
+        // Avança o índice.
+        pontoAtual++;
+
+        print(
+          'Avançando para o ponto '
+          '${pontoAtual + 1} '
+          'de ${pontosDaRota.length}',
+        );
+
+        // ======================================================
+        // MANDA O GOOGLE NAVIGATION CONTINUAR PARA O PRÓXIMO
+        // ======================================================
+
+        final resposta = await GoogleMapsNavigator.continueToNextDestination();
+
+        print(
+          'continueToNextDestination(): '
+          '$resposta',
+        );
+
+        print('Navegação para o próximo ponto iniciada.');
+
+        if (mounted) {
+          setState(() {});
+        }
+      } else {
+        // ======================================================
+        // CHEGOU AO ÚLTIMO PONTO
+        // ======================================================
+
+        print('');
+        print('=================================');
+        print('ÚLTIMO DESTINO ALCANÇADO');
+        print('=================================');
+
+        if (mounted) {
+          widget.onTituloChanged('Destino final alcançado');
+
+          setState(() {});
+        }
+
+        // Não chama finalizarNavegacao() automaticamente.
+        //
+        // O botão "Finalizar navegação" continuará disponível.
+      }
+    } catch (e) {
+      print('Erro ao avançar para o próximo ponto: $e');
+    } finally {
+      processandoChegada = false;
+    }
+  }
+
+  // ============================================================
+  // INICIAR NAVEGAÇÃO
+  // ============================================================
 
   Future<void> iniciarNavegacao() async {
     if (iniciandoNavegacao) return;
@@ -146,15 +299,27 @@ class _CorridaState extends State<Corrida> {
     });
 
     try {
+      print('');
       print('=================================');
       print('INICIANDO NAVEGAÇÃO');
+      print('=================================');
       print('Tipo: $tipoSolicitacao');
       print('Solicitação: $solicitacaoSelecionada');
       print('=================================');
 
+      // ========================================================
+      // CRIA OS PONTOS
+      // ========================================================
+
       print('Criando destinos...');
 
       final destinos = criarDestinos();
+
+      print('Total de pontos: ${pontosDaRota.length}');
+
+      // ========================================================
+      // CALCULA A ROTA
+      // ========================================================
 
       print('Calculando rota...');
 
@@ -174,9 +339,19 @@ class _CorridaState extends State<Corrida> {
 
       print('Rota calculada com sucesso!');
 
+      // ========================================================
+      // INICIA A ORIENTAÇÃO
+      // ========================================================
+
       await GoogleMapsNavigator.startGuidance();
 
       print('Navegação iniciada!');
+
+      print(
+        'Navegando para o ponto '
+        '${pontoAtual + 1} '
+        'de ${pontosDaRota.length}',
+      );
 
       if (!mounted) return;
 
@@ -204,7 +379,15 @@ class _CorridaState extends State<Corrida> {
     }
   }
 
+  // ============================================================
+  // FINALIZAR NAVEGAÇÃO
+  // ============================================================
+
   Future<void> finalizarNavegacao() async {
+    final viewModel = solicitacoesViewModel;
+    final atual = solicitacaoSelecionada;
+
+    print('');
     print('=================================');
     print('FINALIZANDO NAVEGAÇÃO');
     print('=================================');
@@ -217,6 +400,12 @@ class _CorridaState extends State<Corrida> {
       await GoogleMapsNavigator.clearDestinations();
 
       print('Rota removida do mapa.');
+
+      // Mantendo o comportamento que já existia
+      // no seu arquivo.
+      if (viewModel != null && atual != null) {
+        await viewModel.finalizar(atual);
+      }
 
       if (!mounted) return;
 
@@ -236,6 +425,12 @@ class _CorridaState extends State<Corrida> {
         destinoCliente = null;
 
         destinoFinal = null;
+
+        pontosDaRota.clear();
+
+        pontoAtual = 0;
+
+        processandoChegada = false;
       });
 
       widget.onTituloChanged('Procurando Corrida');
@@ -245,6 +440,10 @@ class _CorridaState extends State<Corrida> {
       print('Erro ao finalizar navegação: $e');
     }
   }
+
+  // ============================================================
+  // ABRIR PASSAGEIRO
+  // ============================================================
 
   void abrirPassageiro(SolicitacaoCorrida solicitacao) {
     setState(() {
@@ -262,10 +461,18 @@ class _CorridaState extends State<Corrida> {
     );
   }
 
+  // ============================================================
+  // CANCELAR SOLICITAÇÃO
+  // ============================================================
+
   Future<void> cancelarSolicitacao() async {
     final viewModel = solicitacoesViewModel;
+
     final atual = solicitacaoSelecionada;
-    if (viewModel == null || atual == null) return;
+
+    if (viewModel == null || atual == null) {
+      return;
+    }
 
     final recusou = await viewModel.recusar(atual);
 
@@ -293,6 +500,10 @@ class _CorridaState extends State<Corrida> {
     );
   }
 
+  // ============================================================
+  // VOLTAR PARA LISTA
+  // ============================================================
+
   void voltarParaLista() {
     setState(() {
       mostrandoPassageiro = false;
@@ -305,6 +516,10 @@ class _CorridaState extends State<Corrida> {
     widget.onTituloChanged('Procurando Corrida');
   }
 
+  // ============================================================
+  // INIT STATE
+  // ============================================================
+
   @override
   void initState() {
     super.initState();
@@ -312,17 +527,29 @@ class _CorridaState extends State<Corrida> {
     inicializarNavegacao();
 
     final mototaxistaId = widget.mototaxistaId;
+
     if (mototaxistaId != null && mototaxistaId.isNotEmpty) {
       solicitacoesViewModel = SolicitacoesViewModel(
         mototaxistaId: mototaxistaId,
       )..addListener(_aoAtualizarSolicitacoes);
+
       solicitacoesViewModel!.carregar();
     }
   }
 
+  // ============================================================
+  // ATUALIZAÇÃO DAS SOLICITAÇÕES
+  // ============================================================
+
   void _aoAtualizarSolicitacoes() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -354,21 +581,15 @@ class _CorridaState extends State<Corrida> {
                     bottom: 0,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-
                       curve: Curves.easeInOut,
-
                       height: listaExpandida ? 500 : 100,
-
                       width: double.infinity,
-
                       decoration: const BoxDecoration(
                         color: CupertinoColors.white,
-
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(24),
                           topRight: Radius.circular(24),
                         ),
-
                         boxShadow: [
                           BoxShadow(
                             blurRadius: 10,
@@ -378,13 +599,11 @@ class _CorridaState extends State<Corrida> {
                           ),
                         ],
                       ),
-
                       child: Column(
                         children: [
                           SizedBox(
                             height: 45,
                             width: double.infinity,
-
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
@@ -403,15 +622,12 @@ class _CorridaState extends State<Corrida> {
                                   }
                                 });
                               },
-
                               child: Center(
                                 child: Icon(
                                   listaExpandida
                                       ? CupertinoIcons.chevron_down
                                       : CupertinoIcons.chevron_up,
-
                                   size: 20,
-
                                   color: CupertinoColors.systemBlue,
                                 ),
                               ),
@@ -451,10 +667,8 @@ class _CorridaState extends State<Corrida> {
                     left: 12,
                     right: 12,
                     bottom: 12,
-
                     child: CupertinoButton.filled(
                       onPressed: iniciandoNavegacao ? null : finalizarNavegacao,
-
                       child: const Text(
                         'Finalizar navegação',
                         style: TextStyle(color: CupertinoColors.white),
@@ -466,7 +680,6 @@ class _CorridaState extends State<Corrida> {
                   Positioned.fill(
                     child: Container(
                       color: CupertinoColors.black.withOpacity(0.15),
-
                       child: const Center(
                         child: CupertinoActivityIndicator(radius: 15),
                       ),
@@ -477,6 +690,10 @@ class _CorridaState extends State<Corrida> {
           )
         : const Center(child: CupertinoActivityIndicator());
   }
+
+  // ============================================================
+  // DRAWER
+  // ============================================================
 
   Widget _construirDrawer() {
     final carregando = solicitacoesViewModel?.atualizandoStatus ?? false;
@@ -498,11 +715,20 @@ class _CorridaState extends State<Corrida> {
     );
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
+    // Remove o listener de chegada.
+    arrivalSubscription?.cancel();
+
     final viewModel = solicitacoesViewModel;
+
     if (viewModel != null) {
       viewModel.removeListener(_aoAtualizarSolicitacoes);
+
       viewModel.dispose();
     }
 
