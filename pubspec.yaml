@@ -33,6 +33,7 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   provider: ^6.1.2
+  shared_preferences: ^2.3.5
   flutter:
     sdk: flutter
 
