@@ -9,16 +9,28 @@ class MototaxistaRepository {
 
   MototaxistaRepository() : _dio = ApiClient().dio;
 
+  // ============================================================
+  // CADASTRAR MOTOTAXISTA
+  // ============================================================
+
   Future<void> cadastrar(MototaxistaCadastro mototaxista) async {
-    await _dio.post(ApiConfig.mototaxistas, data: mototaxista.toJson());
+    final json = mototaxista.toJson();
+
+    await _dio.post(ApiConfig.mototaxistas, data: json);
   }
+
+  // ============================================================
+  // LISTAR MOTOTAXISTAS
+  // ============================================================
 
   Future<List<MototaxistaResumo>> listar({CancelToken? cancelToken}) async {
     final response = await _dio.get(
       ApiConfig.mototaxistas,
       cancelToken: cancelToken,
     );
+
     final data = response.data;
+
     if (data is! List) {
       return const [];
     }
@@ -30,5 +42,19 @@ class MototaxistaRepository {
         )
         .where((mototaxista) => mototaxista.id.isNotEmpty)
         .toList();
+  }
+
+  // ============================================================
+  // ATUALIZAR PARCIALMENTE A DISPONIBILIDADE
+  // ============================================================
+
+  Future<void> atualizarDisponibilidade({
+    required String id,
+    required bool disponivel,
+  }) async {
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      data: {'disponivel': disponivel},
+    );
   }
 }

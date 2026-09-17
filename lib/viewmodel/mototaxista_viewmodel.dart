@@ -25,6 +25,37 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
     avisar();
   }
 
+  Future<bool> alterarDisponibilidade({
+    required String id,
+    required bool disponivel,
+  }) async {
+    try {
+      await _repository.atualizarDisponibilidade(
+        id: id,
+        disponivel: disponivel,
+      );
+
+      return true;
+    } on DioException catch (e) {
+      _erro = mensagemErroDio(
+        e,
+        fallback: 'Não foi possível alterar a disponibilidade',
+        porStatus: const {
+          400: 'Valor de disponibilidade inválido',
+          404: 'Mototaxista não encontrado',
+          500: 'Erro interno no servidor',
+        },
+      );
+
+      avisar();
+      return false;
+    } catch (_) {
+      _erro = 'Não foi possível alterar a disponibilidade';
+      avisar();
+      return false;
+    }
+  }
+
   Future<bool> cadastrar([MototaxistaCadastro? mototaxista]) async {
     if (_carregando) return false;
     final cadastro = mototaxista ?? rascunho.paraCadastro();

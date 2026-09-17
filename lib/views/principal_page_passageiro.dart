@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
+import 'package:route_pires_flutter/views/perfil_passageiro.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
 
 class PrincipalPagePassageiro extends StatefulWidget {
@@ -20,7 +21,6 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
       tabBar: CupertinoTabBar(
         activeColor: CupertinoColors.systemBlue,
         inactiveColor: CupertinoColors.systemGrey2,
-
         items: const [
           BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.compass),
@@ -94,10 +94,7 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
           case 3:
             return CupertinoTabView(
               builder: (context) {
-                return const CupertinoPageScaffold(
-                  navigationBar: CupertinoNavigationBar(middle: Text('Perfil')),
-                  child: SafeArea(child: Center(child: Text('Perfil'))),
-                );
+                return PerfilPassageiro();
               },
             );
 

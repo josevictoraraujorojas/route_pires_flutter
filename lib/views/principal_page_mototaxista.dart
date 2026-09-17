@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
+import 'package:route_pires_flutter/views/perfil_mototaxista.dart';
 
 class PrincipalPageMototaxista extends StatefulWidget {
   const PrincipalPageMototaxista({super.key});
@@ -27,8 +28,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
       tabBar: CupertinoTabBar(
         activeColor: CupertinoColors.systemBlue,
         inactiveColor: CupertinoColors.systemGrey2,
-
-        items: [
+        items: const [
           BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.compass),
             label: 'Corrida',
@@ -50,6 +50,10 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
 
       tabBuilder: (context, index) {
         switch (index) {
+          // ============================================================
+          // CORRIDA
+          // ============================================================
+
           case 0:
             return CupertinoTabView(
               builder: (context) {
@@ -57,7 +61,6 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
                   navigationBar: CupertinoNavigationBar(
                     middle: Text(tituloCorrida),
                   ),
-
                   child: Corrida(
                     onTituloChanged: alterarTituloCorrida,
                     mototaxistaId: mototaxistaId,
@@ -65,6 +68,10 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
                 );
               },
             );
+
+          // ============================================================
+          // AVALIAÇÕES
+          // ============================================================
 
           case 1:
             return CupertinoTabView(
@@ -78,6 +85,10 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
               },
             );
 
+          // ============================================================
+          // NEGOCIAÇÃO
+          // ============================================================
+
           case 2:
             return CupertinoTabView(
               builder: (context) {
@@ -90,15 +101,20 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
               },
             );
 
+          // ============================================================
+          // PERFIL
+          // ============================================================
+
           case 3:
             return CupertinoTabView(
               builder: (context) {
-                return const CupertinoPageScaffold(
-                  navigationBar: CupertinoNavigationBar(middle: Text('Perfil')),
-                  child: Center(child: Text('Perfil')),
-                );
+                return const PerfilMototaxista();
               },
             );
+
+          // ============================================================
+          // PADRÃO
+          // ============================================================
 
           default:
             return CupertinoTabView(

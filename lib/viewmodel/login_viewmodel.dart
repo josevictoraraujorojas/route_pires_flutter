@@ -31,14 +31,20 @@ class LoginViewModel extends ChangeNotifier {
 
   Future<void> carregarUsuarioSalvo() async {
     final prefs = await SharedPreferences.getInstance();
+
     final json = prefs.getString(_usuarioKey);
-    if (json == null || json.isEmpty) return;
+
+    if (json == null || json.isEmpty) {
+      return;
+    }
 
     try {
       final map = Map<String, dynamic>.from(
         jsonDecode(json) as Map? ?? const {},
       );
+
       _usuario = UsuarioResponse.fromJson(map);
+
       notifyListeners();
     } catch (_) {
       await prefs.remove(_usuarioKey);
@@ -47,14 +53,22 @@ class LoginViewModel extends ChangeNotifier {
 
   Future<void> _salvarUsuario(UsuarioResponse usuario) async {
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.setString(_usuarioKey, jsonEncode(usuario.toJson()));
   }
 
+  /// Encerra a sessão do usuário.
+  ///
+  /// Remove o usuário salvo no SharedPreferences
+  /// e limpa o usuário atualmente carregado.
   Future<void> sair() async {
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.remove(_usuarioKey);
+
     _usuario = null;
     _erro = null;
+
     notifyListeners();
   }
 
@@ -69,6 +83,7 @@ class LoginViewModel extends ChangeNotifier {
 
     try {
       _usuario = await _repository.logar(email: email, senha: senha);
+
       await _salvarUsuario(_usuario!);
 
       return true;
@@ -83,12 +98,15 @@ class LoginViewModel extends ChangeNotifier {
           500: 'Erro interno no servidor',
         },
       );
+
       return false;
     } catch (e) {
       _erro = 'Ocorreu um erro inesperado';
+
       return false;
     } finally {
       _carregando = false;
+
       notifyListeners();
     }
   }
