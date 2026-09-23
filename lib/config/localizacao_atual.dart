@@ -25,6 +25,26 @@ Future<LatLng> posicaoAtual() {
 }
 
 Future<LatLng> _lerPosicao() async {
+  await verificarPermissaoLocalizacao();
+
+  try {
+    final posicao = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
+      ),
+    );
+    final ponto = LatLng(posicao.latitude, posicao.longitude);
+    _cache = ponto;
+    _cacheEm = DateTime.now();
+    return ponto;
+  } catch (erro) {
+    if (erro is FalhaLocalizacao) rethrow;
+    throw FalhaLocalizacao('Não foi possível obter sua localização.');
+  }
+}
+
+Future<void> verificarPermissaoLocalizacao() async {
   final servicoAtivo = await Geolocator.isLocationServiceEnabled();
   if (!servicoAtivo) {
     throw FalhaLocalizacao('Ative a localização do aparelho.');
@@ -41,21 +61,5 @@ Future<LatLng> _lerPosicao() async {
     throw FalhaLocalizacao(
       'Libere a localização nas configurações do aplicativo.',
     );
-  }
-
-  try {
-    final posicao = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 15),
-      ),
-    );
-    final ponto = LatLng(posicao.latitude, posicao.longitude);
-    _cache = ponto;
-    _cacheEm = DateTime.now();
-    return ponto;
-  } catch (erro) {
-    if (erro is FalhaLocalizacao) rethrow;
-    throw FalhaLocalizacao('Não foi possível obter sua localização.');
   }
 }

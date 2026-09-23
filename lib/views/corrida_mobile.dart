@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
+import 'package:route_pires_flutter/config/localizacao_atual.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
 import 'package:route_pires_flutter/views/drawer_corrida.dart';
@@ -45,6 +46,8 @@ class _CorridaState extends State<Corrida> {
 
   GoogleNavigationViewController? mapController;
 
+  Future<bool>? _inicializacaoEmVoo;
+
   // ============================================================
   // DESTINOS DA ROTA
   // ============================================================
@@ -74,16 +77,23 @@ class _CorridaState extends State<Corrida> {
   // INICIALIZAÇÃO DA NAVEGAÇÃO
   // ============================================================
 
-  Future<bool> inicializarNavegacao() async {
-    if (navegacaoInicializada) return true;
-    if (inicializandoNavegacao) return false;
+  Future<bool> inicializarNavegacao() {
+    if (navegacaoInicializada) return Future.value(true);
+    final emVoo = _inicializacaoEmVoo;
+    if (emVoo != null) return emVoo;
+    return _inicializacaoEmVoo = _inicializarNavegacao().whenComplete(() {
+      _inicializacaoEmVoo = null;
+    });
+  }
 
+  Future<bool> _inicializarNavegacao() async {
     setState(() {
       inicializandoNavegacao = true;
       erroNavegacao = null;
     });
 
     try {
+      await verificarPermissaoLocalizacao();
       final termosAceitos = await GoogleMapsNavigator.areTermsAccepted();
       if (!termosAceitos) {
         final aceitou = await GoogleMapsNavigator.showTermsAndConditionsDialog(
@@ -116,8 +126,7 @@ class _CorridaState extends State<Corrida> {
       return true;
     } on SessionInitializationException catch (e) {
       final motivo = switch (e.code) {
-        SessionInitializationError.notAuthorized =>
-          'A chave do Google Maps/Navigation não está autorizada para este aplicativo.',
+        SessionInitializationError.notAuthorized => 'A chave do Google Maps/Navigation não está autorizada para este aplicativo.',
         SessionInitializationError.locationPermissionMissing =>
           'Permita o acesso à localização para iniciar o Google Navigation.',
         SessionInitializationError.termsNotAccepted =>
@@ -126,6 +135,14 @@ class _CorridaState extends State<Corrida> {
       if (mounted) {
         setState(() {
           erroNavegacao = '$motivo As solicitações continuam disponíveis.';
+        });
+      }
+      return false;
+    } on FalhaLocalizacao catch (e) {
+      if (mounted) {
+        setState(() {
+          erroNavegacao =
+              '${e.mensagem} As solicitações continuam disponíveis.';
         });
       }
       return false;
@@ -275,12 +292,8 @@ class _CorridaState extends State<Corrida> {
     });
 
     try {
-      // Confirma os termos antes de alterar o estado da corrida na API.
-      if (!navegacaoInicializada && !await inicializarNavegacao()) return;
-      if (!mounted) return;
-
-      // Uma tentativa de rota pode falhar depois do aceite. Nesse caso, uma
-      // nova tentativa não deve enviar ANDAMENTO pela segunda vez.
+      // O estado da corrida não depende do SDK de navegação. Se o mapa falhar,
+      // o mototaxista ainda pode finalizar ou cancelar a corrida.
       if (!corridaAceita) {
         final aceitou = await viewModel.aceitar(atual);
         if (!mounted) return;
@@ -294,6 +307,9 @@ class _CorridaState extends State<Corrida> {
           corridaAceita = true;
         });
       }
+
+      if (!navegacaoInicializada && !await inicializarNavegacao()) return;
+      if (!mounted) return;
 
       final destinos = criarDestinos();
       final status = await GoogleMapsNavigator.setDestinations(destinos);
