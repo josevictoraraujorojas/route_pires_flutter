@@ -45,7 +45,10 @@ class MototaxistaRepository {
   }
 
   Future<bool> obterDisponibilidade({required String id}) async {
-    final response = await _dio.get('${ApiConfig.mototaxistas}/$id');
+    final response = await _dio.get(
+      '${ApiConfig.mototaxistas}/$id',
+      queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+    );
     final data = response.data;
     if (data is Map && data['disponivel'] is bool) {
       return data['disponivel'] as bool;
