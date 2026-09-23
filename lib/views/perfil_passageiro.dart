@@ -88,7 +88,11 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
     final nome = usuario?.nome ?? 'Passageiro';
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('Perfil')),
+      backgroundColor: CupertinoColors.white,
+      navigationBar: const CupertinoNavigationBar(
+        backgroundColor: CupertinoColors.white,
+        middle: Text('Perfil'),
+      ),
 
       child: SafeArea(
         child: ListView(

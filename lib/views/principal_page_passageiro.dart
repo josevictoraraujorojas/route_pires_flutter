@@ -16,6 +16,7 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
+        backgroundColor: CupertinoColors.white,
         activeColor: CupertinoColors.systemBlue,
         inactiveColor: CupertinoColors.systemGrey2,
         items: const [
@@ -47,7 +48,9 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
             return CupertinoTabView(
               builder: (context) {
                 return CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: const Text('Corrida'),
                     trailing: CupertinoButton(
                       padding: EdgeInsets.zero,
@@ -72,7 +75,9 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
             return CupertinoTabView(
               builder: (context) {
                 return const CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: Text('Avaliações'),
                   ),
                   child: SafeArea(child: Center(child: Text('Avaliações'))),
@@ -87,7 +92,9 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
             return CupertinoTabView(
               builder: (context) {
                 return const CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: Text('Negociação'),
                   ),
                   child: SafeArea(child: Center(child: Text('Negociação'))),
@@ -112,7 +119,9 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
             return CupertinoTabView(
               builder: (context) {
                 return CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: const CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: Text('Corrida'),
                   ),
                   child: SafeArea(child: Center(child: SelecaoLocalPage())),

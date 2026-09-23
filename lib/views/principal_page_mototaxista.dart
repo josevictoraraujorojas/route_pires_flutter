@@ -26,6 +26,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
 
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
+        backgroundColor: CupertinoColors.white,
         activeColor: CupertinoColors.systemBlue,
         inactiveColor: CupertinoColors.systemGrey2,
         items: const [
@@ -58,7 +59,9 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
             return CupertinoTabView(
               builder: (context) {
                 return CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: Text(tituloCorrida),
                   ),
                   child: Corrida(
@@ -77,7 +80,9 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
             return CupertinoTabView(
               builder: (context) {
                 return const CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: Text('Avaliações'),
                   ),
                   child: Center(child: Text('Avaliações')),
@@ -93,7 +98,9 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
             return CupertinoTabView(
               builder: (context) {
                 return const CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: Text('Negociação'),
                   ),
                   child: Center(child: Text('Negociação')),
@@ -120,7 +127,9 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista> {
             return CupertinoTabView(
               builder: (context) {
                 return CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
+                    backgroundColor: CupertinoColors.white,
                     middle: Text(tituloCorrida),
                   ),
                   child: Corrida(

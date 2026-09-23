@@ -198,7 +198,11 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
     final nome = usuario?.nome ?? 'Mototaxista';
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('Perfil')),
+      backgroundColor: CupertinoColors.white,
+      navigationBar: const CupertinoNavigationBar(
+        backgroundColor: CupertinoColors.white,
+        middle: Text('Perfil'),
+      ),
 
       child: SafeArea(
         child: ListView(
