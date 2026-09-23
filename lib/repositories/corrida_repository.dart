@@ -194,7 +194,7 @@ class CorridaRepository {
       ids.map((id) async {
         try {
           final response = await _dio.get(
-            '${ApiConfig.passageiros}/$id',
+            ApiConfig.passageiroResumo(id),
             cancelToken: cancelToken,
           );
 
@@ -209,6 +209,13 @@ class CorridaRepository {
               },
             );
           }
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 401 ||
+              e.response?.statusCode == 403 ||
+              e.type == DioExceptionType.cancel) {
+            rethrow;
+          }
+          // Melhor esforço para outras falhas: mantém o nome padrão.
         } catch (_) {
           // Melhor esforço: se a busca falhar, mantém o nome padrão.
         }
@@ -240,9 +247,6 @@ class CorridaRepository {
     required String id,
     required String status,
     String? motivoCancelamento,
-    String? descricaoCarga,
-    double? pesoCarga,
-    bool? cargaFragil,
     CancelToken? cancelToken,
   }) async {
     final path = categoria == CategoriaCorrida.corrida
@@ -254,23 +258,6 @@ class CorridaRepository {
     if (motivoCancelamento != null && motivoCancelamento.trim().isNotEmpty) {
       data['motivoCancelamento'] = motivoCancelamento;
     }
-
-    // Dados específicos da entrega/frete
-    if (categoria != CategoriaCorrida.corrida) {
-      data['descricaoCarga'] = descricaoCarga?.trim().isNotEmpty == true
-          ? descricaoCarga
-          : 'Frete';
-
-      data['pesoCarga'] = pesoCarga ?? 1.0;
-
-      data['cargaFragil'] = cargaFragil ?? false;
-    }
-
-    print('==============================');
-    print('ATUALIZANDO STATUS');
-    print('URL: $path/$id');
-    print('BODY: $data');
-    print('==============================');
 
     await _dio.put('$path/$id', cancelToken: cancelToken, data: data);
   }

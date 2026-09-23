@@ -108,28 +108,35 @@ void main() {
       },
     );
 
-    test(
-      'Deve recusar solicitação localmente sem enviar status ao backend',
-      () async {
-        mockCarregar([solicitacao]);
-        await viewModel.carregar();
+    test('Deve recusar solicitação no backend e remover da lista', () async {
+      mockCarregar([solicitacao]);
+      await viewModel.carregar();
 
-        final ok = await viewModel.recusar(solicitacao);
+      when(
+        () => repository.atualizarStatus(
+          categoria: any(named: 'categoria'),
+          id: any(named: 'id'),
+          status: any(named: 'status'),
+          motivoCancelamento: any(named: 'motivoCancelamento'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async {});
 
-        expect(ok, isTrue);
-        expect(viewModel.solicitacoes, isEmpty);
-        expect(viewModel.erro, isNull);
-        verifyNever(
-          () => repository.atualizarStatus(
-            categoria: any(named: 'categoria'),
-            id: any(named: 'id'),
-            status: any(named: 'status'),
-            motivoCancelamento: any(named: 'motivoCancelamento'),
-            cancelToken: any(named: 'cancelToken'),
-          ),
-        );
-      },
-    );
+      final ok = await viewModel.recusar(solicitacao);
+
+      expect(ok, isTrue);
+      expect(viewModel.solicitacoes, isEmpty);
+      expect(viewModel.erro, isNull);
+      verify(
+        () => repository.atualizarStatus(
+          categoria: CategoriaCorrida.corrida,
+          id: 'solicitacao-1',
+          status: 'CANCELADO',
+          motivoCancelamento: 'Recusada pelo mototaxista',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+    });
 
     test('Deve cancelar solicitação e remover da lista', () async {
       mockCarregar([solicitacao]);

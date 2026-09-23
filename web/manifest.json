@@ -1,7 +1,8 @@
 {
     "name": "route_pires_flutter",
     "short_name": "route_pires_flutter",
-    "start_url": ".",
+    "start_url": "/app/",
+    "scope": "/app/",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",

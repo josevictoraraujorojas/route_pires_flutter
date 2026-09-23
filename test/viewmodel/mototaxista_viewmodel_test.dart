@@ -144,7 +144,7 @@ void main() {
       );
     });
 
-    test('Deve retornar erro genérico para outros status HTTP', () async {
+    test('Deve mostrar falta de permissão no 403', () async {
       final erroDio403 = DioException(
         requestOptions: RequestOptions(path: '/mototaxistas'),
         response: Response(
@@ -158,7 +158,7 @@ void main() {
       final resultado = await viewModel.cadastrar(mototaxista);
 
       expect(resultado, isFalse);
-      expect(viewModel.erro, equals('Não foi possível concluir o cadastro'));
+      expect(viewModel.erro, equals('Você não tem permissão para esta ação'));
     });
 
     test('Deve retornar erro de conexão quando não houver resposta', () async {

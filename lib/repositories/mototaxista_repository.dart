@@ -25,7 +25,7 @@ class MototaxistaRepository {
 
   Future<List<MototaxistaResumo>> listar({CancelToken? cancelToken}) async {
     final response = await _dio.get(
-      ApiConfig.mototaxistas,
+      ApiConfig.mototaxistasDisponiveis,
       cancelToken: cancelToken,
     );
 

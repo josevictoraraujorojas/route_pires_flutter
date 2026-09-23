@@ -31,7 +31,7 @@ android {
     defaultConfig {
     applicationId = "com.example.route_pires_flutter"
 
-    minSdk = flutter.minSdkVersion
+    minSdk = 24
     targetSdk = flutter.targetSdkVersion
 
     versionCode = flutter.versionCode

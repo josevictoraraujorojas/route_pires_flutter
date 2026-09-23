@@ -1,6 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:provider/provider.dart';
-import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/perfil_passageiro.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
 
@@ -15,8 +13,6 @@ class PrincipalPagePassageiro extends StatefulWidget {
 class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
   @override
   Widget build(BuildContext context) {
-    final passageiroId = context.watch<LoginViewModel>().usuario?.id;
-
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
         activeColor: CupertinoColors.systemBlue,

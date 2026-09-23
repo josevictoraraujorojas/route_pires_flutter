@@ -18,5 +18,8 @@ String mensagemErroDio(
     }
   }
 
+  if (response.statusCode == 403) {
+    return 'Você não tem permissão para esta ação';
+  }
   return porStatus[response.statusCode] ?? fallback;
 }

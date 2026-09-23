@@ -5,9 +5,6 @@ import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_1_page.dart';
 import 'package:route_pires_flutter/views/cadastro_passageiro_page.dart';
-import 'package:route_pires_flutter/views/principal_page_mototaxista.dart';
-import 'package:route_pires_flutter/views/principal_page_passageiro.dart';
-import 'package:route_pires_flutter/views/selecao_local_page.dart';
 import 'package:route_pires_flutter/views/text_field_padrao.dart';
 import 'package:route_pires_flutter/views/text_field_senha.dart';
 import 'package:route_pires_flutter/views/tipo_cadastro_dialog.dart';
@@ -37,26 +34,12 @@ class _LoginPageState extends State<LoginPage> {
 
     final requisicao = await loginViewModel.realizarLogin(
       email: emailController.text.trim(),
-      senha: senhaController.text.trim(),
+      senha: senhaController.text,
     );
 
     if (!mounted) return;
 
-    if (requisicao) {
-      final usuario = loginViewModel.usuario;
-
-      if (usuario?.tipo == "PASSAGEIRO") {
-        Navigator.pushReplacement(
-          context,
-          CupertinoPageRoute(builder: (_) => const PrincipalPagePassageiro()),
-        );
-      } else if (usuario?.tipo == "MOTOTAXISTA") {
-        Navigator.pushReplacement(
-          context,
-          CupertinoPageRoute(builder: (_) => const PrincipalPageMototaxista()),
-        );
-      }
-    } else {
+    if (!requisicao) {
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(

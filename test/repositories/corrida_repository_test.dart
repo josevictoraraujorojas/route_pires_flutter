@@ -112,6 +112,31 @@ void main() {
       esperarGeoPoints(post.data);
     });
 
+    test('Mudar status de frete não reenvia dados da carga', () async {
+      late String path;
+      late Map<String, dynamic> data;
+      when(
+        () => dio.put<dynamic>(
+          any(),
+          data: any(named: 'data'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((invocation) async {
+        path = invocation.positionalArguments.first as String;
+        data = Map<String, dynamic>.from(invocation.namedArguments[#data] as Map);
+        return Response<dynamic>(requestOptions: RequestOptions(path: path));
+      });
+
+      await repository.atualizarStatus(
+        categoria: CategoriaCorrida.frete,
+        id: 'frete-1',
+        status: 'ANDAMENTO',
+      );
+
+      expect(path, '${ApiConfig.corridaFrete}/frete-1');
+      expect(data, {'status': 'ANDAMENTO'});
+    });
+
     Future<void> stubResposta(dynamic data) async {
       when(
         () => dio.post<dynamic>(

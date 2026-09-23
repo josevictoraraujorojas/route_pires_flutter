@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
-import 'package:route_pires_flutter/views/login_page.dart';
 
 class PerfilMototaxista extends StatefulWidget {
   const PerfilMototaxista({super.key});
@@ -104,14 +103,12 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
   Future<void> _fazerLogout() async {
     final loginViewModel = context.read<LoginViewModel>();
 
-    await loginViewModel.sair();
+    final saiu = await loginViewModel.sair();
 
     if (!mounted) return;
-
-    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      CupertinoPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
-    );
+    if (!saiu) {
+      _mostrarErro(loginViewModel.erro ?? 'Não foi possível sair da conta');
+    }
   }
 
   void _confirmarLogout() {

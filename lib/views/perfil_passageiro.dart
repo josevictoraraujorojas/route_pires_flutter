@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
-import 'package:route_pires_flutter/views/login_page.dart';
 
 class PerfilPassageiro extends StatefulWidget {
   const PerfilPassageiro({super.key});
@@ -18,17 +17,26 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
   Future<void> _fazerLogout() async {
     final loginViewModel = context.read<LoginViewModel>();
 
-    // Remove o usuário salvo e encerra a sessão
-    await loginViewModel.sair();
+    final saiu = await loginViewModel.sair();
 
     if (!mounted) return;
-
-    // Vai diretamente para o Login
-    // removendo todas as telas anteriores.
-    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      CupertinoPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
-    );
+    if (!saiu) {
+      showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Erro'),
+          content: Text(
+            loginViewModel.erro ?? 'Não foi possível sair da conta',
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   // ============================================================
