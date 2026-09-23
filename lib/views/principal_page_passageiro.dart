@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/views/perfil_passageiro.dart';
+import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
 
 class PrincipalPagePassageiro extends StatefulWidget {
@@ -46,8 +47,18 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
             return CupertinoTabView(
               builder: (context) {
                 return CupertinoPageScaffold(
-                  navigationBar: const CupertinoNavigationBar(
-                    middle: Text('Corrida'),
+                  navigationBar: CupertinoNavigationBar(
+                    middle: const Text('Corrida'),
+                    trailing: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => Navigator.push<void>(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (_) => const MinhasCorridasPage(),
+                        ),
+                      ),
+                      child: const Text('Minhas corridas'),
+                    ),
                   ),
                   child: SafeArea(child: Center(child: SelecaoLocalPage())),
                 );

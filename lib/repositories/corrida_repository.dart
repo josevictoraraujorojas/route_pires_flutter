@@ -35,6 +35,10 @@ class CorridaRepository {
     required String mototaxistaId,
     required LocalizacaoPonto origem,
     required LocalizacaoPonto destino,
+    String formaPagamento = 'PIX',
+    String? descricaoCarga,
+    double? pesoCarga,
+    bool cargaFragil = false,
     CancelToken? cancelToken,
   }) {
     final (path, extra) = switch (categoria) {
@@ -50,7 +54,10 @@ class CorridaRepository {
         _extraFrete(
           passageiroId: passageiroId,
           mototaxistaId: mototaxistaId,
-          descricaoCarga: 'Frete simples',
+          modalidadeFrete: 'FRETE_SIMPLES',
+          descricaoCarga: descricaoCarga,
+          pesoCarga: pesoCarga,
+          cargaFragil: cargaFragil,
         ),
       ),
       CategoriaCorrida.frete => (
@@ -58,7 +65,10 @@ class CorridaRepository {
         _extraFrete(
           passageiroId: passageiroId,
           mototaxistaId: mototaxistaId,
-          descricaoCarga: 'Frete',
+          modalidadeFrete: 'FRETE',
+          descricaoCarga: descricaoCarga,
+          pesoCarga: pesoCarga,
+          cargaFragil: cargaFragil,
         ),
       ),
     };
@@ -68,6 +78,7 @@ class CorridaRepository {
       extra: extra,
       origem: origem,
       destino: destino,
+      formaPagamento: formaPagamento,
       cancelToken: cancelToken,
     );
   }
@@ -75,14 +86,18 @@ class CorridaRepository {
   Map<String, dynamic> _extraFrete({
     required String passageiroId,
     required String mototaxistaId,
-    required String descricaoCarga,
+    required String modalidadeFrete,
+    String? descricaoCarga,
+    double? pesoCarga,
+    required bool cargaFragil,
   }) {
     return {
       'solicitanteId': passageiroId,
       'mototaxistaId': mototaxistaId,
-      'descricaoCarga': descricaoCarga,
-      'cargaFragil': false,
-      'pesoCarga': 1.0,
+      'modalidadeFrete': modalidadeFrete,
+      'descricaoCarga': descricaoCarga?.trim() ?? '',
+      'cargaFragil': cargaFragil,
+      'pesoCarga': pesoCarga ?? 0,
     };
   }
 
@@ -91,6 +106,7 @@ class CorridaRepository {
     required Map<String, dynamic> extra,
     required LocalizacaoPonto origem,
     required LocalizacaoPonto destino,
+    required String formaPagamento,
     CancelToken? cancelToken,
   }) async {
     final agora = DateTime.now().toUtc();
@@ -99,10 +115,9 @@ class CorridaRepository {
       cancelToken: cancelToken,
       data: {
         ...extra,
+        'formaPagamento': formaPagamento,
         'origem': _localizacaoJson(origem, agora),
         'destino': _localizacaoJson(destino, agora),
-        'dataHoraSolicitacao': agora.toIso8601String(),
-        'status': statusInicial,
       },
     );
 
@@ -182,6 +197,32 @@ class CorridaRepository {
         passageiroAvaliacao: dados.avaliacaoMedia,
       );
     }).toList();
+  }
+
+  Future<List<SolicitacaoCorrida>> listarMinhas({
+    required String passageiroId,
+    CancelToken? cancelToken,
+  }) async {
+    final respostas = await Future.wait([
+      _dio.get(ApiConfig.corridasPassageiro, cancelToken: cancelToken),
+      _dio.get(ApiConfig.corridaFrete, cancelToken: cancelToken),
+    ]);
+    final corridas = [
+      ..._extrairSolicitacoes(
+        respostas[0].data,
+        categoria: CategoriaCorrida.corrida,
+      ),
+      ..._extrairSolicitacoes(
+        respostas[1].data,
+        categoria: CategoriaCorrida.frete,
+      ),
+    ].where((corrida) => corrida.passageiroId == passageiroId).toList();
+    corridas.sort(
+      (a, b) => (b.dataHoraSolicitacao ?? DateTime(1970)).compareTo(
+        a.dataHoraSolicitacao ?? DateTime(1970),
+      ),
+    );
+    return corridas;
   }
 
   Future<Map<String, _PassageiroResumo>> _buscarPassageiros(

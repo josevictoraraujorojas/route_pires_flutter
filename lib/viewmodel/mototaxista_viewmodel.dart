@@ -25,10 +25,33 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
     avisar();
   }
 
+  Future<bool?> consultarDisponibilidade({required String id}) async {
+    _erro = null;
+    try {
+      return await _repository.obterDisponibilidade(id: id);
+    } on DioException catch (e) {
+      _erro = mensagemErroDio(
+        e,
+        fallback: 'Não foi possível consultar sua disponibilidade',
+        porStatus: const {
+          403: 'Você não tem permissão para consultar este perfil',
+          404: 'Mototaxista não encontrado',
+        },
+      );
+      avisar();
+      return null;
+    } catch (_) {
+      _erro = 'Não foi possível consultar sua disponibilidade';
+      avisar();
+      return null;
+    }
+  }
+
   Future<bool> alterarDisponibilidade({
     required String id,
     required bool disponivel,
   }) async {
+    _erro = null;
     try {
       await _repository.atualizarDisponibilidade(
         id: id,

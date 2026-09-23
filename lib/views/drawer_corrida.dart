@@ -20,6 +20,14 @@ class DrawerCorrida extends StatelessWidget {
   Widget build(BuildContext context) {
     final String nome = corrida.passageiroNome;
     final double? avaliacao = corrida.passageiroAvaliacao;
+    final emAndamento = corrida.status.toUpperCase() == 'ANDAMENTO';
+    final pagamento = switch (corrida.formaPagamento) {
+      'DEBITO' => 'Débito',
+      'CREDITO' => 'Crédito',
+      'DINHEIRO' => 'Dinheiro',
+      'PIX' => 'PIX',
+      _ => 'Não informado',
+    };
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
@@ -110,10 +118,16 @@ class DrawerCorrida extends StatelessWidget {
             ],
           ),
 
+          const SizedBox(height: 18),
+          Text(
+            'Pagamento: $pagamento',
+            style: const TextStyle(color: CupertinoColors.black),
+          ),
+
           const Spacer(),
 
           _BotaoDrawer(
-            texto: 'Aceitar Corrida',
+            texto: emAndamento ? 'Iniciar navegação' : 'Iniciar corrida',
             cor: CupertinoColors.systemBlue,
             onPressed: carregando ? null : onIniciar,
           ),

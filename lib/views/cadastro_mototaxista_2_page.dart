@@ -176,6 +176,22 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
                         return "Informe a data no formato DD/MM/AAAA";
                       }
 
+                      final dia = int.parse(valor.substring(0, 2));
+                      final mes = int.parse(valor.substring(3, 5));
+                      final ano = int.parse(valor.substring(6));
+                      final data = DateTime(ano, mes, dia);
+                      if (data.day != dia ||
+                          data.month != mes ||
+                          data.year != ano) {
+                        return "Informe uma data de validade real";
+                      }
+                      final hoje = DateTime.now();
+                      if (data.isBefore(
+                        DateTime(hoje.year, hoje.month, hoje.day),
+                      )) {
+                        return "A CNH está vencida";
+                      }
+
                       return null;
                     },
                   ),

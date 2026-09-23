@@ -117,9 +117,20 @@ class _CorridaWebState extends State<Corrida> {
           onPressed: _voltar,
           child: const Text('Voltar às solicitações'),
         ),
+        Text('Categoria: ${solicitacao.categoria.label}'),
+        const SizedBox(height: 8),
         Text('Passageiro: ${solicitacao.passageiroNome}'),
         const SizedBox(height: 8),
         Text('Status: ${solicitacao.status}'),
+        const SizedBox(height: 8),
+        Text('Pagamento: ${_rotuloPagamento(solicitacao.formaPagamento)}'),
+        if (solicitacao.ehEntrega) ...[
+          const SizedBox(height: 8),
+          Text('Carga: ${solicitacao.descricaoCarga ?? 'Não informada'}'),
+          if (solicitacao.pesoCarga != null)
+            Text('Peso: ${solicitacao.pesoCarga} kg'),
+          Text('Frágil: ${solicitacao.cargaFragil == true ? 'Sim' : 'Não'}'),
+        ],
         const SizedBox(height: 8),
         Text(
           'Origem: ${solicitacao.origem.latitude.toStringAsFixed(5)}, '
@@ -153,6 +164,14 @@ class _CorridaWebState extends State<Corrida> {
       ],
     );
   }
+
+  String _rotuloPagamento(String? valor) => switch (valor) {
+    'DEBITO' => 'Débito',
+    'CREDITO' => 'Crédito',
+    'DINHEIRO' => 'Dinheiro',
+    'PIX' => 'PIX',
+    _ => 'Não informado',
+  };
 
   @override
   void dispose() {

@@ -58,7 +58,7 @@ class DadosPessoaisFormState extends State<DadosPessoaisForm> {
             if (valor == null || valor.trim().isEmpty) {
               return 'Informe seu e-mail';
             }
-            if (!valor.contains('@')) {
+            if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(valor.trim())) {
               return 'Informe um e-mail válido';
             }
             return null;

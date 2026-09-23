@@ -12,12 +12,20 @@ class FluxoCorridaPage extends StatefulWidget {
     required this.categoria,
     required this.origem,
     required this.destino,
+    this.formaPagamento = 'PIX',
+    this.descricaoCarga,
+    this.pesoCarga,
+    this.cargaFragil = false,
   });
 
   final String passageiroId;
   final CategoriaCorrida categoria;
   final LocalizacaoPonto origem;
   final LocalizacaoPonto destino;
+  final String formaPagamento;
+  final String? descricaoCarga;
+  final double? pesoCarga;
+  final bool cargaFragil;
 
   @override
   State<FluxoCorridaPage> createState() => _FluxoCorridaPageState();
@@ -34,6 +42,10 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
       categoria: widget.categoria,
       origem: widget.origem,
       destino: widget.destino,
+      formaPagamento: widget.formaPagamento,
+      descricaoCarga: widget.descricaoCarga,
+      pesoCarga: widget.pesoCarga,
+      cargaFragil: widget.cargaFragil,
     );
     viewModel.buscarMotoristas();
   }
@@ -52,7 +64,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
       await showCupertinoDialog<void>(
         context: context,
         builder: (context) => CupertinoAlertDialog(
-          title: const Text('Corrida solicitada'),
+          title: const Text('Solicitação enviada'),
           content: Text('Solicitação enviada para ${viewModel.motorista}.'),
           actions: [
             CupertinoDialogAction(
@@ -63,7 +75,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
         ),
       );
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context, true);
       return;
     }
 
@@ -165,7 +177,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
               ? null
               : () => Navigator.pop(context),
           child: const Text(
-            'Cancel',
+            'Cancelar busca',
             style: TextStyle(color: Color(0xFF006FFD), fontSize: 12),
           ),
         ),
@@ -238,7 +250,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
       child: Column(
         children: [
-          _statusBusca('Deseja Negociar?'),
+          _statusBusca('Confirmar solicitação'),
           Expanded(
             child: Stack(
               alignment: Alignment.center,
@@ -263,8 +275,8 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Deseja Negociar?',
+                      Text(
+                        'Solicitar ${widget.categoria.label.toLowerCase()}?',
                         style: TextStyle(
                           color: Color(0xFF303038),
                           fontSize: 18,
@@ -307,7 +319,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
                         children: [
                           Expanded(
                             child: _BotaoNegociacao(
-                              texto: 'Não',
+                              texto: 'Voltar',
                               onPressed: viewModel.carregandoCriacao
                                   ? null
                                   : viewModel.recusarNegociacao,
@@ -318,7 +330,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
                             child: _BotaoNegociacao(
                               texto: viewModel.carregandoCriacao
                                   ? '...'
-                                  : 'Sim',
+                                  : 'Confirmar',
                               preenchido: true,
                               onPressed: viewModel.carregandoCriacao
                                   ? null

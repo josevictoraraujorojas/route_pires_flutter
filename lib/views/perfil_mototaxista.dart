@@ -11,15 +11,59 @@ class PerfilMototaxista extends StatefulWidget {
 }
 
 class _PerfilMototaxistaState extends State<PerfilMototaxista> {
-  bool disponivel = true;
+  bool? disponivel;
+  bool carregandoDisponibilidade = true;
   bool alterandoDisponibilidade = false;
+  String? erroDisponibilidade;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _carregarDisponibilidade();
+    });
+  }
+
+  Future<void> _carregarDisponibilidade() async {
+    final mototaxistaId = context.read<LoginViewModel>().usuario?.id;
+    if (mototaxistaId == null || mototaxistaId.isEmpty) {
+      setState(() {
+        carregandoDisponibilidade = false;
+        disponivel = null;
+        erroDisponibilidade = 'Não foi possível identificar o mototaxista.';
+      });
+      return;
+    }
+
+    setState(() {
+      carregandoDisponibilidade = true;
+      disponivel = null;
+      erroDisponibilidade = null;
+    });
+
+    final viewModel = context.read<MototaxistaViewModel>();
+    final valor = await viewModel.consultarDisponibilidade(id: mototaxistaId);
+    if (!mounted) return;
+
+    setState(() {
+      carregandoDisponibilidade = false;
+      disponivel = valor;
+      erroDisponibilidade = valor == null
+          ? viewModel.erro ?? 'Não foi possível consultar sua disponibilidade.'
+          : null;
+    });
+  }
 
   // ============================================================
   // ALTERAR DISPONIBILIDADE
   // ============================================================
 
   Future<void> _alterarDisponibilidade(bool valor) async {
-    if (alterandoDisponibilidade) return;
+    if (alterandoDisponibilidade ||
+        carregandoDisponibilidade ||
+        disponivel == null) {
+      return;
+    }
 
     final loginViewModel = context.read<LoginViewModel>();
     final mototaxistaId = loginViewModel.usuario?.id;
@@ -248,14 +292,31 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
             const SizedBox(height: 10),
 
             Center(
-              child: alterandoDisponibilidade
+              child: carregandoDisponibilidade || alterandoDisponibilidade
                   ? const SizedBox(
                       width: 64,
                       height: 32,
                       child: Center(child: CupertinoActivityIndicator()),
                     )
+                  : disponivel == null
+                  ? Column(
+                      children: [
+                        Text(
+                          erroDisponibilidade ??
+                              'Não foi possível consultar sua disponibilidade.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: CupertinoColors.systemRed,
+                          ),
+                        ),
+                        CupertinoButton(
+                          onPressed: _carregarDisponibilidade,
+                          child: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    )
                   : CupertinoSwitch(
-                      value: disponivel,
+                      value: disponivel!,
                       activeTrackColor: CupertinoColors.systemGreen,
                       onChanged: _alterarDisponibilidade,
                     ),

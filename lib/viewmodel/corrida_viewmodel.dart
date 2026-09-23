@@ -17,6 +17,10 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
     required this.categoria,
     required this.origem,
     required this.destino,
+    this.formaPagamento = 'PIX',
+    this.descricaoCarga,
+    this.pesoCarga,
+    this.cargaFragil = false,
     MototaxistaRepository? mototaxistaRepository,
     CorridaRepository? corridaRepository,
   }) : _mototaxistaRepository =
@@ -27,6 +31,10 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   final CategoriaCorrida categoria;
   final LocalizacaoPonto origem;
   final LocalizacaoPonto destino;
+  final String formaPagamento;
+  final String? descricaoCarga;
+  final double? pesoCarga;
+  final bool cargaFragil;
   final MototaxistaRepository _mototaxistaRepository;
   final CorridaRepository _corridaRepository;
   final CancelToken _cancelLista = CancelToken();
@@ -124,6 +132,10 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
         mototaxistaId: mototaxista.id,
         origem: origem,
         destino: destino,
+        formaPagamento: formaPagamento,
+        descricaoCarga: descricaoCarga,
+        pesoCarga: pesoCarga,
+        cargaFragil: cargaFragil,
         cancelToken: _cancelCriacao,
       );
       return !foiDisposed;

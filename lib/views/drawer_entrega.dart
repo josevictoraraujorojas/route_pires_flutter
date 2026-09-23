@@ -27,6 +27,14 @@ class DrawerEntrega extends StatelessWidget {
     final String nome = entrega.passageiroNome;
 
     final double? avaliacao = entrega.passageiroAvaliacao;
+    final emAndamento = entrega.status.toUpperCase() == 'ANDAMENTO';
+    final pagamento = switch (entrega.formaPagamento) {
+      'DEBITO' => 'Débito',
+      'CREDITO' => 'Crédito',
+      'DINHEIRO' => 'Dinheiro',
+      'PIX' => 'PIX',
+      _ => 'Não informado',
+    };
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
@@ -35,8 +43,8 @@ class DrawerEntrega extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-          const Text(
-            'Entrega',
+          Text(
+            entrega.categoria.label,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -176,10 +184,16 @@ class DrawerEntrega extends StatelessWidget {
             ],
           ),
 
+          const SizedBox(height: 12),
+          Text(
+            'Pagamento: $pagamento',
+            style: const TextStyle(color: CupertinoColors.black),
+          ),
+
           const Spacer(),
 
           _BotaoEntrega(
-            texto: 'Aceitar Entrega',
+            texto: emAndamento ? 'Iniciar navegação' : 'Iniciar entrega',
             cor: CupertinoColors.systemBlue,
             onPressed: carregando ? null : onIniciar,
           ),

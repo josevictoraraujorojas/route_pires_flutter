@@ -5,6 +5,7 @@ import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/botao_primario.dart';
 import 'package:route_pires_flutter/views/fluxo_corrida_page.dart';
+import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/pesquisar_localizacao_page.dart';
 
 class SolicitarCorridaPage extends StatefulWidget {
@@ -29,8 +30,8 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   };
   static const pagamentos = {
     'PIX': Color(0xFF4A9DD1),
-    'DÉBITO': Color(0xFFE2A144),
-    'CRÉDITO': Color(0xFF8E35A8),
+    'DEBITO': Color(0xFFE2A144),
+    'CREDITO': Color(0xFF8E35A8),
     'DINHEIRO': Color(0xFF0B8F87),
   };
 
@@ -38,6 +39,19 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   LocalizacaoPonto? destino;
   CategoriaCorrida? categoria = CategoriaCorrida.corrida;
   String? pagamento = 'PIX';
+  final _descricaoCarga = TextEditingController();
+  final _pesoCarga = TextEditingController();
+  bool cargaFragil = false;
+
+  bool get ehFrete =>
+      categoria != null && categoria != CategoriaCorrida.corrida;
+
+  @override
+  void dispose() {
+    _descricaoCarga.dispose();
+    _pesoCarga.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -75,12 +89,40 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
       categoria = CategoriaCorrida.corrida;
       pagamento = 'PIX';
       inicio = widget.inicioInicial;
-      destino = null;
+      destino = widget.destinoInicial;
+      _descricaoCarga.clear();
+      _pesoCarga.clear();
+      cargaFragil = false;
     });
   }
 
-  void solicitar() {
+  Future<void> _mostrarErro(String mensagem) => showCupertinoDialog<void>(
+    context: context,
+    builder: (context) => CupertinoAlertDialog(
+      title: const Text('Confira o frete'),
+      content: Text(mensagem),
+      actions: [
+        CupertinoDialogAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> solicitar() async {
     if (!formularioValido) return;
+
+    final descricao = _descricaoCarga.text.trim();
+    final peso = double.tryParse(_pesoCarga.text.trim().replaceAll(',', '.'));
+    if (ehFrete && (descricao.isEmpty || descricao.length > 255)) {
+      await _mostrarErro('Informe a descrição da carga (até 255 caracteres).');
+      return;
+    }
+    if (ehFrete && (peso == null || !peso.isFinite || peso <= 0)) {
+      await _mostrarErro('Informe um peso válido maior que zero.');
+      return;
+    }
 
     final usuario = context.read<LoginViewModel>().usuario;
     if (usuario == null || usuario.id.isEmpty) {
@@ -100,7 +142,7 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
       return;
     }
 
-    Navigator.push(
+    final criou = await Navigator.push<bool>(
       context,
       CupertinoPageRoute(
         builder: (_) => FluxoCorridaPage(
@@ -108,8 +150,17 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
           categoria: categoria!,
           origem: inicio!,
           destino: destino!,
+          formaPagamento: pagamento!,
+          descricaoCarga: ehFrete ? descricao : null,
+          pesoCarga: ehFrete ? peso : null,
+          cargaFragil: ehFrete && cargaFragil,
         ),
       ),
+    );
+    if (!mounted || criou != true) return;
+    await Navigator.push<void>(
+      context,
+      CupertinoPageRoute(builder: (_) => const MinhasCorridasPage()),
     );
   }
 
@@ -134,7 +185,7 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: limpar,
-          child: const Text('Limpar', style: TextStyle(fontSize: 13)),
+          child: const Text('Restaurar', style: TextStyle(fontSize: 13)),
         ),
       ),
       child: SafeArea(
@@ -160,10 +211,59 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
                       titulo: 'Forma de Pagamento',
                       opcoes: pagamentos,
                       selecionada: pagamento,
-                      rotulo: (valor) => valor,
+                      rotulo: (valor) => switch (valor) {
+                        'DEBITO' => 'DÉBITO',
+                        'CREDITO' => 'CRÉDITO',
+                        _ => valor,
+                      },
                       aoSelecionar: (valor) =>
                           setState(() => pagamento = valor),
                     ),
+                    if (ehFrete) ...[
+                      const _Divisor(),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Dados da carga',
+                          style: TextStyle(
+                            color: Color(0xFF1F2024),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      CupertinoTextField(
+                        controller: _descricaoCarga,
+                        maxLength: 255,
+                        placeholder: 'Descrição da carga',
+                        style: const TextStyle(color: Color(0xFF1F2024)),
+                      ),
+                      const SizedBox(height: 12),
+                      CupertinoTextField(
+                        controller: _pesoCarga,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        placeholder: 'Peso em kg',
+                        style: const TextStyle(color: Color(0xFF1F2024)),
+                      ),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Carga frágil',
+                              style: TextStyle(color: Color(0xFF1F2024)),
+                            ),
+                          ),
+                          CupertinoSwitch(
+                            value: cargaFragil,
+                            onChanged: (valor) =>
+                                setState(() => cargaFragil = valor),
+                          ),
+                        ],
+                      ),
+                    ],
                     const _Divisor(),
                     _CampoLocalizacao(
                       label: 'Local de Início',

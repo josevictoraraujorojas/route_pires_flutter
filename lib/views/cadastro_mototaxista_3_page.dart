@@ -266,6 +266,11 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
                         return "Informe um ano válido";
                       }
 
+                      final ano = int.parse(valor);
+                      if (ano < 1900 || ano > DateTime.now().year + 1) {
+                        return "Informe um ano de fabricação válido";
+                      }
+
                       return null;
                     },
                   ),

@@ -51,19 +51,17 @@ class MeuApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       navigatorKey: navigatorKey,
-      onGenerateInitialRoutes: (_) => [
-        CupertinoPageRoute<void>(
-          settings: const RouteSettings(name: '/'),
-          builder: (_) => const _SessionGate(),
-        ),
-      ],
       debugShowCheckedModeBanner: false,
 
       theme: CupertinoThemeData(
+        brightness: Brightness.light,
         primaryColor: CupertinoColors.systemBlue,
-        textTheme: CupertinoTextThemeData(textStyle: GoogleFonts.inter()),
+        scaffoldBackgroundColor: CupertinoColors.white,
+        barBackgroundColor: CupertinoColors.white,
+        textTheme: CupertinoTextThemeData(
+          textStyle: GoogleFonts.inter(color: const Color(0xFF1F2024)),
+        ),
       ),
-
       home: const _SessionGate(),
     );
   }

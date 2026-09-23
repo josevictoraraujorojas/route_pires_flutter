@@ -15,6 +15,8 @@ class SolicitacaoCorrida {
     this.descricaoCarga,
     this.pesoCarga,
     this.cargaFragil,
+    this.formaPagamento,
+    this.dataHoraSolicitacao,
   });
 
   final String id;
@@ -29,6 +31,8 @@ class SolicitacaoCorrida {
   final String? descricaoCarga;
   final double? pesoCarga;
   final bool? cargaFragil;
+  final String? formaPagamento;
+  final DateTime? dataHoraSolicitacao;
 
   bool get ehEntrega => categoria != CategoriaCorrida.corrida;
 
@@ -36,21 +40,39 @@ class SolicitacaoCorrida {
     Map<String, dynamic> json, {
     required CategoriaCorrida categoria,
   }) {
+    final descricaoCarga = json['descricaoCarga']?.toString();
+    final cargaLegadaSemDados =
+        json['modalidadeFrete'] == null &&
+        (descricaoCarga?.toLowerCase() == 'frete' ||
+            descricaoCarga?.toLowerCase() == 'frete simples');
+    final categoriaEfetiva = categoria == CategoriaCorrida.corrida
+        ? categoria
+        : switch (json['modalidadeFrete']?.toString()) {
+            'FRETE_SIMPLES' => CategoriaCorrida.freteSimples,
+            'FRETE' => CategoriaCorrida.frete,
+            _ when descricaoCarga?.toLowerCase() == 'frete simples' =>
+              CategoriaCorrida.freteSimples,
+            _ => CategoriaCorrida.frete,
+          };
     final passageiroId = categoria == CategoriaCorrida.corrida
         ? (json['passageiro'] ?? json['passageiroId'])?.toString() ?? ''
         : (json['solicitanteId'] ?? json['passageiroId'])?.toString() ?? '';
 
     return SolicitacaoCorrida(
       id: json['id']?.toString() ?? '',
-      categoria: categoria,
+      categoria: categoriaEfetiva,
       status: json['status']?.toString() ?? '',
       mototaxistaId: json['mototaxistaId']?.toString() ?? '',
       passageiroId: passageiroId,
       origem: _ponto(json['origem'], rotuloPadrao: 'Origem'),
       destino: _ponto(json['destino'], rotuloPadrao: 'Destino'),
-      descricaoCarga: json['descricaoCarga']?.toString(),
-      pesoCarga: _numero(json['pesoCarga']),
+      descricaoCarga: cargaLegadaSemDados ? null : descricaoCarga,
+      pesoCarga: cargaLegadaSemDados ? null : _numero(json['pesoCarga']),
       cargaFragil: json['cargaFragil'] as bool?,
+      formaPagamento: json['formaPagamento']?.toString(),
+      dataHoraSolicitacao: DateTime.tryParse(
+        json['dataHoraSolicitacao']?.toString() ?? '',
+      ),
     );
   }
 
@@ -71,6 +93,8 @@ class SolicitacaoCorrida {
       descricaoCarga: descricaoCarga,
       pesoCarga: pesoCarga,
       cargaFragil: cargaFragil,
+      formaPagamento: formaPagamento,
+      dataHoraSolicitacao: dataHoraSolicitacao,
     );
   }
 
@@ -98,4 +122,3 @@ class SolicitacaoCorrida {
     );
   }
 }
-
