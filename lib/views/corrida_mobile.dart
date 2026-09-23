@@ -114,6 +114,21 @@ class _CorridaState extends State<Corrida> {
         erroNavegacao = null;
       });
       return true;
+    } on SessionInitializationException catch (e) {
+      final motivo = switch (e.code) {
+        SessionInitializationError.notAuthorized =>
+          'A chave do Google Maps/Navigation não está autorizada para este aplicativo.',
+        SessionInitializationError.locationPermissionMissing =>
+          'Permita o acesso à localização para iniciar o Google Navigation.',
+        SessionInitializationError.termsNotAccepted =>
+          'Os termos da navegação não foram aceitos.',
+      };
+      if (mounted) {
+        setState(() {
+          erroNavegacao = '$motivo As solicitações continuam disponíveis.';
+        });
+      }
+      return false;
     } catch (_) {
       if (mounted) {
         setState(() {
