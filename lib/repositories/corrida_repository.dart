@@ -10,6 +10,7 @@ class CorridaRepository {
   CorridaRepository({Dio? dio}) : _dio = dio ?? ApiClient().dio;
 
   final Dio _dio;
+  final Map<String, (DateTime, _PassageiroResumo)> _resumosPassageiros = {};
 
   static const statusInicial = 'PENDENTE';
   static const _statusFinalizados = {
@@ -225,14 +226,33 @@ class CorridaRepository {
     return corridas;
   }
 
+  Future<CorridaResponse> buscarPorId({
+    required CategoriaCorrida categoria,
+    required String id,
+    CancelToken? cancelToken,
+  }) async {
+    final path = categoria == CategoriaCorrida.corrida
+        ? ApiConfig.corridasPassageiro
+        : ApiConfig.corridaFrete;
+    final response = await _dio.get('$path/$id', cancelToken: cancelToken);
+    return _parseResposta(response.data);
+  }
+
   Future<Map<String, _PassageiroResumo>> _buscarPassageiros(
     Set<String> ids, {
     CancelToken? cancelToken,
   }) async {
     final resultado = <String, _PassageiroResumo>{};
+    final agora = DateTime.now();
+    _resumosPassageiros.removeWhere((_, entrada) => entrada.$1.isBefore(agora));
 
     await Future.wait(
       ids.map((id) async {
+        final emCache = _resumosPassageiros[id];
+        if (emCache != null) {
+          resultado[id] = emCache.$2;
+          return;
+        }
         try {
           final response = await _dio.get(
             ApiConfig.passageiroResumo(id),
@@ -242,12 +262,17 @@ class CorridaRepository {
           final data = response.data;
           if (data is Map) {
             final mapa = Map<String, dynamic>.from(data);
-            resultado[id] = _PassageiroResumo(
+            final resumo = _PassageiroResumo(
               nome: mapa['nome']?.toString() ?? 'Passageiro',
               avaliacaoMedia: switch (mapa['avaliacaoMedia']) {
                 num valor => valor.toDouble(),
                 _ => null,
               },
+            );
+            resultado[id] = resumo;
+            _resumosPassageiros[id] = (
+              DateTime.now().add(const Duration(minutes: 15)),
+              resumo,
             );
           }
         } on DioException catch (e) {

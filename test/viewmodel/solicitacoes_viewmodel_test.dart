@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
+import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
@@ -33,7 +34,7 @@ void main() {
   final solicitacao = SolicitacaoCorrida(
     id: 'solicitacao-1',
     categoria: CategoriaCorrida.corrida,
-    status: 'ANDAMENTO',
+    status: 'PENDENTE',
     mototaxistaId: 'moto-1',
     passageiroId: 'passageiro-1',
     passageiroNome: 'Maria',
@@ -59,12 +60,36 @@ void main() {
   }
 
   group('SolicitacoesViewModel Tests |', () {
+    testWidgets('Atualiza a lista enquanto a tela do mototaxista está aberta', (
+      tester,
+    ) async {
+      mockCarregar();
+      await viewModel.carregar();
+      var avisos = 0;
+      viewModel.addListener(() => avisos++);
+      viewModel.iniciarAtualizacaoAutomatica();
+
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pump();
+
+      verify(
+        () => repository.listarPendentes(
+          mototaxistaId: 'moto-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(2);
+      expect(avisos, 0);
+      expect(viewModel.revisaoLista, 1);
+      viewModel.dispose();
+    });
+
     test('Deve carregar solicitações pendentes do mototaxista', () async {
       mockCarregar();
 
       await viewModel.carregar();
 
       expect(viewModel.solicitacoes, [solicitacao]);
+      expect(viewModel.revisaoLista, 1);
       expect(viewModel.erro, isNull);
       expect(viewModel.carregando, isFalse);
     });
@@ -81,6 +106,81 @@ void main() {
         expect(viewModel.carregando, isFalse);
       },
     );
+
+    test('Mantém o passageiro durante uma resposta vazia isolada', () async {
+      var consulta = 0;
+      when(
+        () => repository.listarPendentes(
+          mototaxistaId: any(named: 'mototaxistaId'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async {
+        consulta++;
+        return switch (consulta) {
+          1 || 3 => [solicitacao],
+          _ => <SolicitacaoCorrida>[],
+        };
+      });
+      when(
+        () => repository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'solicitacao-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'solicitacao-1', status: 'CANCELADO'),
+      );
+
+      await viewModel.carregar();
+      await viewModel.carregar(silenciosa: true);
+      expect(viewModel.solicitacoes, hasLength(1));
+
+      await viewModel.carregar(silenciosa: true);
+      expect(viewModel.solicitacoes, hasLength(1));
+
+      await viewModel.carregar(silenciosa: true);
+      expect(viewModel.solicitacoes, hasLength(1));
+
+      await viewModel.carregar(silenciosa: true);
+      expect(viewModel.solicitacoes, isEmpty);
+    });
+
+    test('Confirma o status antes de remover passageiro da lista', () async {
+      var consulta = 0;
+      when(
+        () => repository.listarPendentes(
+          mototaxistaId: any(named: 'mototaxistaId'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async => consulta++ == 0 ? [solicitacao] : []);
+      when(
+        () => repository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'solicitacao-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => const CorridaResponse(
+          id: 'solicitacao-1',
+          mototaxistaId: 'moto-1',
+          status: 'ANDAMENTO',
+        ),
+      );
+
+      await viewModel.carregar();
+      await viewModel.carregar(silenciosa: true);
+      await viewModel.carregar(silenciosa: true);
+
+      expect(viewModel.solicitacoes, hasLength(1));
+      verify(
+        () => repository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'solicitacao-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+    });
 
     test(
       'Deve preencher erro ao falhar o carregamento de solicitações',
@@ -104,6 +204,7 @@ void main() {
 
         expect(viewModel.solicitacoes, isEmpty);
         expect(viewModel.erro, equals('Erro interno no servidor'));
+        expect(viewModel.revisaoLista, 0);
         expect(viewModel.carregando, isFalse);
       },
     );
@@ -157,12 +258,14 @@ void main() {
       expect(ok, isTrue);
       expect(viewModel.solicitacoes, isEmpty);
       expect(viewModel.erro, isNull);
+      await viewModel.carregar(silenciosa: true);
+      expect(viewModel.solicitacoes, isEmpty);
       verify(
         () => repository.atualizarStatus(
           categoria: CategoriaCorrida.corrida,
           id: 'solicitacao-1',
           status: 'CANCELADO',
-          motivoCancelamento: 'Recusada pelo mototaxista',
+          motivoCancelamento: 'Cancelada pelo mototaxista',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
@@ -173,6 +276,17 @@ void main() {
       () async {
         mockCarregar([solicitacao]);
         await viewModel.carregar();
+
+        when(
+          () => repository.buscarPorId(
+            categoria: CategoriaCorrida.corrida,
+            id: 'solicitacao-1',
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              const CorridaResponse(id: 'solicitacao-1', status: 'PENDENTE'),
+        );
 
         when(
           () => repository.atualizarStatus(
@@ -187,8 +301,11 @@ void main() {
         final ok = await viewModel.aceitar(solicitacao);
 
         expect(ok, isTrue);
-        expect(viewModel.solicitacoes, isEmpty);
+        expect(viewModel.solicitacoes, hasLength(1));
+        expect(viewModel.solicitacoes.single.status, 'ANDAMENTO');
         expect(viewModel.erro, isNull);
+        await viewModel.carregar(silenciosa: true);
+        expect(viewModel.solicitacoes.single.status, 'ANDAMENTO');
         verify(
           () => repository.atualizarStatus(
             categoria: CategoriaCorrida.corrida,
@@ -200,6 +317,32 @@ void main() {
         ).called(1);
       },
     );
+
+    test('Não aceita solicitação já cancelada pelo passageiro', () async {
+      mockCarregar([solicitacao]);
+      await viewModel.carregar();
+      when(
+        () => repository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'solicitacao-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'solicitacao-1', status: 'CANCELADO'),
+      );
+
+      expect(await viewModel.aceitar(solicitacao), isFalse);
+      expect(viewModel.erro, contains('não está mais pendente'));
+      verifyNever(
+        () => repository.atualizarStatus(
+          categoria: any(named: 'categoria'),
+          id: any(named: 'id'),
+          status: any(named: 'status'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
+    });
 
     test('Deve mapear erro 404 ao cancelar solicitação', () async {
       when(

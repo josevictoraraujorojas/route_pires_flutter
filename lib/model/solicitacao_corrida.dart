@@ -77,13 +77,14 @@ class SolicitacaoCorrida {
   }
 
   SolicitacaoCorrida copyWith({
+    String? status,
     String? passageiroNome,
     double? passageiroAvaliacao,
   }) {
     return SolicitacaoCorrida(
       id: id,
       categoria: categoria,
-      status: status,
+      status: status ?? this.status,
       mototaxistaId: mototaxistaId,
       passageiroId: passageiroId,
       passageiroNome: passageiroNome ?? this.passageiroNome,
@@ -118,7 +119,10 @@ class SolicitacaoCorrida {
     return LocalizacaoPonto(
       latitude: _numero(localizacao?['latitude']) ?? 0,
       longitude: _numero(localizacao?['longitude']) ?? 0,
-      rotulo: mapa?['rotulo']?.toString() ?? rotuloPadrao,
+      rotulo:
+          mapa?['rotulo']?.toString() ??
+          localizacao?['rotulo']?.toString() ??
+          rotuloPadrao,
     );
   }
 }

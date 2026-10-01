@@ -2,10 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
+import 'package:route_pires_flutter/views/andamento_corrida_page.dart';
 import 'package:route_pires_flutter/views/botao_primario.dart';
 import 'package:route_pires_flutter/views/fluxo_corrida_page.dart';
-import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/pesquisar_localizacao_page.dart';
 
 class SolicitarCorridaPage extends StatefulWidget {
@@ -23,17 +24,8 @@ class SolicitarCorridaPage extends StatefulWidget {
 }
 
 class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
-  static const categorias = {
-    CategoriaCorrida.corrida: Color(0xFFFFB800),
-    CategoriaCorrida.freteSimples: Color(0xFFFF5E6C),
-    CategoriaCorrida.frete: Color(0xFF43C5A5),
-  };
-  static const pagamentos = {
-    'PIX': Color(0xFF4A9DD1),
-    'DEBITO': Color(0xFFE2A144),
-    'CREDITO': Color(0xFF8E35A8),
-    'DINHEIRO': Color(0xFF0B8F87),
-  };
+  static const categorias = [CategoriaCorrida.corrida, CategoriaCorrida.frete];
+  static const pagamentos = ['PIX', 'DEBITO', 'CREDITO', 'DINHEIRO'];
 
   late LocalizacaoPonto? inicio;
   LocalizacaoPonto? destino;
@@ -42,6 +34,7 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   final _descricaoCarga = TextEditingController();
   final _pesoCarga = TextEditingController();
   bool cargaFragil = false;
+  bool _abrindoFluxo = false;
 
   bool get ehFrete =>
       categoria != null && categoria != CategoriaCorrida.corrida;
@@ -111,7 +104,7 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
   );
 
   Future<void> solicitar() async {
-    if (!formularioValido) return;
+    if (!formularioValido || _abrindoFluxo) return;
 
     final descricao = _descricaoCarga.text.trim();
     final peso = double.tryParse(_pesoCarga.text.trim().replaceAll(',', '.'));
@@ -142,26 +135,33 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
       return;
     }
 
-    final criou = await Navigator.push<bool>(
-      context,
-      CupertinoPageRoute(
-        builder: (_) => FluxoCorridaPage(
-          passageiroId: usuario.id,
-          categoria: categoria!,
-          origem: inicio!,
-          destino: destino!,
-          formaPagamento: pagamento!,
-          descricaoCarga: ehFrete ? descricao : null,
-          pesoCarga: ehFrete ? peso : null,
-          cargaFragil: ehFrete && cargaFragil,
+    setState(() => _abrindoFluxo = true);
+    try {
+      final aceita = await Navigator.push<SolicitacaoCorrida>(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => FluxoCorridaPage(
+            passageiroId: usuario.id,
+            categoria: categoria!,
+            origem: inicio!,
+            destino: destino!,
+            formaPagamento: pagamento!,
+            descricaoCarga: ehFrete ? descricao : null,
+            pesoCarga: ehFrete ? peso : null,
+            cargaFragil: ehFrete && cargaFragil,
+          ),
         ),
-      ),
-    );
-    if (!mounted || criou != true) return;
-    await Navigator.push<void>(
-      context,
-      CupertinoPageRoute(builder: (_) => const MinhasCorridasPage()),
-    );
+      );
+      if (!mounted || aceita == null) return;
+      await Navigator.push<void>(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => AndamentoCorridaPage(corridaInicial: aceita),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _abrindoFluxo = false);
+    }
   }
 
   @override
@@ -286,7 +286,9 @@ class _SolicitarCorridaPageState extends State<SolicitarCorridaPage> {
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               child: BotaoPrimario(
                 texto: 'Buscar Corrida',
-                onPressed: formularioValido ? solicitar : null,
+                onPressed: formularioValido && !_abrindoFluxo
+                    ? solicitar
+                    : null,
               ),
             ),
           ],
@@ -306,7 +308,7 @@ class _SecaoOpcoes<T> extends StatelessWidget {
   });
 
   final String titulo;
-  final Map<T, Color> opcoes;
+  final List<T> opcoes;
   final T? selecionada;
   final String Function(T valor) rotulo;
   final ValueChanged<T> aoSelecionar;
@@ -342,37 +344,54 @@ class _SecaoOpcoes<T> extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: opcoes.entries.map((opcao) {
-            final ativa = opcao.key == selecionada;
+          children: opcoes.map((opcao) {
+            final ativa = opcao == selecionada;
             return Semantics(
               selected: ativa,
               button: true,
               child: CupertinoButton(
                 padding: EdgeInsets.zero,
-                minimumSize: const Size(44, 32),
-                onPressed: () => aoSelecionar(opcao.key),
-                child: Opacity(
-                  opacity: ativa ? 1 : 0.7,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 7,
+                minimumSize: const Size(44, 38),
+                onPressed: () => aoSelecionar(opcao),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ativa
+                        ? const Color(0xFF0057D9)
+                        : const Color(0xFFF2F4F8),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: ativa
+                          ? const Color(0xFF0057D9)
+                          : const Color(0xFFCBD5E1),
+                      width: ativa ? 2 : 1,
                     ),
-                    decoration: BoxDecoration(
-                      color: opcao.value,
-                      borderRadius: BorderRadius.circular(18),
-                      border: ativa
-                          ? Border.all(color: CupertinoColors.white, width: 2)
-                          : null,
-                    ),
-                    child: Text(
-                      rotulo(opcao.key),
-                      style: const TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (ativa) ...[
+                        const Icon(
+                          CupertinoIcons.check_mark_circled_solid,
+                          size: 15,
+                          color: CupertinoColors.white,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        rotulo(opcao),
+                        style: TextStyle(
+                          color: ativa
+                              ? CupertinoColors.white
+                              : const Color(0xFF344054),
+                          fontSize: 12,
+                          fontWeight: ativa ? FontWeight.w700 : FontWeight.w600,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),

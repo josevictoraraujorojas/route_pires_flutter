@@ -13,7 +13,7 @@ class SelecaoLocalPage extends StatefulWidget {
 }
 
 class _SelecaoLocalPageState extends State<SelecaoLocalPage> {
-  final repository = LocalizacaoRepository();
+  final repository = LocalizacaoRepository.compartilhado;
   LocalizacaoPonto? inicio;
   String? erroGps;
   Future<void>? _carregandoInicio;
@@ -33,9 +33,7 @@ class _SelecaoLocalPageState extends State<SelecaoLocalPage> {
         ponto = LocalizacaoPonto(
           latitude: posicao.latitude,
           longitude: posicao.longitude,
-          rotulo:
-              '${posicao.latitude.toStringAsFixed(6)}, '
-              '${posicao.longitude.toStringAsFixed(6)}',
+          rotulo: 'Endereço indisponível',
         );
       }
       if (!mounted) return;

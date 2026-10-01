@@ -7,7 +7,7 @@ import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
 class MototaxistaRepository {
   final Dio _dio;
 
-  MototaxistaRepository() : _dio = ApiClient().dio;
+  MototaxistaRepository({Dio? dio}) : _dio = dio ?? ApiClient().dio;
 
   // ============================================================
   // CADASTRAR MOTOTAXISTA
@@ -42,6 +42,24 @@ class MototaxistaRepository {
         )
         .where((mototaxista) => mototaxista.id.isNotEmpty)
         .toList();
+  }
+
+  Future<MototaxistaResumo> buscarPerfilParaPassageiro({
+    required String id,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _dio.get(
+      ApiConfig.perfilMototaxistaParaPassageiro(id),
+      cancelToken: cancelToken,
+    );
+    final data = response.data;
+    if (data is! Map) {
+      throw const FormatException('Resposta inválida do mototaxista');
+    }
+    return MototaxistaResumo.fromJson({
+      ...Map<String, dynamic>.from(data),
+      'id': id,
+    });
   }
 
   Future<bool> obterDisponibilidade({required String id}) async {

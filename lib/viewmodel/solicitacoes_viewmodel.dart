@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
@@ -18,12 +20,18 @@ class SolicitacoesViewModel extends ChangeNotifier {
   bool _atualizandoStatus = false;
   String? _erro;
   List<SolicitacaoCorrida> _solicitacoes = const [];
+  final Map<String, int> _ausenciasConsecutivas = {};
+  final Set<String> _encerradasLocalmente = {};
+  int _revisaoLista = 0;
   bool _disposed = false;
+  Timer? _atualizacaoAutomatica;
+  DateTime? _proximaTentativa;
 
   bool get carregando => _carregando;
   bool get atualizandoStatus => _atualizandoStatus;
   String? get erro => _erro;
   List<SolicitacaoCorrida> get solicitacoes => _solicitacoes;
+  int get revisaoLista => _revisaoLista;
 
   void _avisar() {
     if (!_disposed) notifyListeners();
@@ -33,19 +41,150 @@ class SolicitacoesViewModel extends ChangeNotifier {
     return e.type == DioExceptionType.cancel || _disposed;
   }
 
-  Future<void> carregar() async {
+  void iniciarAtualizacaoAutomatica() {
+    _atualizacaoAutomatica ??= Timer.periodic(const Duration(seconds: 15), (_) {
+      final proximaTentativa = _proximaTentativa;
+      if (proximaTentativa != null &&
+          DateTime.now().isBefore(proximaTentativa)) {
+        return;
+      }
+      unawaited(carregar(silenciosa: true));
+    });
+  }
+
+  void pararAtualizacaoAutomatica() {
+    _atualizacaoAutomatica?.cancel();
+    _atualizacaoAutomatica = null;
+  }
+
+  String _chave(SolicitacaoCorrida corrida) =>
+      '${corrida.categoria.name}:${corrida.id}';
+
+  Object _conteudo(SolicitacaoCorrida corrida) => (
+    corrida.id,
+    corrida.categoria,
+    corrida.status,
+    corrida.mototaxistaId,
+    corrida.passageiroId,
+    corrida.passageiroNome,
+    corrida.passageiroAvaliacao,
+    corrida.origem,
+    corrida.destino,
+    corrida.descricaoCarga,
+    corrida.pesoCarga,
+    corrida.cargaFragil,
+    corrida.formaPagamento,
+    corrida.dataHoraSolicitacao,
+  );
+
+  bool _mesmaLista(
+    List<SolicitacaoCorrida> anterior,
+    List<SolicitacaoCorrida> nova,
+  ) {
+    if (anterior.length != nova.length) return false;
+    for (var i = 0; i < anterior.length; i++) {
+      if (_conteudo(anterior[i]) != _conteudo(nova[i])) return false;
+    }
+    return true;
+  }
+
+  Future<bool> _naoPertenceMais(SolicitacaoCorrida corrida) async {
+    try {
+      final atual = await _repository.buscarPorId(
+        categoria: corrida.categoria,
+        id: corrida.id,
+        cancelToken: _cancelToken,
+      );
+      if (_disposed) return false;
+      final status = atual.status?.toUpperCase();
+      return const {
+            'FINALIZADO',
+            'FINALIZADA',
+            'CONCLUIDA',
+            'CONCLUÍDA',
+            'CANCELADO',
+            'CANCELADA',
+          }.contains(status) ||
+          (atual.mototaxistaId != null && atual.mototaxistaId != mototaxistaId);
+    } on DioException catch (e) {
+      return e.response?.statusCode == 404;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> carregar({bool silenciosa = false}) async {
+    if (_disposed || _carregando || _atualizandoStatus) return;
+    final erroAnterior = _erro;
+    var listaMudou = false;
     _carregando = true;
-    _erro = null;
-    _avisar();
+    if (!silenciosa) {
+      _erro = null;
+      _avisar();
+    }
 
     try {
-      _solicitacoes = await _repository.listarPendentes(
+      final recebidas = await _repository.listarPendentes(
         mototaxistaId: mototaxistaId,
         cancelToken: _cancelToken,
       );
+      if (_disposed) return;
+      final anteriores = {
+        for (final solicitacao in _solicitacoes)
+          _chave(solicitacao): solicitacao,
+      };
+      final novas = <SolicitacaoCorrida>[];
+      final recebidasIds = <String>{};
+      for (var solicitacao in recebidas) {
+        final chave = _chave(solicitacao);
+        if (_encerradasLocalmente.contains(chave)) continue;
+        recebidasIds.add(chave);
+        _ausenciasConsecutivas.remove(chave);
+        final anterior = anteriores[chave];
+        if (anterior != null) {
+          solicitacao = solicitacao.copyWith(
+            status:
+                anterior.status.toUpperCase() == 'ANDAMENTO' &&
+                    solicitacao.status.toUpperCase() == 'PENDENTE'
+                ? 'ANDAMENTO'
+                : null,
+            passageiroNome:
+                solicitacao.passageiroNome == 'Passageiro' &&
+                    anterior.passageiroNome != 'Passageiro'
+                ? anterior.passageiroNome
+                : null,
+          );
+        }
+        novas.add(solicitacao);
+      }
+      for (final anterior in _solicitacoes) {
+        final chave = _chave(anterior);
+        if (recebidasIds.contains(chave) ||
+            _encerradasLocalmente.contains(chave)) {
+          continue;
+        }
+        final ausencias = (_ausenciasConsecutivas[chave] ?? 0) + 1;
+        if (ausencias < 2 || !await _naoPertenceMais(anterior)) {
+          _ausenciasConsecutivas[chave] = ausencias.clamp(0, 2);
+          novas.add(anterior);
+        } else {
+          _ausenciasConsecutivas.remove(chave);
+        }
+      }
+      listaMudou = !_mesmaLista(_solicitacoes, novas);
+      if (listaMudou) {
+        _solicitacoes = novas;
+        _revisaoLista++;
+      }
+      _proximaTentativa = null;
+      _erro = null;
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
-      _solicitacoes = const [];
+      if (e.response?.statusCode == 429) {
+        _proximaTentativa = DateTime.now().add(const Duration(minutes: 5));
+      } else if (e.response == null || (e.response!.statusCode ?? 0) >= 500) {
+        _proximaTentativa = DateTime.now().add(const Duration(minutes: 1));
+      }
       _erro = mensagemErroDio(
         e,
         fallback: 'Erro ao buscar solicitações',
@@ -53,11 +192,10 @@ class SolicitacoesViewModel extends ChangeNotifier {
       );
     } catch (_) {
       if (_disposed) return;
-      _solicitacoes = const [];
       _erro = 'Ocorreu um erro inesperado';
     } finally {
       _carregando = false;
-      _avisar();
+      if (!silenciosa || listaMudou || _erro != erroAnterior) _avisar();
     }
   }
 
@@ -79,8 +217,9 @@ class SolicitacoesViewModel extends ChangeNotifier {
       );
 
       // Remove da lista somente depois que o backend confirmar.
+      _encerradasLocalmente.add(_chave(solicitacao));
       _solicitacoes = _solicitacoes
-          .where((item) => item.id != solicitacao.id)
+          .where((item) => _chave(item) != _chave(solicitacao))
           .toList();
 
       return true;
@@ -115,6 +254,15 @@ class SolicitacoesViewModel extends ChangeNotifier {
     _avisar();
 
     try {
+      final atual = await _repository.buscarPorId(
+        categoria: solicitacao.categoria,
+        id: solicitacao.id,
+        cancelToken: _cancelToken,
+      );
+      if (atual.status?.toUpperCase() != 'PENDENTE') {
+        _erro = 'Esta solicitação não está mais pendente. Atualize a lista.';
+        return false;
+      }
       await _repository.atualizarStatus(
         categoria: solicitacao.categoria,
         id: solicitacao.id,
@@ -123,7 +271,11 @@ class SolicitacoesViewModel extends ChangeNotifier {
       );
 
       _solicitacoes = _solicitacoes
-          .where((item) => item.id != solicitacao.id)
+          .map(
+            (item) => _chave(item) == _chave(solicitacao)
+                ? item.copyWith(status: 'ANDAMENTO')
+                : item,
+          )
           .toList();
       return true;
     } on DioException catch (e) {
@@ -161,8 +313,9 @@ class SolicitacoesViewModel extends ChangeNotifier {
         cancelToken: _cancelToken,
       );
 
+      _encerradasLocalmente.add(_chave(solicitacao));
       _solicitacoes = _solicitacoes
-          .where((item) => item.id != solicitacao.id)
+          .where((item) => _chave(item) != _chave(solicitacao))
           .toList();
       return true;
     } on DioException catch (e) {
@@ -189,7 +342,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
 
   Future<bool> cancelar(
     SolicitacaoCorrida solicitacao, {
-    String motivo = 'Recusada pelo mototaxista',
+    String motivo = 'Cancelada pelo mototaxista',
   }) async {
     _atualizandoStatus = true;
     _erro = null;
@@ -204,8 +357,9 @@ class SolicitacoesViewModel extends ChangeNotifier {
         cancelToken: _cancelToken,
       );
 
+      _encerradasLocalmente.add(_chave(solicitacao));
       _solicitacoes = _solicitacoes
-          .where((item) => item.id != solicitacao.id)
+          .where((item) => _chave(item) != _chave(solicitacao))
           .toList();
       return true;
     } on DioException catch (e) {
@@ -233,6 +387,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    pararAtualizacaoAutomatica();
     if (!_cancelToken.isCancelled) {
       _cancelToken.cancel();
     }

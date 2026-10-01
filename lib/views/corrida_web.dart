@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/lista_passageiros.dart';
+import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
 
 /// No navegador, mantém as solicitações e mudanças de status sem carregar a
 /// SDK de navegação nativa.
@@ -15,23 +19,56 @@ class Corrida extends StatefulWidget {
   State<Corrida> createState() => _CorridaWebState();
 }
 
-class _CorridaWebState extends State<Corrida> {
+class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
   SolicitacoesViewModel? _viewModel;
   SolicitacaoCorrida? _selecionada;
+  int _ultimaRevisaoLista = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final id = widget.mototaxistaId;
     if (id != null && id.isNotEmpty) {
       _viewModel = SolicitacoesViewModel(mototaxistaId: id)
         ..addListener(_atualizar)
-        ..carregar();
+        ..carregar()
+        ..iniciarAtualizacaoAutomatica();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final viewModel = _viewModel;
+    if (viewModel == null) return;
+    if (state == AppLifecycleState.resumed) {
+      unawaited(viewModel.carregar(silenciosa: true));
+      viewModel.iniciarAtualizacaoAutomatica();
+    } else {
+      viewModel.pararAtualizacaoAutomatica();
     }
   }
 
   void _atualizar() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final viewModel = _viewModel;
+    if (viewModel != null && viewModel.revisaoLista != _ultimaRevisaoLista) {
+      _ultimaRevisaoLista = viewModel.revisaoLista;
+      final selecionada = _selecionada;
+      if (selecionada != null) {
+        SolicitacaoCorrida? atual;
+        for (final item in viewModel.solicitacoes) {
+          if (item.id == selecionada.id &&
+              item.categoria == selecionada.categoria) {
+            atual = item;
+            break;
+          }
+        }
+        _selecionada = atual;
+        if (atual == null) widget.onTituloChanged('Procurando Corrida');
+      }
+    }
+    setState(() {});
   }
 
   void _selecionar(SolicitacaoCorrida solicitacao) {
@@ -69,6 +106,23 @@ class _CorridaWebState extends State<Corrida> {
         ],
       ),
     );
+  }
+
+  Future<void> _cancelar(SolicitacaoCorrida solicitacao) async {
+    final viewModel = _viewModel;
+    if (viewModel == null ||
+        viewModel.atualizandoStatus ||
+        solicitacao.status.toUpperCase() != 'ANDAMENTO') {
+      return;
+    }
+    final motivo = await solicitarMotivoCancelamento(
+      context,
+      mototaxista: true,
+    );
+    if (!mounted || motivo == null || _selecionada?.id != solicitacao.id) {
+      return;
+    }
+    await _executar(() => viewModel.cancelar(solicitacao, motivo: motivo));
   }
 
   @override
@@ -132,15 +186,9 @@ class _CorridaWebState extends State<Corrida> {
           Text('Frágil: ${solicitacao.cargaFragil == true ? 'Sim' : 'Não'}'),
         ],
         const SizedBox(height: 8),
-        Text(
-          'Origem: ${solicitacao.origem.latitude.toStringAsFixed(5)}, '
-          '${solicitacao.origem.longitude.toStringAsFixed(5)}',
-        ),
+        EnderecoCorrida(ponto: solicitacao.origem, prefixo: 'Origem: '),
         const SizedBox(height: 8),
-        Text(
-          'Destino: ${solicitacao.destino.latitude.toStringAsFixed(5)}, '
-          '${solicitacao.destino.longitude.toStringAsFixed(5)}',
-        ),
+        EnderecoCorrida(ponto: solicitacao.destino, prefixo: 'Destino: '),
         const SizedBox(height: 16),
         const Text('Navegação passo a passo disponível no aplicativo mobile.'),
         const SizedBox(height: 16),
@@ -154,13 +202,15 @@ class _CorridaWebState extends State<Corrida> {
                 ),
           child: Text(emAndamento ? 'Finalizar corrida' : 'Iniciar corrida'),
         ),
-        const SizedBox(height: 8),
-        CupertinoButton(
-          onPressed: viewModel.atualizandoStatus
-              ? null
-              : () => _executar(() => viewModel.cancelar(solicitacao)),
-          child: const Text('Cancelar corrida'),
-        ),
+        if (emAndamento) ...[
+          const SizedBox(height: 8),
+          CupertinoButton(
+            onPressed: viewModel.atualizandoStatus
+                ? null
+                : () => _cancelar(solicitacao),
+            child: const Text('Cancelar corrida'),
+          ),
+        ],
       ],
     );
   }
@@ -175,6 +225,7 @@ class _CorridaWebState extends State<Corrida> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _viewModel?.removeListener(_atualizar);
     _viewModel?.dispose();
     super.dispose();

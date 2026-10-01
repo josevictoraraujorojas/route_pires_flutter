@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
+import 'package:route_pires_flutter/views/endereco_corrida.dart';
 
 class DrawerEntrega extends StatelessWidget {
   final SolicitacaoCorrida entrega;
@@ -39,24 +40,83 @@ class DrawerEntrega extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
 
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
 
-        children: [
-          Text(
-            entrega.categoria.label,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: CupertinoColors.black,
+          children: [
+            Text(
+              entrega.categoria.label,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: CupertinoColors.black,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 22),
+            const SizedBox(height: 22),
 
-          if (descricao != null && descricao.isNotEmpty) ...[
+            if (descricao != null && descricao.isNotEmpty) ...[
+              const Text(
+                'SOBRE',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                descricao,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+            ],
+
+            Row(
+              children: [
+                _TipoEntrega(selecionado: fragil, texto: 'Frágil'),
+
+                const SizedBox(width: 28),
+
+                _TipoEntrega(selecionado: !fragil, texto: 'Comum'),
+              ],
+            ),
+
+            const SizedBox(height: 18),
+
+            if (peso != null) ...[
+              const Text(
+                'PESO',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                '${peso.toStringAsFixed(peso == peso.roundToDouble() ? 0 : 1)}KG',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.black,
+                ),
+              ),
+
+              const SizedBox(height: 18),
+            ],
+
             const Text(
-              'SOBRE',
+              'SOLICITANTE',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
@@ -66,148 +126,94 @@ class DrawerEntrega extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            Text(
-              descricao,
-              style: const TextStyle(
-                fontSize: 12,
-                color: CupertinoColors.systemGrey,
-              ),
-            ),
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
 
-            const SizedBox(height: 16),
-          ],
-
-          Row(
-            children: [
-              _TipoEntrega(selecionado: fragil, texto: 'Frágil'),
-
-              const SizedBox(width: 28),
-
-              _TipoEntrega(selecionado: !fragil, texto: 'Comum'),
-            ],
-          ),
-
-          const SizedBox(height: 18),
-
-          if (peso != null) ...[
-            const Text(
-              'PESO',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: CupertinoColors.systemGrey,
-              ),
-            ),
-
-            const SizedBox(height: 4),
-
-            Text(
-              '${peso.toStringAsFixed(peso == peso.roundToDouble() ? 0 : 1)}KG',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: CupertinoColors.black,
-              ),
-            ),
-
-            const SizedBox(height: 18),
-          ],
-
-          const Text(
-            'SOLICITANTE',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.systemGrey,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEAF3FF),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-
-                child: const Icon(
-                  CupertinoIcons.person_fill,
-                  size: 25,
-                  color: Color(0xFF9ED0FF),
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  Text(
-                    nome,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: CupertinoColors.black,
-                    ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF3FF),
+                    borderRadius: BorderRadius.circular(14),
                   ),
 
-                  const SizedBox(height: 3),
+                  child: const Icon(
+                    CupertinoIcons.person_fill,
+                    size: 25,
+                    color: Color(0xFF9ED0FF),
+                  ),
+                ),
 
-                  if (avaliacao != null)
-                    Row(
-                      children: [
-                        const Icon(
-                          CupertinoIcons.star_fill,
-                          size: 13,
-                          color: CupertinoColors.systemBlue,
-                        ),
+                const SizedBox(width: 12),
 
-                        const SizedBox(width: 4),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
 
-                        Text(
-                          avaliacao.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: CupertinoColors.systemGrey,
-                          ),
-                        ),
-                      ],
+                  children: [
+                    Text(
+                      nome,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: CupertinoColors.black,
+                      ),
                     ),
-                ],
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 12),
-          Text(
-            'Pagamento: $pagamento',
-            style: const TextStyle(color: CupertinoColors.black),
-          ),
+                    const SizedBox(height: 3),
 
-          const Spacer(),
+                    if (avaliacao != null)
+                      Row(
+                        children: [
+                          const Icon(
+                            CupertinoIcons.star_fill,
+                            size: 13,
+                            color: CupertinoColors.systemBlue,
+                          ),
 
-          _BotaoEntrega(
-            texto: emAndamento ? 'Iniciar navegação' : 'Iniciar entrega',
-            cor: CupertinoColors.systemBlue,
-            onPressed: carregando ? null : onIniciar,
-          ),
+                          const SizedBox(width: 4),
 
-          const SizedBox(height: 24),
+                          Text(
+                            avaliacao.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.systemGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
 
-          _BotaoEntrega(
-            texto: carregando ? 'Cancelando...' : 'Cancelar Entrega',
-            cor: CupertinoColors.systemOrange,
-            onPressed: carregando ? null : onVoltar,
-          ),
+            const SizedBox(height: 12),
+            Text(
+              'Pagamento: $pagamento',
+              style: const TextStyle(color: CupertinoColors.black),
+            ),
+            const SizedBox(height: 8),
+            EnderecoCorrida(ponto: entrega.origem, prefixo: 'Origem: '),
+            EnderecoCorrida(ponto: entrega.destino, prefixo: 'Destino: '),
 
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 24),
+
+            _BotaoEntrega(
+              texto: emAndamento ? 'Iniciar navegação' : 'Iniciar entrega',
+              cor: CupertinoColors.systemBlue,
+              onPressed: carregando ? null : onIniciar,
+            ),
+
+            const SizedBox(height: 24),
+
+            _BotaoEntrega(
+              texto: 'Voltar',
+              cor: CupertinoColors.systemOrange,
+              onPressed: carregando ? null : onVoltar,
+            ),
+
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

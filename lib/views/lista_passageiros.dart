@@ -17,11 +17,11 @@ class ListaPassageiros extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (carregando) {
+    if (carregando && solicitacoes.isEmpty) {
       return const Center(child: CupertinoActivityIndicator());
     }
 
-    if (erro != null) {
+    if (erro != null && solicitacoes.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -43,93 +43,113 @@ class ListaPassageiros extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 0, bottom: 20),
+    return Column(
+      children: [
+        if (erro != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Text(
+              'Não foi possível atualizar. Exibindo as últimas solicitações.',
+              style: const TextStyle(color: CupertinoColors.systemRed),
+            ),
+          ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(top: 0, bottom: 20),
 
-      itemCount: solicitacoes.length,
+            itemCount: solicitacoes.length,
 
-      itemBuilder: (context, index) {
-        final solicitacao = solicitacoes[index];
+            itemBuilder: (context, index) {
+              final solicitacao = solicitacoes[index];
 
-        return GestureDetector(
-          onTap: () {
-            onPassageiroSelecionado(solicitacao);
-          },
+              return GestureDetector(
+                onTap: () {
+                  onPassageiroSelecionado(solicitacao);
+                },
 
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF3FF),
-                    borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
                   ),
 
-                  child: Icon(
-                    solicitacao.ehEntrega
-                        ? CupertinoIcons.cube_box_fill
-                        : CupertinoIcons.person_fill,
-
-                    size: 30,
-
-                    color: const Color(0xFF9ED0FF),
-                  ),
-                ),
-
-                const SizedBox(width: 24),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-
+                  child: Row(
                     children: [
-                      Text(
-                        solicitacao.passageiroNome,
+                      Container(
+                        width: 48,
+                        height: 48,
 
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: CupertinoColors.black,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEAF3FF),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+
+                        child: Icon(
+                          solicitacao.ehEntrega
+                              ? CupertinoIcons.cube_box_fill
+                              : CupertinoIcons.person_fill,
+
+                          size: 30,
+
+                          color: const Color(0xFF9ED0FF),
                         ),
                       ),
 
-                      const SizedBox(height: 4),
+                      const SizedBox(width: 24),
 
-                      Text(
-                        solicitacao.ehEntrega ? 'Entrega' : 'Corrida',
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
 
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: CupertinoColors.systemGrey,
+                          children: [
+                            Text(
+                              solicitacao.passageiroNome,
+
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: CupertinoColors.black,
+                              ),
+                            ),
+
+                            const SizedBox(height: 4),
+
+                            Text(
+                              solicitacao.ehEntrega ? 'Entrega' : 'Corrida',
+
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: CupertinoColors.systemGrey,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+
+                      if (solicitacao.passageiroAvaliacao != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+
+                          children: List.generate(
+                            solicitacao.passageiroAvaliacao!.round().clamp(
+                              0,
+                              5,
+                            ),
+                            (index) => const Icon(
+                              CupertinoIcons.star_fill,
+                              size: 11,
+                              color: CupertinoColors.systemBlue,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-
-                if (solicitacao.passageiroAvaliacao != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-
-                    children: List.generate(
-                      solicitacao.passageiroAvaliacao!.round().clamp(0, 5),
-                      (index) => const Icon(
-                        CupertinoIcons.star_fill,
-                        size: 11,
-                        color: CupertinoColors.systemBlue,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }

@@ -5,6 +5,9 @@ import 'package:route_pires_flutter/config/api_error.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
+import 'package:route_pires_flutter/views/andamento_corrida_page.dart';
+import 'package:route_pires_flutter/views/endereco_corrida.dart';
+import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
 
 class MinhasCorridasPage extends StatefulWidget {
   const MinhasCorridasPage({super.key});
@@ -14,12 +17,14 @@ class MinhasCorridasPage extends StatefulWidget {
 }
 
 class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
+  static const _itensHistoricoPorPagina = 10;
   final _repository = CorridaRepository();
   final _cancelToken = CancelToken();
   List<SolicitacaoCorrida> _corridas = const [];
   bool _carregando = false;
   String? _cancelandoId;
   String? _erro;
+  int _limiteHistorico = _itensHistoricoPorPagina;
 
   @override
   void initState() {
@@ -52,7 +57,10 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
         cancelToken: _cancelToken,
       );
       if (!mounted) return;
-      setState(() => _corridas = corridas);
+      setState(() {
+        _corridas = corridas;
+        _limiteHistorico = _itensHistoricoPorPagina;
+      });
     } on DioException catch (e) {
       if (!mounted || e.type == DioExceptionType.cancel) return;
       setState(
@@ -70,33 +78,21 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
   }
 
   Future<void> _cancelar(SolicitacaoCorrida corrida) async {
-    if (corrida.status.toUpperCase() != 'PENDENTE') return;
-    final confirmou = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Cancelar solicitação?'),
-        content: const Text('A corrida ficará registrada como cancelada.'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Voltar'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cancelar corrida'),
-          ),
-        ],
-      ),
+    if (corrida.status.toUpperCase() != 'PENDENTE' || _cancelandoId != null) {
+      return;
+    }
+    final motivo = await solicitarMotivoCancelamento(
+      context,
+      mototaxista: false,
     );
-    if (confirmou != true || !mounted) return;
+    if (motivo == null || !mounted) return;
     setState(() => _cancelandoId = corrida.id);
     try {
       await _repository.atualizarStatus(
         categoria: corrida.categoria,
         id: corrida.id,
         status: 'CANCELADO',
-        motivoCancelamento: 'Cancelada pelo passageiro',
+        motivoCancelamento: motivo,
         cancelToken: _cancelToken,
       );
       if (!mounted) return;
@@ -143,6 +139,7 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
               c.status.toUpperCase() != 'ANDAMENTO',
         )
         .toList();
+    final historicoVisivel = historico.take(_limiteHistorico).toList();
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
       navigationBar: CupertinoNavigationBar(
@@ -181,7 +178,24 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
                   ],
                   if (historico.isNotEmpty) ...[
                     const _TituloSecao('Histórico'),
-                    for (final corrida in historico) _cartao(corrida),
+                    for (final corrida in historicoVisivel)
+                      _cartao(
+                        corrida,
+                        key: ValueKey(
+                          '${corrida.categoria.name}:${corrida.id}',
+                        ),
+                      ),
+                    if (historicoVisivel.length < historico.length)
+                      Center(
+                        child: CupertinoButton(
+                          onPressed: () => setState(() {
+                            _limiteHistorico += _itensHistoricoPorPagina;
+                          }),
+                          child: Text(
+                            'Carregar mais ${historico.length - historicoVisivel.length} corridas',
+                          ),
+                        ),
+                      ),
                   ],
                 ],
               ),
@@ -189,8 +203,9 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
     );
   }
 
-  Widget _cartao(SolicitacaoCorrida corrida) {
+  Widget _cartao(SolicitacaoCorrida corrida, {Key? key}) {
     final pendente = corrida.status.toUpperCase() == 'PENDENTE';
+    final emAndamento = corrida.status.toUpperCase() == 'ANDAMENTO';
     final pagamento = switch (corrida.formaPagamento) {
       'DEBITO' => 'Débito',
       'CREDITO' => 'Crédito',
@@ -199,6 +214,7 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
       _ => 'Não informado',
     };
     return Container(
+      key: key,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -217,14 +233,14 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Origem: ${corrida.origem.latitude.toStringAsFixed(5)}, '
-            '${corrida.origem.longitude.toStringAsFixed(5)}',
+          EnderecoCorrida(
+            ponto: corrida.origem,
+            prefixo: 'Origem: ',
             style: const TextStyle(color: Color(0xFF1F2024)),
           ),
-          Text(
-            'Destino: ${corrida.destino.latitude.toStringAsFixed(5)}, '
-            '${corrida.destino.longitude.toStringAsFixed(5)}',
+          EnderecoCorrida(
+            ponto: corrida.destino,
+            prefixo: 'Destino: ',
             style: const TextStyle(color: Color(0xFF1F2024)),
           ),
           Text(
@@ -240,6 +256,26 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
             Text(
               'Peso: ${corrida.pesoCarga} kg',
               style: const TextStyle(color: Color(0xFF1F2024)),
+            ),
+          if (emAndamento)
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                await Navigator.push<void>(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) =>
+                        AndamentoCorridaPage(corridaInicial: corrida),
+                  ),
+                );
+                if (mounted) _carregar();
+              },
+              child: const Text('Acompanhar corrida'),
+            ),
+          if (emAndamento)
+            const Text(
+              'A corrida já foi aceita pelo mototaxista e não pode mais ser cancelada pelo aplicativo.',
+              style: TextStyle(color: CupertinoColors.systemGrey),
             ),
           if (pendente)
             CupertinoButton(

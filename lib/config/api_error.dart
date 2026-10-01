@@ -7,7 +7,18 @@ String mensagemErroDio(
 }) {
   final response = e.response;
   if (response == null) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout) {
+      return 'O servidor demorou para responder. Tente novamente';
+    }
     return 'Não foi possível conectar ao servidor';
+  }
+
+  if (response.statusCode == 502 ||
+      response.statusCode == 503 ||
+      response.statusCode == 504) {
+    return 'Servidor indisponível no momento. Tente novamente em instantes';
   }
 
   final data = response.data;

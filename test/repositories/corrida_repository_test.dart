@@ -61,6 +61,12 @@ void main() {
       mototaxistaId: 'moto-1',
       origem: origem,
       destino: destino,
+      descricaoCarga: categoria == CategoriaCorrida.freteSimples
+          ? 'Frete simples'
+          : categoria == CategoriaCorrida.frete
+          ? 'Frete'
+          : null,
+      pesoCarga: categoria == CategoriaCorrida.corrida ? null : 1.0,
     );
 
     return (path: path, data: data);
@@ -71,9 +77,12 @@ void main() {
     expect(data['origem']['localizacao']['longitude'], origem.longitude);
     expect(data['destino']['localizacao']['latitude'], destino.latitude);
     expect(data['destino']['localizacao']['longitude'], destino.longitude);
-    expect(data['origem']['timestamp'], data['dataHoraSolicitacao']);
-    expect(data['destino']['timestamp'], data['dataHoraSolicitacao']);
-    expect(data['status'], 'PENDENTE');
+    expect(data['origem'].containsKey('rotulo'), isFalse);
+    expect(data['destino'].containsKey('rotulo'), isFalse);
+    expect(data['origem']['timestamp'], data['destino']['timestamp']);
+    expect(DateTime.tryParse(data['origem']['timestamp'] as String), isNotNull);
+    expect(data.containsKey('dataHoraSolicitacao'), isFalse);
+    expect(data.containsKey('status'), isFalse);
   }
 
   group('CorridaRepository Tests |', () {
@@ -123,7 +132,9 @@ void main() {
         ),
       ).thenAnswer((invocation) async {
         path = invocation.positionalArguments.first as String;
-        data = Map<String, dynamic>.from(invocation.namedArguments[#data] as Map);
+        data = Map<String, dynamic>.from(
+          invocation.namedArguments[#data] as Map,
+        );
         return Response<dynamic>(requestOptions: RequestOptions(path: path));
       });
 
@@ -135,6 +146,32 @@ void main() {
 
       expect(path, '${ApiConfig.corridaFrete}/frete-1');
       expect(data, {'status': 'ANDAMENTO'});
+    });
+
+    test('Consulta status da solicitação pelo ID e categoria', () async {
+      when(
+        () => dio.get<dynamic>(
+          '${ApiConfig.corridaFrete}/frete-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(
+            path: '${ApiConfig.corridaFrete}/frete-1',
+          ),
+          data: [
+            {'id': 'frete-1', 'status': 'PENDENTE'},
+          ],
+        ),
+      );
+
+      final corrida = await repository.buscarPorId(
+        categoria: CategoriaCorrida.frete,
+        id: 'frete-1',
+      );
+
+      expect(corrida.id, 'frete-1');
+      expect(corrida.status, 'PENDENTE');
     });
 
     Future<void> stubResposta(dynamic data) async {

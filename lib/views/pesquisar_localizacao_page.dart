@@ -28,7 +28,8 @@ class PesquisarLocalizacaoPage extends StatefulWidget {
 
 class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
   final controller = TextEditingController();
-  late final repository = widget.repository ?? LocalizacaoRepository();
+  late final repository =
+      widget.repository ?? LocalizacaoRepository.compartilhado;
   Timer? debounceBusca;
   Timer? debounceEndereco;
   LocalizacaoPonto? pontoMapa;
@@ -57,6 +58,7 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
 
   Future<void> selecionar(LocalizacaoPonto ponto) async {
     if (selecionando) return;
+    repository.guardarEndereco(ponto);
     setState(() => selecionando = true);
     try {
       final callback = widget.onSelecionar;
@@ -155,9 +157,7 @@ class _PesquisarLocalizacaoPageState extends State<PesquisarLocalizacaoPage> {
           pontoMapa = LocalizacaoPonto(
             latitude: ponto.latitude,
             longitude: ponto.longitude,
-            rotulo:
-                '${ponto.latitude.toStringAsFixed(6)}, '
-                '${ponto.longitude.toStringAsFixed(6)}',
+            rotulo: 'Endereço indisponível',
           );
           erroMapa = 'Não foi possível identificar o endereço deste ponto.';
         });

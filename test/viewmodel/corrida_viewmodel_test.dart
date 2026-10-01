@@ -7,6 +7,7 @@ import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
 import 'package:route_pires_flutter/viewmodel/corrida_viewmodel.dart';
@@ -301,8 +302,12 @@ void main() {
       expect(ok, isFalse);
       expect(
         viewModel.erroCriacao,
-        equals('Não foi possível conectar ao servidor'),
+        equals(
+          'Não foi possível confirmar o envio. Verifique suas corridas antes de tentar novamente.',
+        ),
       );
+      expect(viewModel.criacaoIncerta, isTrue);
+      expect(await viewModel.confirmarNegociacao(), isFalse);
       expect(viewModel.erro, isNull);
     });
 
@@ -383,7 +388,8 @@ void main() {
       viewModel.selecionarMotorista(joa);
       expect(await viewModel.confirmarNegociacao(), isTrue);
       expect(await viewModel.confirmarNegociacao(), isTrue);
-      expect(viewModel.carregandoCriacao, isTrue);
+      expect(viewModel.carregandoCriacao, isFalse);
+      expect(viewModel.etapa, EtapaCorrida.aceita);
       verify(
         () => corridaRepository.criar(
           categoria: any(named: 'categoria'),
@@ -394,6 +400,525 @@ void main() {
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
+    });
+
+    test('Aguarda resposta e avança quando motorista aceita', () async {
+      mockCriar(
+        resposta: const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+      );
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'corrida-1', status: 'ANDAMENTO'),
+      );
+
+      viewModel.selecionarMotorista(joa);
+      expect(await viewModel.confirmarNegociacao(), isTrue);
+      expect(viewModel.etapa, EtapaCorrida.aguardando);
+      await viewModel.atualizarSolicitacao();
+      expect(viewModel.etapa, EtapaCorrida.aceita);
+    });
+
+    test('Não libera nova escolha sem confirmação do cancelamento', () async {
+      mockListar();
+      mockCriar(
+        resposta: const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+      );
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+      );
+      when(
+        () => corridaRepository.atualizarStatus(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-1',
+          status: 'CANCELADO',
+          motivoCancelamento: 'Tempo de aceite esgotado',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async {});
+
+      viewModel.selecionarMotorista(joa);
+      await viewModel.confirmarNegociacao();
+      await viewModel.encerrarEspera(porTempo: true);
+
+      // A consulta depois do PUT ainda retorna PENDENTE: não libera outra corrida.
+      expect(viewModel.etapa, EtapaCorrida.aguardando);
+      expect(
+        viewModel.erroAcompanhamento,
+        'Não foi possível confirmar o cancelamento',
+      );
+    });
+
+    test(
+      'Timeout confirmado volta à lista com motorista ainda disponível',
+      () async {
+        mockListar();
+        mockCriar(
+          resposta: const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+        );
+        var consultas = 0;
+        when(
+          () => corridaRepository.buscarPorId(
+            categoria: CategoriaCorrida.corrida,
+            id: 'corrida-1',
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer(
+          (_) async => CorridaResponse(
+            id: 'corrida-1',
+            status: consultas++ == 0 ? 'PENDENTE' : 'CANCELADO',
+          ),
+        );
+        when(
+          () => corridaRepository.atualizarStatus(
+            categoria: CategoriaCorrida.corrida,
+            id: 'corrida-1',
+            status: 'CANCELADO',
+            motivoCancelamento: 'Tempo de aceite esgotado',
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer((_) async {});
+
+        viewModel.selecionarMotorista(joa);
+        await viewModel.confirmarNegociacao();
+        await viewModel.encerrarEspera(porTempo: true);
+
+        expect(viewModel.etapa, EtapaCorrida.motoristas);
+        expect(viewModel.corridaCriada, isNull);
+        expect(viewModel.motoristas, [joa]);
+      },
+    );
+
+    test(
+      'Consulta em andamento não pisca cancelamento nem reverte seu resultado',
+      () async {
+        mockListar();
+        mockCriar(
+          resposta: const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+        );
+        final consultaAntiga = Completer<CorridaResponse>();
+        var consultas = 0;
+        when(
+          () => corridaRepository.buscarPorId(
+            categoria: CategoriaCorrida.corrida,
+            id: 'corrida-1',
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer((_) {
+          switch (consultas++) {
+            case 0:
+              return consultaAntiga.future;
+            case 1:
+              return Future.value(
+                const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+              );
+            default:
+              return Future.value(
+                const CorridaResponse(id: 'corrida-1', status: 'CANCELADO'),
+              );
+          }
+        });
+        when(
+          () => corridaRepository.atualizarStatus(
+            categoria: CategoriaCorrida.corrida,
+            id: 'corrida-1',
+            status: 'CANCELADO',
+            motivoCancelamento: 'Cancelada pelo passageiro',
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer((_) async {});
+
+        viewModel.selecionarMotorista(joa);
+        await viewModel.confirmarNegociacao();
+        final consulta = viewModel.atualizarSolicitacao();
+        expect(viewModel.atualizandoSolicitacao, isTrue);
+        expect(viewModel.encerrandoEspera, isFalse);
+
+        await viewModel.encerrarEspera();
+        consultaAntiga.complete(
+          const CorridaResponse(id: 'corrida-1', status: 'ANDAMENTO'),
+        );
+        await consulta;
+        expect(viewModel.etapa, EtapaCorrida.motoristas);
+        expect(viewModel.motoristas, [joa]);
+      },
+    );
+
+    test('Aceite antes do cancelamento mantém corrida aceita', () async {
+      mockCriar(
+        resposta: const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+      );
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'corrida-1', status: 'ANDAMENTO'),
+      );
+
+      viewModel.selecionarMotorista(joa);
+      await viewModel.confirmarNegociacao();
+      await viewModel.encerrarEspera();
+
+      expect(viewModel.etapa, EtapaCorrida.aceita);
+      verifyNever(
+        () => corridaRepository.atualizarStatus(
+          categoria: any(named: 'categoria'),
+          id: any(named: 'id'),
+          status: any(named: 'status'),
+          motivoCancelamento: any(named: 'motivoCancelamento'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
+    });
+
+    test('Troca abre confirmação sem solicitar antes do novo toque', () async {
+      const outro = MototaxistaResumo(id: 'moto-2', nome: 'Ana');
+      mockListar([joa, outro]);
+      final eventos = <String>[];
+      var criacoes = 0;
+      when(
+        () => corridaRepository.criar(
+          categoria: any(named: 'categoria'),
+          passageiroId: any(named: 'passageiroId'),
+          mototaxistaId: any(named: 'mototaxistaId'),
+          origem: any(named: 'origem'),
+          destino: any(named: 'destino'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((invocation) async {
+        eventos.add('criar');
+        return CorridaResponse(id: 'corrida-${++criacoes}', status: 'PENDENTE');
+      });
+      var consultas = 0;
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => CorridaResponse(
+          id: 'corrida-1',
+          status: consultas++ == 0 ? 'PENDENTE' : 'CANCELADO',
+        ),
+      );
+      when(
+        () => corridaRepository.atualizarStatus(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-1',
+          status: 'CANCELADO',
+          motivoCancelamento: 'Cancelada pelo passageiro',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async {
+        eventos.add('cancelar');
+      });
+
+      await viewModel.buscarMotoristas();
+      viewModel.selecionarMotorista(joa);
+      await viewModel.confirmarNegociacao();
+      final etapasDuranteTroca = <EtapaCorrida>[];
+      viewModel.addListener(() => etapasDuranteTroca.add(viewModel.etapa));
+      final trocou = await viewModel.trocarMotorista(outro);
+
+      expect(trocou, isTrue);
+      expect(etapasDuranteTroca, isNot(contains(EtapaCorrida.motoristas)));
+      expect(eventos, ['criar', 'cancelar']);
+      expect(viewModel.etapa, EtapaCorrida.negociacao);
+      expect(viewModel.motoristaSelecionado, outro);
+      expect(viewModel.corridaCriada, isNull);
+      expect(viewModel.motoristas, [joa, outro]);
+
+      await viewModel.confirmarNegociacao();
+
+      expect(eventos, ['criar', 'cancelar', 'criar']);
+      expect(viewModel.etapa, EtapaCorrida.aguardando);
+      expect(viewModel.corridaCriada?.id, 'corrida-2');
+    });
+
+    test('Não cria outra solicitação se a anterior foi aceita', () async {
+      const outro = MototaxistaResumo(id: 'moto-2', nome: 'Ana');
+      mockListar([joa, outro]);
+      mockCriar(
+        resposta: const CorridaResponse(id: 'corrida-1', status: 'PENDENTE'),
+      );
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'corrida-1', status: 'ANDAMENTO'),
+      );
+
+      await viewModel.buscarMotoristas();
+      viewModel.selecionarMotorista(joa);
+      await viewModel.confirmarNegociacao();
+      expect(await viewModel.trocarMotorista(outro), isFalse);
+      expect(viewModel.etapa, EtapaCorrida.aceita);
+      verify(
+        () => corridaRepository.criar(
+          categoria: any(named: 'categoria'),
+          passageiroId: any(named: 'passageiroId'),
+          mototaxistaId: any(named: 'mototaxistaId'),
+          origem: any(named: 'origem'),
+          destino: any(named: 'destino'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+    });
+
+    test('Corrida em andamento impede uma nova solicitação', () async {
+      mockListar();
+      when(
+        () => corridaRepository.listarMinhas(
+          passageiroId: 'passageiro-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => [
+          SolicitacaoCorrida(
+            id: 'corrida-ativa',
+            categoria: CategoriaCorrida.corrida,
+            status: 'ANDAMENTO',
+            mototaxistaId: joa.id,
+            passageiroId: 'passageiro-1',
+            origem: origem,
+            destino: destino,
+          ),
+        ],
+      );
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-ativa',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'corrida-ativa', status: 'ANDAMENTO'),
+      );
+
+      await viewModel.iniciar();
+      viewModel.selecionarMotorista(joa);
+
+      expect(viewModel.etapa, EtapaCorrida.aceita);
+      expect(viewModel.corridaCriada?.id, 'corrida-ativa');
+      expect(viewModel.solicitacaoAtiva?.origem, origem);
+      verifyNever(
+        () => mototaxistaRepository.listar(
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
+      verifyNever(
+        () => corridaRepository.criar(
+          categoria: any(named: 'categoria'),
+          passageiroId: any(named: 'passageiroId'),
+          mototaxistaId: any(named: 'mototaxistaId'),
+          origem: any(named: 'origem'),
+          destino: any(named: 'destino'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
+    });
+
+    test('Corrida finalizada não bloqueia uma nova busca', () async {
+      mockListar();
+      when(
+        () => corridaRepository.listarMinhas(
+          passageiroId: 'passageiro-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => [
+          SolicitacaoCorrida(
+            id: 'corrida-antiga',
+            categoria: CategoriaCorrida.corrida,
+            status: 'ANDAMENTO',
+            mototaxistaId: joa.id,
+            passageiroId: 'passageiro-1',
+            origem: origem,
+            destino: destino,
+          ),
+        ],
+      );
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-antiga',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'corrida-antiga', status: 'FINALIZADO'),
+      );
+
+      await viewModel.iniciar();
+
+      expect(viewModel.etapa, EtapaCorrida.motoristas);
+      expect(viewModel.corridaCriada, isNull);
+      expect(viewModel.motoristas, [joa]);
+    });
+
+    test('Retoma frete pendente antes de oferecer nova solicitação', () async {
+      mockListar();
+      when(
+        () => corridaRepository.listarMinhas(
+          passageiroId: 'passageiro-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => [
+          SolicitacaoCorrida(
+            id: 'frete-pendente',
+            categoria: CategoriaCorrida.frete,
+            status: 'PENDENTE',
+            mototaxistaId: 'moto-2',
+            passageiroId: 'passageiro-1',
+            origem: origem,
+            destino: destino,
+            dataHoraSolicitacao: DateTime.now().subtract(
+              const Duration(seconds: 20),
+            ),
+          ),
+        ],
+      );
+      var consultas = 0;
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.frete,
+          id: 'frete-pendente',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => CorridaResponse(
+          id: 'frete-pendente',
+          status: consultas++ == 0 ? 'PENDENTE' : 'ANDAMENTO',
+        ),
+      );
+
+      await viewModel.iniciar();
+      expect(viewModel.etapa, EtapaCorrida.aguardando);
+      expect(viewModel.segundosRestantes, inInclusiveRange(39, 40));
+      await viewModel.atualizarSolicitacao();
+      expect(viewModel.etapa, EtapaCorrida.aceita);
+      verify(
+        () => mototaxistaRepository.listar(
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+    });
+
+    test('Não mostra espera para pendência já cancelada ao entrar', () async {
+      mockListar();
+      when(
+        () => corridaRepository.listarMinhas(
+          passageiroId: 'passageiro-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => [
+          SolicitacaoCorrida(
+            id: 'corrida-antiga',
+            categoria: CategoriaCorrida.corrida,
+            status: 'PENDENTE',
+            mototaxistaId: joa.id,
+            passageiroId: 'passageiro-1',
+            origem: origem,
+            destino: destino,
+          ),
+        ],
+      );
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-antiga',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const CorridaResponse(id: 'corrida-antiga', status: 'CANCELADO'),
+      );
+      final etapasAoEntrar = <EtapaCorrida>[];
+      viewModel.addListener(() => etapasAoEntrar.add(viewModel.etapa));
+
+      await viewModel.iniciar();
+
+      expect(viewModel.etapa, EtapaCorrida.motoristas);
+      expect(etapasAoEntrar, isNot(contains(EtapaCorrida.aguardando)));
+      expect(viewModel.motoristas, [joa]);
+    });
+
+    test('Encerra pendência vencida antes de mostrar a lista', () async {
+      mockListar();
+      when(
+        () => corridaRepository.listarMinhas(
+          passageiroId: 'passageiro-1',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => [
+          SolicitacaoCorrida(
+            id: 'corrida-vencida',
+            categoria: CategoriaCorrida.corrida,
+            status: 'PENDENTE',
+            mototaxistaId: joa.id,
+            passageiroId: 'passageiro-1',
+            origem: origem,
+            destino: destino,
+            dataHoraSolicitacao: DateTime.now().subtract(
+              const Duration(minutes: 2),
+            ),
+          ),
+        ],
+      );
+      var consultas = 0;
+      when(
+        () => corridaRepository.buscarPorId(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-vencida',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => CorridaResponse(
+          id: 'corrida-vencida',
+          status: consultas++ == 2 ? 'CANCELADO' : 'PENDENTE',
+        ),
+      );
+      when(
+        () => corridaRepository.atualizarStatus(
+          categoria: CategoriaCorrida.corrida,
+          id: 'corrida-vencida',
+          status: 'CANCELADO',
+          motivoCancelamento: 'Tempo de aceite esgotado',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async {});
+
+      await viewModel.iniciar();
+
+      expect(viewModel.recuperando, isFalse);
+      expect(viewModel.etapa, EtapaCorrida.motoristas);
+      expect(viewModel.corridaCriada, isNull);
+      expect(viewModel.motoristas, [joa]);
+      expect(consultas, 3);
     });
   });
 }

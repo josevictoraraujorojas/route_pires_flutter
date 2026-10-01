@@ -7,7 +7,9 @@ import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
 import 'package:route_pires_flutter/views/drawer_corrida.dart';
 import 'package:route_pires_flutter/views/drawer_entrega.dart';
+import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/lista_passageiros.dart';
+import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
 
 enum TipoSolicitacao { corrida, entrega }
 
@@ -21,7 +23,7 @@ class Corrida extends StatefulWidget {
   State<Corrida> createState() => _CorridaState();
 }
 
-class _CorridaState extends State<Corrida> {
+class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   bool navegacaoInicializada = false;
 
   bool inicializandoNavegacao = false;
@@ -43,6 +45,8 @@ class _CorridaState extends State<Corrida> {
   TipoSolicitacao? tipoSolicitacao;
 
   SolicitacoesViewModel? solicitacoesViewModel;
+  int _ultimaRevisaoLista = 0;
+  bool _limpandoSelecaoRemota = false;
 
   GoogleNavigationViewController? mapController;
 
@@ -459,13 +463,22 @@ class _CorridaState extends State<Corrida> {
 
     final atual = solicitacaoSelecionada;
 
-    if (viewModel == null || atual == null || viewModel.atualizandoStatus) {
+    if (viewModel == null ||
+        atual == null ||
+        !corridaAceita ||
+        viewModel.atualizandoStatus) {
       return;
     }
 
-    final cancelou = corridaAceita
-        ? await viewModel.cancelar(atual)
-        : await viewModel.recusar(atual);
+    final motivo = await solicitarMotivoCancelamento(
+      context,
+      mototaxista: true,
+    );
+    if (!mounted || motivo == null || solicitacaoSelecionada?.id != atual.id) {
+      return;
+    }
+
+    final cancelou = await viewModel.cancelar(atual, motivo: motivo);
 
     if (!mounted) return;
 
@@ -511,6 +524,7 @@ class _CorridaState extends State<Corrida> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     unawaited(inicializarNavegacao());
 
@@ -522,6 +536,19 @@ class _CorridaState extends State<Corrida> {
       )..addListener(_aoAtualizarSolicitacoes);
 
       solicitacoesViewModel!.carregar();
+      solicitacoesViewModel!.iniciarAtualizacaoAutomatica();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final viewModel = solicitacoesViewModel;
+    if (viewModel == null) return;
+    if (state == AppLifecycleState.resumed) {
+      unawaited(viewModel.carregar(silenciosa: true));
+      viewModel.iniciarAtualizacaoAutomatica();
+    } else {
+      viewModel.pararAtualizacaoAutomatica();
     }
   }
 
@@ -530,8 +557,54 @@ class _CorridaState extends State<Corrida> {
   // ============================================================
 
   void _aoAtualizarSolicitacoes() {
-    if (mounted) {
-      setState(() {});
+    if (!mounted) return;
+    final viewModel = solicitacoesViewModel;
+    if (viewModel != null && viewModel.revisaoLista != _ultimaRevisaoLista) {
+      _ultimaRevisaoLista = viewModel.revisaoLista;
+      final selecionada = solicitacaoSelecionada;
+      if (selecionada != null && !_limpandoSelecaoRemota) {
+        SolicitacaoCorrida? atual;
+        for (final item in viewModel.solicitacoes) {
+          if (item.id == selecionada.id &&
+              item.categoria == selecionada.categoria) {
+            atual = item;
+            break;
+          }
+        }
+        if (atual == null) {
+          unawaited(_retirarSelecaoEncerrada());
+        } else {
+          solicitacaoSelecionada = atual;
+          corridaAceita =
+              corridaAceita || atual.status.toUpperCase() == 'ANDAMENTO';
+        }
+      }
+    }
+    setState(() {});
+  }
+
+  Future<void> _retirarSelecaoEncerrada() async {
+    if (_limpandoSelecaoRemota || solicitacaoSelecionada == null) return;
+    _limpandoSelecaoRemota = true;
+    try {
+      await _pararNavegacao();
+      if (!mounted) return;
+      _limparCorridaSelecionada();
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Solicitação encerrada'),
+          content: const Text('Esta solicitação não está mais disponível.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      _limpandoSelecaoRemota = false;
     }
   }
 
@@ -730,6 +803,30 @@ class _CorridaState extends State<Corrida> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (solicitacaoSelecionada case final solicitacao?) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          EnderecoCorrida(
+                            ponto: solicitacao.origem,
+                            prefixo: 'Origem: ',
+                          ),
+                          EnderecoCorrida(
+                            ponto: solicitacao.destino,
+                            prefixo: 'Destino: ',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     child: CupertinoButton.filled(
@@ -793,7 +890,7 @@ class _CorridaState extends State<Corrida> {
       return DrawerEntrega(
         entrega: solicitacaoSelecionada!,
         onIniciar: iniciarNavegacao,
-        onVoltar: cancelarSolicitacao,
+        onVoltar: voltarParaLista,
         carregando: carregando,
       );
     }
@@ -801,7 +898,7 @@ class _CorridaState extends State<Corrida> {
     return DrawerCorrida(
       corrida: solicitacaoSelecionada!,
       onIniciar: iniciarNavegacao,
-      onVoltar: cancelarSolicitacao,
+      onVoltar: voltarParaLista,
       carregando: carregando,
     );
   }
@@ -831,6 +928,17 @@ class _CorridaState extends State<Corrida> {
         const SizedBox(height: 8),
         Text(
           'Passageiro: ${solicitacao.passageiroNome}',
+          style: const TextStyle(color: Color(0xFF1F2024)),
+        ),
+        const SizedBox(height: 8),
+        EnderecoCorrida(
+          ponto: solicitacao.origem,
+          prefixo: 'Origem: ',
+          style: const TextStyle(color: Color(0xFF1F2024)),
+        ),
+        EnderecoCorrida(
+          ponto: solicitacao.destino,
+          prefixo: 'Destino: ',
           style: const TextStyle(color: Color(0xFF1F2024)),
         ),
         const SizedBox(height: 16),
@@ -867,6 +975,7 @@ class _CorridaState extends State<Corrida> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     // Remove o listener de chegada.
     arrivalSubscription?.cancel();
 

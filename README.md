@@ -20,7 +20,7 @@ No Android e iOS, a API padrão é `https://routepires.otavio.win`. Para usar um
 
 ## Corridas
 
-- O passageiro escolhe Corrida, Frete Simples ou Frete e informa PIX, débito, crédito ou dinheiro. O pagamento é apenas informativo; o aplicativo não cobra valores.
+- O passageiro escolhe Corrida ou Frete e informa PIX, débito, crédito ou dinheiro. O pagamento é apenas informativo; o aplicativo não cobra valores.
 - Fretes exigem descrição e peso da carga. Em **Minhas corridas**, o passageiro atualiza os estados, consulta o histórico e cancela solicitações pendentes sem apagar o registro.
 - O mototaxista vê categoria, pagamento e dados da carga. Se a navegação nativa não iniciar, as ações da corrida permanecem disponíveis e o botão permite tentar novamente.
 - **Restaurar** na solicitação volta à categoria, pagamento e locais recebidos da tela anterior.

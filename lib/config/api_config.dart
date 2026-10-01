@@ -18,6 +18,8 @@ class ApiConfig {
   static const String passageiros = '/passageiros';
   static const String mototaxistas = '/mototaxistas';
   static const String mototaxistasDisponiveis = '/mototaxistas/disponiveis';
+  static String perfilMototaxistaParaPassageiro(String id) =>
+      '$passageiros/mototaxista/$id/perfil';
   static String passageiroResumo(String id) => '$passageiros/$id/resumo';
   static const String corridasPassageiro = '/corridas-passageiro';
   static const String corridaFrete = '/corrida-frete';

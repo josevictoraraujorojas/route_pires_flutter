@@ -9,6 +9,19 @@ class LocalizacaoPonto {
   final double longitude;
   final String rotulo;
 
+  static bool rotuloLegivel(String rotulo) {
+    final valor = rotulo.trim();
+    if (valor.isEmpty ||
+        valor == 'Origem' ||
+        valor == 'Destino' ||
+        valor == 'Endereço indisponível' ||
+        valor == 'Buscando endereço...') {
+      return false;
+    }
+    return !RegExp(r'^-?\d+(?:[.,]\d+)?\s*,\s*-?\d+(?:[.,]\d+)?$')
+        .hasMatch(valor);
+  }
+
   @override
   bool operator ==(Object other) {
     return other is LocalizacaoPonto &&
