@@ -20,6 +20,11 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
   LoginViewModel? _login;
   MototaxistaViewModel? _mototaxista;
   String? _mototaxistaId;
+  Timer? _retryDisponibilidade;
+
+  bool get _appAtivo =>
+      WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
   @override
   void initState() {
@@ -40,14 +45,24 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
     if (!mounted) return;
     final id = _login?.usuario?.id;
     if (id == _mototaxistaId) return;
+    _retryDisponibilidade?.cancel();
     _mototaxista?.pararLocalizacao();
     _mototaxistaId = id;
     if (id == null || id.isEmpty) return;
-    _mototaxista?.definirLocalizacaoAtiva(
-      WidgetsBinding.instance.lifecycleState == null ||
-          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
-    );
-    unawaited(_mototaxista?.consultarDisponibilidade(id: id));
+    _mototaxista?.definirLocalizacaoAtiva(_appAtivo);
+    unawaited(_carregarDisponibilidade(id));
+  }
+
+  Future<void> _carregarDisponibilidade(String id) async {
+    if (!mounted || id != _mototaxistaId || !_appAtivo) return;
+    final disponivel = await _mototaxista?.consultarDisponibilidade(id: id);
+    if (!mounted || id != _mototaxistaId || !_appAtivo) return;
+    _retryDisponibilidade?.cancel();
+    if (disponivel == null) {
+      _retryDisponibilidade = Timer(const Duration(seconds: 15), () {
+        unawaited(_carregarDisponibilidade(id));
+      });
+    }
   }
 
   void _atendimentoMudou(bool emAtendimento) {
@@ -60,12 +75,18 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _mototaxista?.definirLocalizacaoAtiva(state == AppLifecycleState.resumed);
+    _retryDisponibilidade?.cancel();
+    final id = _mototaxistaId;
+    if (state == AppLifecycleState.resumed && id != null && id.isNotEmpty) {
+      unawaited(_carregarDisponibilidade(id));
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _login?.removeListener(_sincronizarSessao);
+    _retryDisponibilidade?.cancel();
     _mototaxista?.pararLocalizacao();
     super.dispose();
   }

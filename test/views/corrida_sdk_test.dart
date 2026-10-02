@@ -154,6 +154,38 @@ Future<void> _flush(WidgetTester tester) async {
   }
 }
 
+Future<({_Login login, MototaxistaViewModel moto})> _iniciarHome(
+  WidgetTester tester,
+  InterceptorsWrapper interceptor,
+) async {
+  final session = _Session();
+  GoogleMapsNavigationPlatform.instance = _Platform(session);
+  final gpsAnterior = gps.GeolocatorPlatform.instance;
+  gps.GeolocatorPlatform.instance = _Gps();
+  final login = _Login();
+  final moto = MototaxistaViewModel(clock: tester.binding.clock.now);
+  ApiClient().dio.interceptors.add(interceptor);
+  addTearDown(() async {
+    ApiClient().dio.interceptors.remove(interceptor);
+    gps.GeolocatorPlatform.instance = gpsAnterior;
+    login.dispose();
+    moto.dispose();
+    await session.remaining.close();
+    await session.arrival.close();
+  });
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<LoginViewModel>.value(value: login),
+        ChangeNotifierProvider<MototaxistaViewModel>.value(value: moto),
+      ],
+      child: const CupertinoApp(home: PrincipalPageMototaxista()),
+    ),
+  );
+  await _flush(tester);
+  return (login: login, moto: moto);
+}
+
 Future<List<Map<String, dynamic>>> _iniciarSdk(
   WidgetTester tester,
   _Session session,
@@ -224,6 +256,153 @@ OnArrivalEvent _chegadaEmbarque() => OnArrivalEvent(
 );
 
 void main() {
+  for (final online in [true, false]) {
+    testWidgets(
+      'Home recupera disponibilidade ${online ? 'online' : 'offline'} após falha inicial',
+      (tester) async {
+        var consultasDisponibilidade = 0;
+        var consultasCorridas = 0;
+        final home = await _iniciarHome(
+          tester,
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              if (options.method == 'GET' &&
+                  options.path == '/mototaxistas/moto-1') {
+                consultasDisponibilidade++;
+                if (consultasDisponibilidade == 1) {
+                  handler.reject(
+                    DioException(
+                      requestOptions: options,
+                      type: DioExceptionType.badResponse,
+                      response: Response(
+                        requestOptions: options,
+                        statusCode: 503,
+                        headers: Headers.fromMap({
+                          'retry-after': ['60'],
+                        }),
+                      ),
+                    ),
+                  );
+                  return;
+                }
+              }
+              final perfil = options.path == '/mototaxistas/moto-1';
+              if (!perfil) consultasCorridas++;
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  data: perfil ? {'disponivel': online} : [],
+                ),
+              );
+            },
+          ),
+        );
+        expect(consultasDisponibilidade, 1);
+        expect(consultasCorridas, 2);
+        await tester.pump(const Duration(seconds: 30));
+        await _flush(tester);
+        expect(consultasDisponibilidade, 1, reason: 'Respeita Retry-After');
+        expect(consultasCorridas, 2);
+
+        await tester.pump(const Duration(seconds: 31));
+        await _flush(tester);
+        expect(consultasDisponibilidade, 2);
+        expect(home.moto.disponivel, online);
+        expect(tester.widget<Corrida>(find.byType(Corrida)).online, online);
+        await tester.pump(const Duration(seconds: 15));
+        await _flush(tester);
+        expect(consultasCorridas, online ? 4 : 2);
+        expect(consultasDisponibilidade, 2);
+        await tester.pumpWidget(const SizedBox());
+        await _flush(tester);
+      },
+    );
+  }
+
+  testWidgets(
+    'Home pausa a recuperação sem antecipar Retry-After na retomada',
+    (tester) async {
+      var consultasDisponibilidade = 0;
+      final home = await _iniciarHome(
+        tester,
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final perfil = options.path == '/mototaxistas/moto-1';
+            if (perfil && options.method == 'GET') {
+              consultasDisponibilidade++;
+              if (consultasDisponibilidade == 1) {
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    type: DioExceptionType.badResponse,
+                    response: Response(
+                      requestOptions: options,
+                      statusCode: 503,
+                      headers: Headers.fromMap({
+                        'retry-after': ['60'],
+                      }),
+                    ),
+                  ),
+                );
+                return;
+              }
+            }
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                data: perfil ? {'disponivel': true} : [],
+              ),
+            );
+          },
+        ),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(seconds: 20));
+      await _flush(tester);
+      expect(consultasDisponibilidade, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _flush(tester);
+      expect(consultasDisponibilidade, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(seconds: 45));
+      await _flush(tester);
+      expect(consultasDisponibilidade, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _flush(tester);
+      expect(consultasDisponibilidade, 2);
+      expect(home.moto.disponivel, isTrue);
+      await tester.pumpWidget(const SizedBox());
+      await _flush(tester);
+    },
+  );
+
+  testWidgets('Home encerra a recuperação de disponibilidade no logout', (
+    tester,
+  ) async {
+    var consultasDisponibilidade = 0;
+    final home = await _iniciarHome(
+      tester,
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.path == '/mototaxistas/moto-1') {
+            consultasDisponibilidade++;
+            handler.reject(
+              DioException(requestOptions: options, error: 'Sem conexão'),
+            );
+          } else {
+            handler.resolve(Response(requestOptions: options, data: []));
+          }
+        },
+      ),
+    );
+    home.login.encerrar();
+    await tester.pump(const Duration(minutes: 5));
+    await _flush(tester);
+    expect(consultasDisponibilidade, 1);
+    await tester.pumpWidget(const SizedBox());
+    await _flush(tester);
+  });
+
   testWidgets('Perfil propaga disponibilidade para a aba Corrida já aberta', (
     tester,
   ) async {

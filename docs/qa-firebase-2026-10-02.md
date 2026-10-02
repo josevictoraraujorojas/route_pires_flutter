@@ -56,3 +56,15 @@ ignorados nesse build, já aprovados no `clean verify` local. A ativação em pr
 está pendente da criação dos índices e da conclusão da auditoria de datas antigas:
 a credencial disponível recebeu `403` ao criar índices e a cota esgotada interrompeu
 a auditoria após 40 registros, sem alteração de datas.
+
+## Correções após a revisão
+
+A home recupera automaticamente a disponibilidade quando a consulta inicial falha,
+respeitando o backoff e `Retry-After`. A recuperação pausa em segundo plano e
+termina após sucesso, logout ou saída da tela; motorista confirmado offline
+continua sem consultas periódicas de solicitações. Na API, GPS atualizado entre
+a montagem e a execução da busca deixa de excluir um motorista válido.
+
+Nova validação: 154 testes Flutter, `flutter analyze` sem problemas, builds Android
+debug e Web release aprovados. A API passou em 116 testes, incluindo nove com
+Firestore Emulator. Os custos por operação e a projeção do piloto permaneceram iguais.
