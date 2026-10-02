@@ -4,10 +4,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
+import 'package:route_pires_flutter/views/previsao_chegada.dart';
 
 class AndamentoCorridaPage extends StatefulWidget {
   const AndamentoCorridaPage({super.key, required this.corridaInicial});
@@ -25,6 +27,7 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
   Timer? _relogio;
   late SolicitacaoCorrida _corrida;
   late String _status;
+  late CorridaResponse _acompanhamento;
   String? _nomeMototaxista;
   String? _motoristaConsultado;
   String? _erro;
@@ -35,6 +38,7 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
     super.initState();
     _corrida = widget.corridaInicial;
     _status = _corrida.status.toUpperCase();
+    _acompanhamento = _corrida.acompanhamento;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _buscarMototaxista(_corrida.mototaxistaId);
@@ -74,12 +78,12 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
       );
       if (!mounted) return;
       final status = atual.status?.toUpperCase();
-      if (status != null && status != _status) {
-        setState(() => _status = status);
-        if (_finalizada) {
-          _relogio?.cancel();
-        }
-      }
+      setState(() {
+        _status = status ?? _status;
+        _acompanhamento = atual;
+        _erro = null;
+      });
+      if (_finalizada) _relogio?.cancel();
     } on DioException catch (e) {
       if (!mounted || e.type == DioExceptionType.cancel) return;
       setState(
@@ -198,6 +202,10 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
                     _descricaoStatus,
                     style: const TextStyle(color: Color(0xFF667085)),
                   ),
+                  if (_status == 'ANDAMENTO') ...[
+                    const SizedBox(height: 16),
+                    PrevisaoChegada(corrida: _acompanhamento),
+                  ],
                 ],
               ),
             ),

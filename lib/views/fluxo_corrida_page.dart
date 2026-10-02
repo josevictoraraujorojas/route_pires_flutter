@@ -9,6 +9,7 @@ import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/corrida_viewmodel.dart';
 import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
+import 'package:route_pires_flutter/views/previsao_chegada.dart';
 
 class FluxoCorridaPage extends StatefulWidget {
   const FluxoCorridaPage({
@@ -61,7 +62,15 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
     viewModel.addListener(_sincronizarEspera);
     viewModel.iniciar();
     _relogio = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || viewModel.etapa != EtapaCorrida.aguardando) return;
+      if (!mounted) return;
+      if (viewModel.etapa == EtapaCorrida.aceita) {
+        setState(() {});
+        if (++_segundosDecorridos % 5 == 0) {
+          unawaited(viewModel.atualizarSolicitacao());
+        }
+        return;
+      }
+      if (viewModel.etapa != EtapaCorrida.aguardando) return;
       setState(() {});
       if (viewModel.segundosRestantes == 0) {
         if (!_tentouEncerrarPrazo && !viewModel.atualizandoSolicitacao) {
@@ -314,6 +323,8 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
             'Você tem uma corrida em andamento.',
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 16),
+          PrevisaoChegada(corrida: viewModel.corridaCriada),
           const SizedBox(height: 24),
           CupertinoButton.filled(
             onPressed: viewModel.corridaCriada == null
@@ -334,6 +345,13 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
                           descricaoCarga: widget.descricaoCarga,
                           pesoCarga: widget.pesoCarga,
                           cargaFragil: widget.cargaFragil,
+                          tempoRestanteSegundos:
+                              viewModel.corridaCriada?.tempoRestanteSegundos,
+                          distanciaRestanteMetros:
+                              viewModel.corridaCriada?.distanciaRestanteMetros,
+                          pontoAtual: viewModel.corridaCriada?.pontoAtual,
+                          estimativaAtualizadaEm:
+                              viewModel.corridaCriada?.estimativaAtualizadaEm,
                         ),
                   ),
             child: const Text('Acompanhar corrida'),

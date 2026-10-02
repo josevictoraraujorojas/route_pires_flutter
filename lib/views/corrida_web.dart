@@ -10,10 +10,16 @@ import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
 /// No navegador, mantém as solicitações e mudanças de status sem carregar a
 /// SDK de navegação nativa.
 class Corrida extends StatefulWidget {
-  const Corrida({super.key, required this.onTituloChanged, this.mototaxistaId});
+  const Corrida({
+    super.key,
+    required this.onTituloChanged,
+    this.mototaxistaId,
+    this.onAtendimentoChanged,
+  });
 
   final ValueChanged<String> onTituloChanged;
   final String? mototaxistaId;
+  final ValueChanged<bool>? onAtendimentoChanged;
 
   @override
   State<Corrida> createState() => _CorridaWebState();
@@ -52,6 +58,12 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
   void _atualizar() {
     if (!mounted) return;
     final viewModel = _viewModel;
+    widget.onAtendimentoChanged?.call(
+      viewModel?.solicitacoes.any(
+            (corrida) => corrida.status.toUpperCase() == 'ANDAMENTO',
+          ) ??
+          false,
+    );
     if (viewModel != null && viewModel.revisaoLista != _ultimaRevisaoLista) {
       _ultimaRevisaoLista = viewModel.revisaoLista;
       final selecionada = _selecionada;

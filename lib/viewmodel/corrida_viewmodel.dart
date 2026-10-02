@@ -128,7 +128,10 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
         );
         if (foiDisposed) return;
         if (atual.status?.toUpperCase() == 'ANDAMENTO') {
-          _restaurarPendente(corrida, etapa: EtapaCorrida.aceita);
+          _restaurarPendente(
+            corrida.copyWith(acompanhamento: atual),
+            etapa: EtapaCorrida.aceita,
+          );
           return;
         }
       }
@@ -162,7 +165,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
           }
         } else if (status == 'ANDAMENTO') {
           _restaurarPendente(
-            pendente.copyWith(status: 'ANDAMENTO'),
+            pendente.copyWith(status: 'ANDAMENTO', acompanhamento: atual),
             etapa: EtapaCorrida.aceita,
           );
         } else {
@@ -191,7 +194,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
     EtapaCorrida etapa = EtapaCorrida.aguardando,
   }) {
     _solicitacaoAtiva = pendente;
-    _corridaCriada = CorridaResponse(id: pendente.id, status: pendente.status);
+    _corridaCriada = pendente.acompanhamento;
     _categoriaSolicitacao = pendente.categoria;
     _motoristaSelecionado = MototaxistaResumo(
       id: pendente.mototaxistaId,
@@ -210,6 +213,8 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
 
     try {
       final lista = await _mototaxistaRepository.listar(
+        latitude: origem.latitude,
+        longitude: origem.longitude,
         cancelToken: _cancelLista,
       );
       _motoristas = lista
@@ -318,7 +323,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   }
 
   Future<void> atualizarSolicitacao() async {
-    if (_etapa != EtapaCorrida.aguardando ||
+    if ((_etapa != EtapaCorrida.aguardando && _etapa != EtapaCorrida.aceita) ||
         _atualizandoSolicitacao ||
         _encerrandoEspera) {
       return;
@@ -335,11 +340,19 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
         cancelToken: _cancelAcompanhamento,
       );
       if (foiDisposed || versao != _versaoAcompanhamento) return;
+      _corridaCriada = atual;
+      _solicitacaoAtiva = _solicitacaoAtiva?.copyWith(
+        status: atual.status,
+        acompanhamento: atual,
+      );
       final status = atual.status?.toUpperCase();
       if (status == 'ANDAMENTO') {
         _etapa = EtapaCorrida.aceita;
         avisar();
-      } else if (status == 'CANCELADO' || status == 'CANCELADA') {
+      } else if (status == 'CANCELADO' ||
+          status == 'CANCELADA' ||
+          status == 'FINALIZADO' ||
+          status == 'FINALIZADA') {
         await _voltarALista();
       } else if (status != 'PENDENTE') {
         _erroAcompanhamento =

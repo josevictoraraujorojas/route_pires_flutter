@@ -23,9 +23,16 @@ class MototaxistaRepository {
   // LISTAR MOTOTAXISTAS
   // ============================================================
 
-  Future<List<MototaxistaResumo>> listar({CancelToken? cancelToken}) async {
+  Future<List<MototaxistaResumo>> listar({
+    double? latitude,
+    double? longitude,
+    CancelToken? cancelToken,
+  }) async {
     final response = await _dio.get(
       ApiConfig.mototaxistasDisponiveis,
+      queryParameters: latitude == null && longitude == null
+          ? null
+          : {'latitude': latitude, 'longitude': longitude},
       cancelToken: cancelToken,
     );
 
@@ -81,10 +88,31 @@ class MototaxistaRepository {
   Future<void> atualizarDisponibilidade({
     required String id,
     required bool disponivel,
+    double? latitude,
+    double? longitude,
+    CancelToken? cancelToken,
   }) async {
     await _dio.patch(
       '${ApiConfig.mototaxistas}/$id',
-      data: {'disponivel': disponivel},
+      cancelToken: cancelToken,
+      data: {
+        'disponivel': disponivel,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+      },
+    );
+  }
+
+  Future<void> publicarLocalizacao(
+    String id,
+    double latitude,
+    double longitude, {
+    CancelToken? cancelToken,
+  }) async {
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      cancelToken: cancelToken,
+      data: {'latitude': latitude, 'longitude': longitude},
     );
   }
 }

@@ -308,6 +308,28 @@ class CorridaRepository {
         .toList();
   }
 
+  Future<void> atualizarDadosNavegacao({
+    required CategoriaCorrida categoria,
+    required String id,
+    required int tempoRestanteSegundos,
+    required double distanciaRestanteMetros,
+    required int pontoAtual,
+    CancelToken? cancelToken,
+  }) async {
+    final path = categoria == CategoriaCorrida.corrida
+        ? ApiConfig.corridasPassageiro
+        : ApiConfig.corridaFrete;
+    await _dio.put(
+      '$path/$id',
+      cancelToken: cancelToken,
+      data: {
+        'tempoRestanteSegundos': tempoRestanteSegundos,
+        'distanciaRestanteMetros': distanciaRestanteMetros,
+        'pontoAtual': pontoAtual,
+      },
+    );
+  }
+
   Future<void> atualizarStatus({
     required CategoriaCorrida categoria,
     required String id,

@@ -68,8 +68,11 @@ void main() {
 
   void mockListar([List<MototaxistaResumo>? motoristas]) {
     when(
-      () =>
-          mototaxistaRepository.listar(cancelToken: any(named: 'cancelToken')),
+      () => mototaxistaRepository.listar(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
     ).thenAnswer((_) async => motoristas ?? [joa]);
   }
 
@@ -98,6 +101,77 @@ void main() {
   });
 
   group('CorridaViewModel Tests |', () {
+    test('Busca proximidade em relação ao embarque escolhido', () async {
+      mockListar();
+      await viewModel.buscarMotoristas();
+      final coordenadas = verify(
+        () => mototaxistaRepository.listar(
+          latitude: captureAny(named: 'latitude'),
+          longitude: captureAny(named: 'longitude'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).captured;
+      expect(coordenadas, [-17.3037, -48.2855]);
+    });
+
+    test(
+      'Acompanhamento aceito recebe novas métricas sem mudar o status',
+      () async {
+        mockCriar();
+        var segundos = 120;
+        when(
+          () => corridaRepository.buscarPorId(
+            categoria: CategoriaCorrida.corrida,
+            id: 'corrida-1',
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer(
+          (_) async => CorridaResponse.fromJson({
+            'id': 'corrida-1',
+            'status': 'ANDAMENTO',
+            'tempoRestanteSegundos': segundos,
+            'distanciaRestanteMetros': 900.0,
+            'pontoAtual': 0,
+            'estimativaAtualizadaEm': DateTime.now().toUtc().toIso8601String(),
+          }),
+        );
+        viewModel.selecionarMotorista(joa);
+        await viewModel.confirmarNegociacao();
+        await viewModel.atualizarSolicitacao();
+        expect(viewModel.corridaCriada?.tempoRestanteSegundos, 120);
+        segundos = 60;
+        await viewModel.atualizarSolicitacao();
+        expect(viewModel.corridaCriada?.tempoRestanteSegundos, 60);
+        expect(viewModel.etapa, EtapaCorrida.aceita);
+      },
+    );
+
+    test(
+      'Corrida concluída encerra acompanhamento na tela de solicitação',
+      () async {
+        mockCriar();
+        mockListar();
+        var consultas = 0;
+        when(
+          () => corridaRepository.buscarPorId(
+            categoria: CategoriaCorrida.corrida,
+            id: 'corrida-1',
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer((_) async {
+          consultas++;
+          return const CorridaResponse(id: 'corrida-1', status: 'FINALIZADO');
+        });
+        viewModel.selecionarMotorista(joa);
+        await viewModel.confirmarNegociacao();
+        await viewModel.atualizarSolicitacao();
+        await viewModel.atualizarSolicitacao();
+        expect(viewModel.etapa, EtapaCorrida.motoristas);
+        expect(viewModel.corridaCriada, isNull);
+        expect(consultas, 1);
+      },
+    );
+
     test('Deve buscar motoristas e ir para a lista', () async {
       mockListar();
 
@@ -141,6 +215,8 @@ void main() {
     test('Deve preencher erro quando o GET de motoristas falhar', () async {
       when(
         () => mototaxistaRepository.listar(
+          latitude: origem.latitude,
+          longitude: origem.longitude,
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
@@ -338,6 +414,8 @@ void main() {
       final pendente = Completer<List<MototaxistaResumo>>();
       when(
         () => mototaxistaRepository.listar(
+          latitude: origem.latitude,
+          longitude: origem.longitude,
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) => pendente.future);
@@ -724,6 +802,8 @@ void main() {
       expect(viewModel.solicitacaoAtiva?.origem, origem);
       verifyNever(
         () => mototaxistaRepository.listar(
+          latitude: origem.latitude,
+          longitude: origem.longitude,
           cancelToken: any(named: 'cancelToken'),
         ),
       );
@@ -821,6 +901,8 @@ void main() {
       expect(viewModel.etapa, EtapaCorrida.aceita);
       verify(
         () => mototaxistaRepository.listar(
+          latitude: origem.latitude,
+          longitude: origem.longitude,
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);

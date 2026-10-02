@@ -16,8 +16,14 @@ enum TipoSolicitacao { corrida, entrega }
 class Corrida extends StatefulWidget {
   final Function(String) onTituloChanged;
   final String? mototaxistaId;
+  final ValueChanged<bool>? onAtendimentoChanged;
 
-  const Corrida({super.key, required this.onTituloChanged, this.mototaxistaId});
+  const Corrida({
+    super.key,
+    required this.onTituloChanged,
+    this.mototaxistaId,
+    this.onAtendimentoChanged,
+  });
 
   @override
   State<Corrida> createState() => _CorridaState();
@@ -82,6 +88,109 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
 
   StreamSubscription<RemainingTimeOrDistanceChangedEvent>?
   remainingTimeDistanceSubscription;
+  Timer? _timerEstimativa;
+  bool _consultaEstimativaEmVoo = false;
+  bool _appAtivo = true;
+  int _revisaoEstimativa = 0;
+
+  void _iniciarEstimativa() {
+    if (!_appAtivo || !navegacaoAtiva || !corridaAceita || !mounted) return;
+    final revisao = _revisaoEstimativa;
+    remainingTimeDistanceSubscription ??=
+        GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener(
+          (event) {
+            if (revisao == _revisaoEstimativa) {
+              _atualizarEstimativa(
+                event.remainingTime,
+                event.remainingDistance,
+              );
+            }
+          },
+          remainingTimeThresholdSeconds: 15,
+          remainingDistanceThresholdMeters: 50,
+        );
+    arrivalSubscription ??= GoogleMapsNavigator.setOnArrivalListener((event) {
+      if (revisao == _revisaoEstimativa) unawaited(_aoChegarNoPonto(event));
+    });
+    _timerEstimativa ??= Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(_lerEstimativaSdk());
+    });
+    unawaited(_lerEstimativaSdk());
+  }
+
+  Future<void> _lerEstimativaSdk() async {
+    if (_consultaEstimativaEmVoo ||
+        !_appAtivo ||
+        !navegacaoAtiva ||
+        processandoChegada ||
+        !mounted ||
+        _timerEstimativa == null) {
+      return;
+    }
+    final revisao = _revisaoEstimativa;
+    _consultaEstimativaEmVoo = true;
+    try {
+      final dados = await GoogleMapsNavigator.getCurrentTimeAndDistance();
+      if (revisao == _revisaoEstimativa) {
+        _atualizarEstimativa(dados.time, dados.distance);
+      }
+    } catch (_) {
+      // O SDK pode ainda estar recalculando a rota.
+    } finally {
+      _consultaEstimativaEmVoo = false;
+      if (revisao != _revisaoEstimativa &&
+          mounted &&
+          navegacaoAtiva &&
+          _appAtivo &&
+          _timerEstimativa != null) {
+        unawaited(_lerEstimativaSdk());
+      }
+    }
+  }
+
+  void _atualizarEstimativa(double tempo, double distancia) {
+    final solicitacao = solicitacaoSelecionada;
+    if (!mounted ||
+        !_appAtivo ||
+        !navegacaoAtiva ||
+        !corridaAceita ||
+        _timerEstimativa == null ||
+        processandoChegada ||
+        solicitacao == null ||
+        !tempo.isFinite ||
+        tempo < 0 ||
+        !distancia.isFinite ||
+        distancia < 0) {
+      return;
+    }
+    setState(() {
+      tempoRestanteSegundos = tempo.round();
+      distanciaRestanteMetros = distancia;
+    });
+    solicitacoesViewModel?.publicarEstimativa(
+      solicitacao: solicitacao,
+      tempoRestanteSegundos: tempo,
+      distanciaRestanteMetros: distancia,
+      pontoAtual: pontoAtual,
+    );
+  }
+
+  void _pararEstimativa({bool preservarIntervalo = false}) {
+    _revisaoEstimativa++;
+    _timerEstimativa?.cancel();
+    _timerEstimativa = null;
+    remainingTimeDistanceSubscription?.cancel();
+    remainingTimeDistanceSubscription = null;
+    arrivalSubscription?.cancel();
+    arrivalSubscription = null;
+    tempoRestanteSegundos = null;
+    distanciaRestanteMetros = null;
+    if (preservarIntervalo) {
+      solicitacoesViewModel?.descartarEstimativaPendente();
+    } else {
+      solicitacoesViewModel?.pararPublicacaoEstimativa();
+    }
+  }
 
   // ============================================================
   // INICIALIZAÇÃO DA NAVEGAÇÃO
@@ -127,27 +236,6 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
         return false;
       }
 
-      remainingTimeDistanceSubscription =
-          GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener(
-            (event) {
-              if (!mounted) return;
-
-              setState(() {
-                tempoRestanteSegundos = event.remainingTime.round();
-                distanciaRestanteMetros = event.remainingDistance;
-              });
-
-              print('Tempo restante: $tempoRestanteSegundos segundos');
-
-              print('Distância restante: $distanciaRestanteMetros metros');
-            },
-            remainingTimeThresholdSeconds: 60,
-            remainingDistanceThresholdMeters: 100,
-          );
-
-      arrivalSubscription = GoogleMapsNavigator.setOnArrivalListener(
-        _aoChegarNoPonto,
-      );
       setState(() {
         navegacaoInicializada = true;
         erroNavegacao = null;
@@ -233,10 +321,10 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
 
     pontosDaRota.add(destinoFinal!);
 
-    pontoAtual = 0;
+    pontoAtual = pontoAtual == 1 || solicitacao.pontoAtual == 1 ? 1 : 0;
 
     return Destinations(
-      waypoints: pontosDaRota,
+      waypoints: pontosDaRota.skip(pontoAtual).toList(),
       displayOptions: NavigationDisplayOptions(),
       routingOptions: criarOpcoesDeRota(),
     );
@@ -256,11 +344,12 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
 
   Future<void> _aoChegarNoPonto(OnArrivalEvent _) async {
     // Impede processamento duplicado.
-    if (processandoChegada) {
+    if (processandoChegada || !mounted || !navegacaoAtiva || !corridaAceita) {
       return;
     }
 
     processandoChegada = true;
+    var revisaoParaRetomar = _revisaoEstimativa;
 
     try {
       // ========================================================
@@ -268,18 +357,20 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       // ========================================================
 
       if (pontoAtual < pontosDaRota.length - 1) {
-        // Avança o índice.
-        pontoAtual++;
+        _pararEstimativa(preservarIntervalo: true);
+        revisaoParaRetomar = _revisaoEstimativa;
 
         // ======================================================
         // MANDA O GOOGLE NAVIGATION CONTINUAR PARA O PRÓXIMO
         // ======================================================
 
         await GoogleMapsNavigator.continueToNextDestination();
-
-        if (mounted) {
-          setState(() {});
+        if (!mounted ||
+            !navegacaoAtiva ||
+            revisaoParaRetomar != _revisaoEstimativa) {
+          return;
         }
+        setState(() => pontoAtual++);
       } else {
         // ======================================================
         // CHEGOU AO ÚLTIMO PONTO
@@ -299,6 +390,11 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       if (mounted) widget.onTituloChanged('Falha na navegação');
     } finally {
       processandoChegada = false;
+      if (mounted &&
+          navegacaoAtiva &&
+          revisaoParaRetomar == _revisaoEstimativa) {
+        _iniciarEstimativa();
+      }
     }
   }
 
@@ -334,6 +430,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
         }
         setState(() {
           corridaAceita = true;
+          solicitacaoSelecionada = atual.copyWith(status: 'ANDAMENTO');
         });
       }
 
@@ -359,6 +456,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
         listaExpandida = false;
       });
       widget.onTituloChanged('Em Navegação');
+      _iniciarEstimativa();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -409,6 +507,8 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   }
 
   Future<void> _pararNavegacao() async {
+    if (mounted) setState(() => navegacaoAtiva = false);
+    _pararEstimativa();
     if (!navegacaoInicializada) return;
     try {
       await GoogleMapsNavigator.stopGuidance();
@@ -440,6 +540,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   }
 
   void _limparCorridaSelecionada() {
+    _pararEstimativa();
     setState(() {
       navegacaoAtiva = false;
       mostrandoPassageiro = false;
@@ -462,8 +563,10 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   // ============================================================
 
   void abrirPassageiro(SolicitacaoCorrida solicitacao) {
+    _pararEstimativa();
     setState(() {
       solicitacaoSelecionada = solicitacao;
+      pontoAtual = solicitacao.pontoAtual == 1 ? 1 : 0;
 
       mostrandoPassageiro = true;
 
@@ -525,6 +628,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   // ============================================================
 
   void voltarParaLista() {
+    _pararEstimativa();
     setState(() {
       mostrandoPassageiro = false;
 
@@ -567,13 +671,16 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appAtivo = state == AppLifecycleState.resumed;
     final viewModel = solicitacoesViewModel;
     if (viewModel == null) return;
     if (state == AppLifecycleState.resumed) {
       unawaited(viewModel.carregar(silenciosa: true));
       viewModel.iniciarAtualizacaoAutomatica();
+      _iniciarEstimativa();
     } else {
       viewModel.pararAtualizacaoAutomatica();
+      _pararEstimativa();
     }
   }
 
@@ -584,6 +691,12 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   void _aoAtualizarSolicitacoes() {
     if (!mounted) return;
     final viewModel = solicitacoesViewModel;
+    widget.onAtendimentoChanged?.call(
+      viewModel?.solicitacoes.any(
+            (corrida) => corrida.status.toUpperCase() == 'ANDAMENTO',
+          ) ??
+          false,
+    );
     if (viewModel != null && viewModel.revisaoLista != _ultimaRevisaoLista) {
       _ultimaRevisaoLista = viewModel.revisaoLista;
       final selecionada = solicitacaoSelecionada;
@@ -1001,8 +1114,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Remove o listener de chegada.
-    arrivalSubscription?.cancel();
+    _pararEstimativa();
 
     final viewModel = solicitacoesViewModel;
 

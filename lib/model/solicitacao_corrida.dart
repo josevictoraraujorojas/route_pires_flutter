@@ -1,4 +1,5 @@
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
+import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 
 class SolicitacaoCorrida {
@@ -17,6 +18,10 @@ class SolicitacaoCorrida {
     this.cargaFragil,
     this.formaPagamento,
     this.dataHoraSolicitacao,
+    this.tempoRestanteSegundos,
+    this.distanciaRestanteMetros,
+    this.pontoAtual,
+    this.estimativaAtualizadaEm,
   });
 
   final String id;
@@ -33,6 +38,21 @@ class SolicitacaoCorrida {
   final bool? cargaFragil;
   final String? formaPagamento;
   final DateTime? dataHoraSolicitacao;
+  final int? tempoRestanteSegundos;
+  final double? distanciaRestanteMetros;
+  final int? pontoAtual;
+  final DateTime? estimativaAtualizadaEm;
+
+  CorridaResponse get acompanhamento => CorridaResponse(
+    id: id,
+    status: status,
+    mototaxistaId: mototaxistaId,
+    passageiroId: passageiroId,
+    tempoRestanteSegundos: tempoRestanteSegundos,
+    distanciaRestanteMetros: distanciaRestanteMetros,
+    pontoAtual: pontoAtual,
+    estimativaAtualizadaEm: estimativaAtualizadaEm,
+  );
 
   bool get ehEntrega => categoria != CategoriaCorrida.corrida;
 
@@ -40,6 +60,7 @@ class SolicitacaoCorrida {
     Map<String, dynamic> json, {
     required CategoriaCorrida categoria,
   }) {
+    final acompanhamento = CorridaResponse.fromJson(json);
     final descricaoCarga = json['descricaoCarga']?.toString();
     final cargaLegadaSemDados =
         json['modalidadeFrete'] == null &&
@@ -73,6 +94,10 @@ class SolicitacaoCorrida {
       dataHoraSolicitacao: DateTime.tryParse(
         json['dataHoraSolicitacao']?.toString() ?? '',
       ),
+      tempoRestanteSegundos: acompanhamento.tempoRestanteSegundos,
+      distanciaRestanteMetros: acompanhamento.distanciaRestanteMetros,
+      pontoAtual: acompanhamento.pontoAtual,
+      estimativaAtualizadaEm: acompanhamento.estimativaAtualizadaEm,
     );
   }
 
@@ -80,6 +105,7 @@ class SolicitacaoCorrida {
     String? status,
     String? passageiroNome,
     double? passageiroAvaliacao,
+    CorridaResponse? acompanhamento,
   }) {
     return SolicitacaoCorrida(
       id: id,
@@ -96,6 +122,18 @@ class SolicitacaoCorrida {
       cargaFragil: cargaFragil,
       formaPagamento: formaPagamento,
       dataHoraSolicitacao: dataHoraSolicitacao,
+      tempoRestanteSegundos: acompanhamento == null
+          ? tempoRestanteSegundos
+          : acompanhamento.tempoRestanteSegundos,
+      distanciaRestanteMetros: acompanhamento == null
+          ? distanciaRestanteMetros
+          : acompanhamento.distanciaRestanteMetros,
+      pontoAtual: acompanhamento == null
+          ? pontoAtual
+          : acompanhamento.pontoAtual,
+      estimativaAtualizadaEm: acompanhamento == null
+          ? estimativaAtualizadaEm
+          : acompanhamento.estimativaAtualizadaEm,
     );
   }
 

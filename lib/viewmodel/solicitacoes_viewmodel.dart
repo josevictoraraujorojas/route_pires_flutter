@@ -25,6 +25,11 @@ class SolicitacoesViewModel extends ChangeNotifier {
   int _revisaoLista = 0;
   bool _disposed = false;
   Timer? _atualizacaoAutomatica;
+  Timer? _intervaloEstimativa;
+  CancelToken? _cancelEstimativa;
+  bool _publicandoEstimativa = false;
+  ({SolicitacaoCorrida solicitacao, int tempo, double distancia, int ponto})?
+  _estimativaPendente;
   DateTime? _proximaTentativa;
 
   bool get carregando => _carregando;
@@ -32,6 +37,72 @@ class SolicitacoesViewModel extends ChangeNotifier {
   String? get erro => _erro;
   List<SolicitacaoCorrida> get solicitacoes => _solicitacoes;
   int get revisaoLista => _revisaoLista;
+
+  void publicarEstimativa({
+    required SolicitacaoCorrida solicitacao,
+    required double tempoRestanteSegundos,
+    required double distanciaRestanteMetros,
+    required int pontoAtual,
+  }) {
+    if (_disposed ||
+        solicitacao.status.toUpperCase() != 'ANDAMENTO' ||
+        solicitacao.mototaxistaId != mototaxistaId ||
+        !tempoRestanteSegundos.isFinite ||
+        tempoRestanteSegundos < 0 ||
+        !distanciaRestanteMetros.isFinite ||
+        distanciaRestanteMetros < 0 ||
+        (pontoAtual != 0 && pontoAtual != 1)) {
+      return;
+    }
+    _estimativaPendente = (
+      solicitacao: solicitacao,
+      tempo: tempoRestanteSegundos.round(),
+      distancia: distanciaRestanteMetros,
+      ponto: pontoAtual,
+    );
+    unawaited(_enviarEstimativa());
+  }
+
+  Future<void> _enviarEstimativa() async {
+    if (_disposed || _publicandoEstimativa || _intervaloEstimativa != null) {
+      return;
+    }
+    final dados = _estimativaPendente;
+    if (dados == null) return;
+    _estimativaPendente = null;
+    _publicandoEstimativa = true;
+    final cancelToken = _cancelEstimativa = CancelToken();
+    _intervaloEstimativa = Timer(const Duration(seconds: 15), () {
+      _intervaloEstimativa = null;
+      unawaited(_enviarEstimativa());
+    });
+    try {
+      await _repository.atualizarDadosNavegacao(
+        categoria: dados.solicitacao.categoria,
+        id: dados.solicitacao.id,
+        tempoRestanteSegundos: dados.tempo,
+        distanciaRestanteMetros: dados.distancia,
+        pontoAtual: dados.ponto,
+        cancelToken: cancelToken,
+      );
+    } catch (_) {
+      // A previsão é complementar; não bloqueia as ações da corrida.
+    } finally {
+      _publicandoEstimativa = false;
+      if (_intervaloEstimativa == null) unawaited(_enviarEstimativa());
+    }
+  }
+
+  void pararPublicacaoEstimativa() {
+    descartarEstimativaPendente();
+    _intervaloEstimativa?.cancel();
+    _intervaloEstimativa = null;
+  }
+
+  void descartarEstimativaPendente() {
+    _estimativaPendente = null;
+    _cancelEstimativa?.cancel();
+  }
 
   void _avisar() {
     if (!_disposed) notifyListeners();
@@ -75,6 +146,10 @@ class SolicitacoesViewModel extends ChangeNotifier {
     corrida.cargaFragil,
     corrida.formaPagamento,
     corrida.dataHoraSolicitacao,
+    corrida.tempoRestanteSegundos,
+    corrida.distanciaRestanteMetros,
+    corrida.pontoAtual,
+    corrida.estimativaAtualizadaEm,
   );
 
   bool _mesmaLista(
@@ -387,6 +462,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    pararPublicacaoEstimativa();
     pararAtualizacaoAutomatica();
     if (!_cancelToken.isCancelled) {
       _cancelToken.cancel();

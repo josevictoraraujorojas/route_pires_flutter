@@ -9,7 +9,7 @@ flutter pub get
 flutter run
 ```
 
-No Android e iOS, a API padrão é `https://routepires.otavio.win`. Para usar uma API local durante desenvolvimento, informe `--dart-define=API_BASE_URL=http://10.0.2.2:8080` no emulador Android ou a URL alcançável pelo aparelho. O Android permite HTTP local apenas no build de debug. Configure `GOOGLE_MAPS_API_KEY` em `android/local.properties` para compilar o app Android; não versione a chave.
+No Android e iOS, a API padrão é `https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.2.sslip.io`. Para usar uma API local durante desenvolvimento, informe `--dart-define=API_BASE_URL=http://10.0.2.2:8080` no emulador Android ou a URL alcançável pelo aparelho. O Android permite HTTP local apenas no build de debug. Configure `GOOGLE_MAPS_API_KEY` em `android/local.properties` para compilar o app Android; não versione a chave.
 
 ## Autenticação
 
@@ -24,6 +24,20 @@ No Android e iOS, a API padrão é `https://routepires.otavio.win`. Para usar um
 - Fretes exigem descrição e peso da carga. Em **Minhas corridas**, o passageiro atualiza os estados, consulta o histórico e cancela solicitações pendentes sem apagar o registro.
 - O mototaxista vê categoria, pagamento e dados da carga. Se a navegação nativa não iniciar, as ações da corrida permanecem disponíveis e o botão permite tentar novamente.
 - **Restaurar** na solicitação volta à categoria, pagamento e locais recebidos da tela anterior.
+
+O passageiro busca motoristas pelo embarque; a API aplica raio de 2 km e GPS
+recebido nos últimos 120 segundos. O motorista publica GPS ao ficar disponível
+e a cada 15 segundos enquanto disponível ou atendendo. Depois do aceite, o
+SDK calcula a previsão até o próximo ponto e o app envia os valores no PUT
+existente da corrida, no máximo a cada 15 segundos. `pontoAtual: 0` representa
+embarque e `1` representa destino final.
+
+O polling do passageiro mostra minutos arredondados para cima e distância,
+mesmo sem mudança de status. Sem previsão ou após 120 segundos, mostra
+**Aguardando previsão**. O crédito **Google Maps** acompanha os valores do SDK;
+as [políticas oficiais](https://developers.google.com/maps/documentation/navigation/android-sdk/policies)
+orientam sua exibição. GPS, SDK e publicação podem falhar sem impedir as ações
+da corrida. O Web lê a previsão produzida pelo SDK Android/iOS.
 
 ## Publicar Flutter Web em `/app/`
 

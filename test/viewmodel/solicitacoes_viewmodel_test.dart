@@ -60,6 +60,41 @@ void main() {
   }
 
   group('SolicitacoesViewModel Tests |', () {
+    test(
+      'Atualiza a etapa quando somente os dados de navegação mudam',
+      () async {
+        var consulta = 0;
+        when(
+          () => repository.listarPendentes(
+            mototaxistaId: any(named: 'mototaxistaId'),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer(
+          (_) async => [
+            SolicitacaoCorrida(
+              id: 'solicitacao-1',
+              categoria: CategoriaCorrida.corrida,
+              status: 'ANDAMENTO',
+              mototaxistaId: 'moto-1',
+              passageiroId: 'passageiro-1',
+              origem: origem,
+              destino: destino,
+              tempoRestanteSegundos: 120,
+              distanciaRestanteMetros: 900,
+              pontoAtual: consulta++ == 0 ? 0 : 1,
+            ),
+          ],
+        );
+        await viewModel.carregar();
+        var avisos = 0;
+        viewModel.addListener(() => avisos++);
+        await viewModel.carregar(silenciosa: true);
+        expect(viewModel.solicitacoes.single.pontoAtual, 1);
+        expect(avisos, 1);
+        viewModel.dispose();
+      },
+    );
+
     testWidgets('Atualiza a lista enquanto a tela do mototaxista está aberta', (
       tester,
     ) async {
