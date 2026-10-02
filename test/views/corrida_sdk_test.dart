@@ -258,14 +258,31 @@ OnArrivalEvent _chegadaEmbarque() => OnArrivalEvent(
 void main() {
   for (final online in [true, false]) {
     testWidgets(
-      'Home recupera disponibilidade ${online ? 'online' : 'offline'} após falha inicial',
+      'Perfil acompanha recuperação ${online ? 'online' : 'offline'} após falha inicial',
       (tester) async {
         var consultasDisponibilidade = 0;
         var consultasCorridas = 0;
+        var falharAlteracao = true;
         final home = await _iniciarHome(
           tester,
           InterceptorsWrapper(
             onRequest: (options, handler) {
+              if (options.method == 'PATCH' &&
+                  (options.data as Map).containsKey('disponivel') &&
+                  falharAlteracao) {
+                falharAlteracao = false;
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    type: DioExceptionType.badResponse,
+                    response: Response(
+                      requestOptions: options,
+                      statusCode: 503,
+                    ),
+                  ),
+                );
+                return;
+              }
               if (options.method == 'GET' &&
                   options.path == '/mototaxistas/moto-1') {
                 consultasDisponibilidade++;
@@ -299,6 +316,10 @@ void main() {
         );
         expect(consultasDisponibilidade, 1);
         expect(consultasCorridas, 2);
+        await tester.tap(find.text('Perfil'));
+        await _flush(tester);
+        expect(find.byType(CupertinoSwitch), findsNothing);
+        expect(find.text('Tentar novamente'), findsOneWidget);
         await tester.pump(const Duration(seconds: 30));
         await _flush(tester);
         expect(consultasDisponibilidade, 1, reason: 'Respeita Retry-After');
@@ -308,10 +329,37 @@ void main() {
         await _flush(tester);
         expect(consultasDisponibilidade, 2);
         expect(home.moto.disponivel, online);
+        expect(find.text('Tentar novamente'), findsNothing);
+        expect(
+          tester.widget<CupertinoSwitch>(find.byType(CupertinoSwitch)).value,
+          online,
+        );
+        await tester.tap(find.text('Corrida'));
+        await _flush(tester);
         expect(tester.widget<Corrida>(find.byType(Corrida)).online, online);
         await tester.pump(const Duration(seconds: 15));
         await _flush(tester);
         expect(consultasCorridas, online ? 4 : 2);
+        expect(consultasDisponibilidade, 2);
+        await tester.tap(find.text('Perfil'));
+        await _flush(tester);
+        await tester.tap(find.byType(CupertinoSwitch));
+        await _flush(tester);
+        expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+        expect(home.moto.disponivel, online);
+        await tester.tap(find.text('OK'));
+        await _flush(tester);
+        expect(
+          tester.widget<CupertinoSwitch>(find.byType(CupertinoSwitch)).value,
+          online,
+        );
+        await tester.tap(find.byType(CupertinoSwitch));
+        await _flush(tester);
+        expect(home.moto.disponivel, !online);
+        expect(
+          tester.widget<CupertinoSwitch>(find.byType(CupertinoSwitch)).value,
+          !online,
+        );
         expect(consultasDisponibilidade, 2);
         await tester.pumpWidget(const SizedBox());
         await _flush(tester);

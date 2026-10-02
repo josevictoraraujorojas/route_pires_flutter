@@ -11,7 +11,6 @@ class PerfilMototaxista extends StatefulWidget {
 }
 
 class _PerfilMototaxistaState extends State<PerfilMototaxista> {
-  bool? disponivel;
   bool carregandoDisponibilidade = true;
   bool alterandoDisponibilidade = false;
   String? erroDisponibilidade;
@@ -29,7 +28,6 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
     if (mototaxistaId == null || mototaxistaId.isEmpty) {
       setState(() {
         carregandoDisponibilidade = false;
-        disponivel = null;
         erroDisponibilidade = 'Não foi possível identificar o mototaxista.';
       });
       return;
@@ -37,7 +35,6 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
 
     setState(() {
       carregandoDisponibilidade = true;
-      disponivel = null;
       erroDisponibilidade = null;
     });
 
@@ -47,7 +44,6 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
 
     setState(() {
       carregandoDisponibilidade = false;
-      disponivel = valor;
       erroDisponibilidade = valor == null
           ? viewModel.erro ?? 'Não foi possível consultar sua disponibilidade.'
           : null;
@@ -59,9 +55,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
   // ============================================================
 
   Future<void> _alterarDisponibilidade(bool valor) async {
-    if (alterandoDisponibilidade ||
-        carregandoDisponibilidade ||
-        disponivel == null) {
+    if (alterandoDisponibilidade || carregandoDisponibilidade) {
       return;
     }
 
@@ -73,35 +67,28 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
       return;
     }
 
-    final valorAnterior = disponivel;
+    final viewModel = context.read<MototaxistaViewModel>();
+    if (viewModel.disponibilidadePara(mototaxistaId) == null) return;
 
     setState(() {
-      disponivel = valor;
       alterandoDisponibilidade = true;
     });
 
     try {
-      final sucesso = await context
-          .read<MototaxistaViewModel>()
-          .alterarDisponibilidade(id: mototaxistaId, disponivel: valor);
+      final sucesso = await viewModel.alterarDisponibilidade(
+        id: mototaxistaId,
+        disponivel: valor,
+      );
 
       if (!mounted) return;
 
       if (!sucesso) {
-        setState(() {
-          disponivel = valorAnterior;
-        });
-
-        final erro = context.read<MototaxistaViewModel>().erro;
-
-        _mostrarErro(erro ?? 'Não foi possível alterar sua disponibilidade.');
+        _mostrarErro(
+          viewModel.erro ?? 'Não foi possível alterar sua disponibilidade.',
+        );
       }
     } catch (_) {
       if (!mounted) return;
-
-      setState(() {
-        disponivel = valorAnterior;
-      });
 
       _mostrarErro('Não foi possível alterar sua disponibilidade.');
     } finally {
@@ -194,6 +181,9 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
   @override
   Widget build(BuildContext context) {
     final usuario = context.watch<LoginViewModel>().usuario;
+    final disponivel = context.select<MototaxistaViewModel, bool?>(
+      (viewModel) => viewModel.disponibilidadePara(usuario?.id),
+    );
 
     final nome = usuario?.nome ?? 'Mototaxista';
 
@@ -328,7 +318,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                       ],
                     )
                   : CupertinoSwitch(
-                      value: disponivel!,
+                      value: disponivel,
                       activeTrackColor: CupertinoColors.systemGreen,
                       onChanged: _alterarDisponibilidade,
                     ),

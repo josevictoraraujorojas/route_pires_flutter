@@ -50,6 +50,9 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
   bool get disponivel => _disponivel;
   bool get emAtendimento => _emAtendimento;
 
+  bool? disponibilidadePara(String? id) =>
+      id != null && _idDisponibilidade == id ? _disponivel : null;
+
   void definirEmAtendimento({required String id, required bool emAtendimento}) {
     final mudou = _emAtendimento != emAtendimento;
     _idLocalizacao = id;

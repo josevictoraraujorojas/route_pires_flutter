@@ -68,3 +68,8 @@ a montagem e a execução da busca deixa de excluir um motorista válido.
 Nova validação: 154 testes Flutter, `flutter analyze` sem problemas, builds Android
 debug e Web release aprovados. A API passou em 116 testes, incluindo nove com
 Firestore Emulator. Os custos por operação e a projeção do piloto permaneceram iguais.
+
+O Perfil agora acompanha a disponibilidade confirmada no ViewModel, inclusive
+quando permanece aberto durante a recuperação. Os testes verificam os estados
+online e offline, a restauração da chave sem consultas extras e a preservação
+do estado anterior quando uma tentativa de alteração falha.
