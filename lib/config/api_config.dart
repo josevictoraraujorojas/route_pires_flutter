@@ -11,7 +11,7 @@ class ApiConfig {
     if (_fromEnv.isNotEmpty) {
       return _fromEnv;
     }
-    return 'https://routepires.otavio.win';
+    return 'https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.2.sslip.io';
   }
 
   static const String health = '/actuator/health/liveness';

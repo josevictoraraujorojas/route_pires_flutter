@@ -77,6 +77,12 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   // Listener do evento de chegada.
   StreamSubscription<OnArrivalEvent>? arrivalSubscription;
 
+  int? tempoRestanteSegundos;
+  double? distanciaRestanteMetros;
+
+  StreamSubscription<RemainingTimeOrDistanceChangedEvent>?
+  remainingTimeDistanceSubscription;
+
   // ============================================================
   // INICIALIZAÇÃO DA NAVEGAÇÃO
   // ============================================================
@@ -115,10 +121,29 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       }
 
       await GoogleMapsNavigator.initializeNavigationSession();
+
       if (!mounted) {
         await GoogleMapsNavigator.cleanup();
         return false;
       }
+
+      remainingTimeDistanceSubscription =
+          GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener(
+            (event) {
+              if (!mounted) return;
+
+              setState(() {
+                tempoRestanteSegundos = event.remainingTime.round();
+                distanciaRestanteMetros = event.remainingDistance;
+              });
+
+              print('Tempo restante: $tempoRestanteSegundos segundos');
+
+              print('Distância restante: $distanciaRestanteMetros metros');
+            },
+            remainingTimeThresholdSeconds: 60,
+            remainingDistanceThresholdMeters: 100,
+          );
 
       arrivalSubscription = GoogleMapsNavigator.setOnArrivalListener(
         _aoChegarNoPonto,
