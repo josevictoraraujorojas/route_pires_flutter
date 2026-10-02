@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/config/safe_change_notifier.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/corrida_response.dart';
@@ -41,6 +42,8 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   final CancelToken _cancelLista = CancelToken();
   final CancelToken _cancelCriacao = CancelToken();
   final CancelToken _cancelAcompanhamento = CancelToken();
+  final ApiRetryGate _retryLista = ApiRetryGate();
+  final ApiRetryGate _retryAcompanhamento = ApiRetryGate();
   static const prazoAceite = Duration(seconds: 60);
 
   EtapaCorrida _etapa = EtapaCorrida.motoristas;
@@ -77,6 +80,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   bool get encerrandoEspera => _encerrandoEspera;
   bool get trocandoMotorista => _trocandoMotorista;
   bool get criacaoIncerta => _criacaoIncerta;
+  bool get podeConsultarSolicitacao => _retryAcompanhamento.canAttempt;
   int get segundosRestantes {
     final inicio = _inicioEspera;
     if (inicio == null) return prazoAceite.inSeconds;
@@ -105,7 +109,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   }
 
   Future<void> iniciar() async {
-    if (_recuperando) return;
+    if (foiDisposed || _recuperando || !_retryLista.canAttempt) return;
     _recuperando = true;
     _erroLista = null;
     _etapa = EtapaCorrida.motoristas;
@@ -176,12 +180,14 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
       await buscarMotoristas();
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
+      _retryLista.failed(e);
       _erroLista = mensagemErroDio(
         e,
         fallback: 'Não foi possível verificar solicitações pendentes',
       );
-    } catch (_) {
+    } catch (e) {
       if (foiDisposed) return;
+      _retryLista.failed(e);
       _erroLista = 'Não foi possível verificar solicitações pendentes';
     } finally {
       _recuperando = false;
@@ -193,6 +199,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
     SolicitacaoCorrida pendente, {
     EtapaCorrida etapa = EtapaCorrida.aguardando,
   }) {
+    _retryLista.succeeded();
     _solicitacaoAtiva = pendente;
     _corridaCriada = pendente.acompanhamento;
     _categoriaSolicitacao = pendente.categoria;
@@ -206,6 +213,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   }
 
   Future<void> buscarMotoristas({bool manterEtapa = false}) async {
+    if (foiDisposed || _carregandoLista || !_retryLista.canAttempt) return;
     _carregandoLista = true;
     _erroLista = null;
     if (!manterEtapa) _etapa = EtapaCorrida.motoristas;
@@ -217,19 +225,22 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
         longitude: origem.longitude,
         cancelToken: _cancelLista,
       );
+      _retryLista.succeeded();
       _motoristas = lista
           .where((mototaxista) => mototaxista.disponivel)
           .toList();
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
+      _retryLista.failed(e);
       _motoristas = const [];
       _erroLista = mensagemErroDio(
         e,
         fallback: 'Erro ao buscar mototaxistas',
         porStatus: const {500: 'Erro interno no servidor'},
       );
-    } catch (_) {
+    } catch (e) {
       if (foiDisposed) return;
+      _retryLista.failed(e);
       _motoristas = const [];
       _erroLista = 'Ocorreu um erro inesperado';
     } finally {
@@ -325,7 +336,8 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   Future<void> atualizarSolicitacao() async {
     if ((_etapa != EtapaCorrida.aguardando && _etapa != EtapaCorrida.aceita) ||
         _atualizandoSolicitacao ||
-        _encerrandoEspera) {
+        _encerrandoEspera ||
+        !_retryAcompanhamento.canAttempt) {
       return;
     }
     final corrida = _corridaCriada;
@@ -340,6 +352,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
         cancelToken: _cancelAcompanhamento,
       );
       if (foiDisposed || versao != _versaoAcompanhamento) return;
+      _retryAcompanhamento.succeeded();
       _corridaCriada = atual;
       _solicitacaoAtiva = _solicitacaoAtiva?.copyWith(
         status: atual.status,
@@ -364,13 +377,15 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
       }
     } on DioException catch (e) {
       if (_foiCancelado(e) || versao != _versaoAcompanhamento) return;
+      _retryAcompanhamento.failed(e);
       _erroAcompanhamento = mensagemErroDio(
         e,
         fallback: 'Não foi possível consultar a solicitação',
       );
       avisar();
-    } catch (_) {
+    } catch (e) {
       if (foiDisposed || versao != _versaoAcompanhamento) return;
+      _retryAcompanhamento.failed(e);
       _erroAcompanhamento = 'Não foi possível consultar a solicitação';
       avisar();
     } finally {
@@ -379,7 +394,11 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   }
 
   Future<void> encerrarEspera({bool porTempo = false}) async {
-    if (_etapa != EtapaCorrida.aguardando || _encerrandoEspera) return;
+    if (_etapa != EtapaCorrida.aguardando ||
+        _encerrandoEspera ||
+        !_retryAcompanhamento.canAttempt) {
+      return;
+    }
     final corrida = _corridaCriada;
     if (corrida == null) return;
 
@@ -428,14 +447,17 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
         _erroAcompanhamento =
             'Estado da solicitação: ${antes.status ?? 'desconhecido'}';
       }
+      if (_erroAcompanhamento == null) _retryAcompanhamento.succeeded();
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
+      _retryAcompanhamento.failed(e);
       _erroAcompanhamento = mensagemErroDio(
         e,
         fallback: 'Não foi possível cancelar a solicitação',
       );
-    } catch (_) {
+    } catch (e) {
       if (foiDisposed) return;
+      _retryAcompanhamento.failed(e);
       _erroAcompanhamento = 'Não foi possível cancelar a solicitação';
     } finally {
       _encerrandoEspera = false;

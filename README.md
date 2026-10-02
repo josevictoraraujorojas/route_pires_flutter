@@ -26,10 +26,12 @@ No Android e iOS, a API padrão é `https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.
 - **Restaurar** na solicitação volta à categoria, pagamento e locais recebidos da tela anterior.
 
 O passageiro busca motoristas pelo embarque; a API aplica raio de 2 km e GPS
-recebido nos últimos 120 segundos. O motorista publica GPS ao ficar disponível
-e a cada 15 segundos enquanto disponível ou atendendo. Depois do aceite, o
+recebido nos últimos 120 segundos. O motorista publica GPS ao ficar disponível,
+a cada 30 segundos com movimento acumulado de pelo menos 20 metros, ou a cada
+60 segundos parado. Depois do aceite, o
 SDK calcula a previsão até o próximo ponto e o app envia os valores no PUT
-existente da corrida, no máximo a cada 15 segundos. `pontoAtual: 0` representa
+existente da corrida, no máximo a cada 30 segundos; primeiro valor e mudança
+de etapa são imediatos. `pontoAtual: 0` representa
 embarque e `1` representa destino final.
 
 O polling do passageiro mostra minutos arredondados para cima e distância,
@@ -38,6 +40,18 @@ mesmo sem mudança de status. Sem previsão ou após 120 segundos, mostra
 as [políticas oficiais](https://developers.google.com/maps/documentation/navigation/android-sdk/policies)
 orientam sua exibição. GPS, SDK e publicação podem falhar sem impedir as ações
 da corrida. O Web lê a previsão produzida pelo SDK Android/iOS.
+
+Motorista online consulta solicitações a cada 15 segundos; em atendimento,
+a cada 30 segundos. Offline, sem atendimento, encerra o polling após a consulta
+inicial. Passageiro consulta a cada 3 segundos enquanto aguarda o aceite, com
+prazo de 60 segundos, e a cada 15 segundos após o aceite. Background pausa os
+ciclos, sem zerar os intervalos e a espera após falhas. `503` preserva a sessão;
+a espera progressiva respeita `Retry-After`, inclusive nos resumos.
+
+O histórico carrega dez registros por modalidade, combina por data/ID e
+exibe dez por página. O botão para carregar mais usa o último ID exibido como
+cursor comum; não há polling do histórico. Consulte os payloads e requisitos
+da API em [firebase-consumo.md](https://github.com/josevictoraraujorojas/RoutePires/blob/develop/docs/firebase-consumo.md).
 
 ## Publicar Flutter Web em `/app/`
 

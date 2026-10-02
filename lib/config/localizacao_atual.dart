@@ -11,10 +11,11 @@ Future<LatLng>? _emVoo;
 LatLng? _cache;
 DateTime? _cacheEm;
 
-Future<LatLng> posicaoAtual() {
+Future<LatLng> posicaoAtual({bool usarCache = true}) {
   final cache = _cache;
   final cacheEm = _cacheEm;
-  if (cache != null &&
+  if (usarCache &&
+      cache != null &&
       cacheEm != null &&
       DateTime.now().difference(cacheEm) < const Duration(seconds: 8)) {
     return Future.value(cache);

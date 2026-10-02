@@ -66,6 +66,7 @@ class _Session extends NavigationSessionAPIImpl {
   double distance = 900;
   Completer<NavigationTimeAndDistance>? leituraPendente;
   Completer<void>? paradaPendente;
+  Completer<ContinueToNextDestinationResponse>? avancoPendente;
   int consultas = 0;
   bool falhaAoAvancar = false;
   @override
@@ -113,9 +114,12 @@ class _Session extends NavigationSessionAPIImpl {
   @override
   Future<ContinueToNextDestinationResponse> continueToNextDestination() async {
     if (falhaAoAvancar) throw StateError('SDK indisponível');
+    final resposta =
+        await (avancoPendente?.future ??
+            Future.value(ContinueToNextDestinationResponse()));
     time = 180;
     distance = 1200;
-    return ContinueToNextDestinationResponse();
+    return resposta;
   }
 }
 
@@ -150,7 +154,166 @@ Future<void> _flush(WidgetTester tester) async {
   }
 }
 
+Future<List<Map<String, dynamic>>> _iniciarSdk(
+  WidgetTester tester,
+  _Session session,
+) async {
+  GoogleMapsNavigationPlatform.instance = _Platform(session);
+  final gpsAnterior = gps.GeolocatorPlatform.instance;
+  gps.GeolocatorPlatform.instance = _Gps();
+  addTearDown(() async {
+    gps.GeolocatorPlatform.instance = gpsAnterior;
+    await session.remaining.close();
+    await session.arrival.close();
+  });
+  var status = 'ANDAMENTO';
+  final envios = <Map<String, dynamic>>[];
+  Map<String, dynamic> corrida() => {
+    'id': 'corrida-1',
+    'mototaxistaId': 'moto-1',
+    'passageiro': 'passageiro-1',
+    'passageiroNome': 'Maria',
+    'status': status,
+    'formaPagamento': 'PIX',
+    'origem': {
+      'localizacao': {'latitude': -17.3, 'longitude': -48.28},
+    },
+    'destino': {
+      'localizacao': {'latitude': -17.29, 'longitude': -48.27},
+    },
+  };
+  final interceptor = InterceptorsWrapper(
+    onRequest: (options, handler) {
+      dynamic data;
+      if (options.method == 'PUT') {
+        final body = Map<String, dynamic>.from(options.data as Map);
+        if (body['status'] case final String novoStatus) status = novoStatus;
+        if (body.containsKey('tempoRestanteSegundos')) envios.add(body);
+        data = corrida();
+      } else if (options.path == '/corridas-passageiro') {
+        data = status == 'ANDAMENTO' ? [corrida()] : [];
+      } else if (options.path.startsWith('/passageiros')) {
+        data = {'id': 'passageiro-1', 'nome': 'Maria'};
+      } else {
+        data = [];
+      }
+      handler.resolve(Response(requestOptions: options, data: data));
+    },
+  );
+  ApiClient().dio.interceptors.add(interceptor);
+  addTearDown(() => ApiClient().dio.interceptors.remove(interceptor));
+  await tester.pumpWidget(
+    CupertinoApp(
+      home: Corrida(mototaxistaId: 'moto-1', onTituloChanged: (_) {}),
+    ),
+  );
+  await _flush(tester);
+  await tester.tap(find.text('Maria'));
+  await _flush(tester);
+  await tester.tap(find.text('Iniciar navegação'));
+  await _flush(tester);
+  expect(envios.single['pontoAtual'], 0);
+  return envios;
+}
+
+OnArrivalEvent _chegadaEmbarque() => OnArrivalEvent(
+  waypoint: NavigationWaypoint.withLatLngTarget(
+    title: 'Embarque',
+    target: const LatLng(latitude: -17.3, longitude: -48.28),
+  ),
+);
+
 void main() {
+  testWidgets('Perfil propaga disponibilidade para a aba Corrida já aberta', (
+    tester,
+  ) async {
+    final session = _Session();
+    GoogleMapsNavigationPlatform.instance = _Platform(session);
+    final gpsAnterior = gps.GeolocatorPlatform.instance;
+    gps.GeolocatorPlatform.instance = _Gps();
+    final login = _Login();
+    final moto = MototaxistaViewModel(clock: tester.binding.clock.now);
+    var disponivel = false;
+    var consultasCorridas = 0;
+    final interceptor = InterceptorsWrapper(
+      onRequest: (options, handler) {
+        dynamic data;
+        if (options.path == '/corridas-passageiro' ||
+            options.path == '/corrida-frete') {
+          consultasCorridas++;
+          data = [];
+        } else if (options.path == '/mototaxistas/moto-1') {
+          if (options.method == 'PATCH') {
+            final body = options.data as Map;
+            if (body['disponivel'] case final bool valor) disponivel = valor;
+          }
+          data = {'disponivel': disponivel};
+        } else {
+          handler.reject(
+            DioException(
+              requestOptions: options,
+              error: 'Requisição inesperada ${options.path}',
+            ),
+          );
+          return;
+        }
+        handler.resolve(Response(requestOptions: options, data: data));
+      },
+    );
+    ApiClient().dio.interceptors.add(interceptor);
+    addTearDown(() async {
+      ApiClient().dio.interceptors.remove(interceptor);
+      gps.GeolocatorPlatform.instance = gpsAnterior;
+      login.dispose();
+      moto.dispose();
+      await session.remaining.close();
+      await session.arrival.close();
+    });
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<LoginViewModel>.value(value: login),
+          ChangeNotifierProvider<MototaxistaViewModel>.value(value: moto),
+        ],
+        child: const CupertinoApp(home: PrincipalPageMototaxista()),
+      ),
+    );
+    await _flush(tester);
+    final estadoCorrida = tester.state(find.byType(Corrida));
+    expect(consultasCorridas, 2);
+
+    await tester.tap(find.text('Perfil'));
+    await _flush(tester);
+    expect(
+      tester.widget<CupertinoSwitch>(find.byType(CupertinoSwitch)).value,
+      isFalse,
+    );
+    await tester.tap(find.byType(CupertinoSwitch));
+    await _flush(tester);
+    expect(moto.disponivel, isTrue);
+    await tester.tap(find.text('Corrida'));
+    await _flush(tester);
+    expect(tester.state(find.byType(Corrida)), same(estadoCorrida));
+    await tester.pump(const Duration(seconds: 15));
+    await _flush(tester);
+    expect(consultasCorridas, 4);
+
+    await tester.tap(find.text('Perfil'));
+    await _flush(tester);
+    await tester.tap(find.byType(CupertinoSwitch));
+    await _flush(tester);
+    expect(moto.disponivel, isFalse);
+    await tester.tap(find.text('Corrida'));
+    await _flush(tester);
+    final antes = consultasCorridas;
+    await tester.pump(const Duration(seconds: 30));
+    await _flush(tester);
+    expect(consultasCorridas, antes);
+    expect(tester.state(find.byType(Corrida)), same(estadoCorrida));
+    await tester.pumpWidget(const SizedBox());
+    await _flush(tester);
+  });
+
   testWidgets('Web informa atendimento mesmo antes de selecionar corrida', (
     tester,
   ) async {
@@ -210,10 +373,15 @@ void main() {
     final previousGps = gps.GeolocatorPlatform.instance;
     gps.GeolocatorPlatform.instance = _Gps();
     final login = _Login();
-    final moto = MototaxistaViewModel();
+    final moto = MototaxistaViewModel(clock: tester.binding.clock.now);
     final gpsEnvios = <Map<String, dynamic>>[];
+    var consultasDisponibilidade = 0;
     final interceptor = InterceptorsWrapper(
       onRequest: (options, handler) {
+        if (options.method == 'GET' &&
+            options.path.startsWith('/mototaxistas/')) {
+          consultasDisponibilidade++;
+        }
         if (options.method == 'PATCH') {
           gpsEnvios.add(Map<String, dynamic>.from(options.data as Map));
         }
@@ -249,23 +417,130 @@ void main() {
     expect(gpsEnvios, [
       {'latitude': -17.3, 'longitude': -48.28},
     ]);
+    await tester.tap(find.text('Perfil'));
+    await _flush(tester);
+    expect(
+      consultasDisponibilidade,
+      1,
+      reason: 'O perfil reutiliza a disponibilidade consultada pela home',
+    );
+    expect(find.textContaining('mantenha o aplicativo aberto'), findsOneWidget);
     await tester.pump(const Duration(seconds: 15));
     await _flush(tester);
-    expect(gpsEnvios, hasLength(2));
+    expect(gpsEnvios, hasLength(1));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump(const Duration(seconds: 30));
     await _flush(tester);
-    expect(gpsEnvios, hasLength(2));
+    expect(gpsEnvios, hasLength(1));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await _flush(tester);
-    expect(gpsEnvios, hasLength(3));
+    expect(gpsEnvios, hasLength(1));
     login.encerrar();
     await tester.pump(const Duration(seconds: 30));
     await _flush(tester);
-    expect(gpsEnvios, hasLength(3));
+    expect(gpsEnvios, hasLength(1));
     await tester.pumpWidget(const SizedBox());
     await _flush(tester);
   });
+
+  testWidgets(
+    'Resume durante avanço não registra listeners da etapa anterior',
+    (tester) async {
+      final session = _Session();
+      final envios = await _iniciarSdk(tester, session);
+      session.avancoPendente = Completer<ContinueToNextDestinationResponse>();
+      session.arrival.add(_chegadaEmbarque());
+      await _flush(tester);
+      final consultas = session.consultas;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _flush(tester);
+      expect(session.remaining.hasListener, isFalse);
+      expect(session.arrival.hasListener, isFalse);
+      expect(session.consultas, consultas);
+      expect(envios, hasLength(1));
+
+      session.avancoPendente!.complete(ContinueToNextDestinationResponse());
+      await _flush(tester);
+      expect(envios.last, {
+        'tempoRestanteSegundos': 180,
+        'distanciaRestanteMetros': 1200.0,
+        'pontoAtual': 1,
+      });
+      expect(session.remaining.hasListener, isTrue);
+      await tester.pumpWidget(const SizedBox());
+      await _flush(tester);
+    },
+  );
+
+  testWidgets(
+    'Leitura antiga do embarque não publica métricas na segunda etapa',
+    (tester) async {
+      final session = _Session();
+      final envios = await _iniciarSdk(tester, session);
+      final leitura = Completer<NavigationTimeAndDistance>();
+      session.leituraPendente = leitura;
+      await tester.pump(const Duration(seconds: 30));
+      await _flush(tester);
+      session.arrival.add(_chegadaEmbarque());
+      await _flush(tester);
+      expect(
+        envios,
+        hasLength(1),
+        reason: 'A leitura da nova etapa espera a anterior terminar',
+      );
+      session.leituraPendente = null;
+      leitura.complete(
+        NavigationTimeAndDistance(
+          time: 10,
+          distance: 50,
+          delaySeverity: TrafficDelaySeverity.light,
+        ),
+      );
+      await _flush(tester);
+      expect(envios, hasLength(2));
+      expect(envios.last, {
+        'tempoRestanteSegundos': 180,
+        'distanciaRestanteMetros': 1200.0,
+        'pontoAtual': 1,
+      });
+      await tester.pumpWidget(const SizedBox());
+      await _flush(tester);
+    },
+  );
+
+  for (final cancelar in [false, true]) {
+    testWidgets(
+      '${cancelar ? 'Cancelar' : 'Finalizar'} durante avanço descarta resposta tardia do SDK',
+      (tester) async {
+        final session = _Session();
+        final envios = await _iniciarSdk(tester, session);
+        session.avancoPendente = Completer<ContinueToNextDestinationResponse>();
+        session.arrival.add(_chegadaEmbarque());
+        await _flush(tester);
+        if (cancelar) {
+          await tester.tap(find.text('Cancelar corrida'));
+          await _flush(tester);
+          await tester.tap(find.text('Problema com o veículo'));
+        } else {
+          await tester.tap(find.text('Finalizar corrida'));
+        }
+        await _flush(tester);
+        final consultas = session.consultas;
+        session.avancoPendente!.complete(ContinueToNextDestinationResponse());
+        await _flush(tester);
+        final dynamic estado = tester.state(find.byType(Corrida));
+        expect(estado.navegacaoAtiva, isFalse);
+        expect(estado.pontoAtual, 0);
+        expect(envios, hasLength(1));
+        expect(session.consultas, consultas);
+        expect(session.remaining.hasListener, isFalse);
+        expect(session.arrival.hasListener, isFalse);
+        await tester.pumpWidget(const SizedBox());
+        await _flush(tester);
+      },
+    );
+  }
 
   testWidgets('SDK publica após aceite, troca etapa e encerra assinaturas', (
     tester,
@@ -366,7 +641,7 @@ void main() {
     session.falhaAoAvancar = true;
     session.arrival.add(chegada);
     await _flush(tester);
-    await tester.pump(const Duration(seconds: 15));
+    await tester.pump(const Duration(seconds: 30));
     await _flush(tester);
     expect(envios.last, {
       'tempoRestanteSegundos': 120,
@@ -374,9 +649,16 @@ void main() {
       'pontoAtual': 0,
     });
     session.falhaAoAvancar = false;
+    session.avancoPendente = Completer<ContinueToNextDestinationResponse>();
     session.arrival.add(chegada);
     await _flush(tester);
-    await tester.pump(const Duration(seconds: 15));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await _flush(tester);
+    session.avancoPendente!.complete(ContinueToNextDestinationResponse());
+    await _flush(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await _flush(tester);
+    await tester.pump(const Duration(seconds: 30));
     await _flush(tester);
     expect(envios.last, {
       'tempoRestanteSegundos': 180,
@@ -385,7 +667,7 @@ void main() {
     });
 
     session.leituraPendente = Completer<NavigationTimeAndDistance>();
-    await tester.pump(const Duration(seconds: 15));
+    await tester.pump(const Duration(seconds: 30));
     await _flush(tester);
     final consultasAntesFinal = session.consultas;
     final totalAntesFinal = envios.length;

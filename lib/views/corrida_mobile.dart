@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
 import 'package:route_pires_flutter/config/localizacao_atual.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
 import 'package:route_pires_flutter/views/drawer_corrida.dart';
@@ -17,12 +18,14 @@ class Corrida extends StatefulWidget {
   final Function(String) onTituloChanged;
   final String? mototaxistaId;
   final ValueChanged<bool>? onAtendimentoChanged;
+  final bool online;
 
   const Corrida({
     super.key,
     required this.onTituloChanged,
     this.mototaxistaId,
     this.onAtendimentoChanged,
+    this.online = false,
   });
 
   @override
@@ -92,9 +95,16 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   bool _consultaEstimativaEmVoo = false;
   bool _appAtivo = true;
   int _revisaoEstimativa = 0;
+  final _retryEstimativa = ApiRetryGate();
 
   void _iniciarEstimativa() {
-    if (!_appAtivo || !navegacaoAtiva || !corridaAceita || !mounted) return;
+    if (!_appAtivo ||
+        !navegacaoAtiva ||
+        !corridaAceita ||
+        processandoChegada ||
+        !mounted) {
+      return;
+    }
     final revisao = _revisaoEstimativa;
     remainingTimeDistanceSubscription ??=
         GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener(
@@ -106,13 +116,13 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
               );
             }
           },
-          remainingTimeThresholdSeconds: 15,
+          remainingTimeThresholdSeconds: 30,
           remainingDistanceThresholdMeters: 50,
         );
     arrivalSubscription ??= GoogleMapsNavigator.setOnArrivalListener((event) {
       if (revisao == _revisaoEstimativa) unawaited(_aoChegarNoPonto(event));
     });
-    _timerEstimativa ??= Timer.periodic(const Duration(seconds: 15), (_) {
+    _timerEstimativa ??= Timer.periodic(const Duration(seconds: 30), (_) {
       unawaited(_lerEstimativaSdk());
     });
     unawaited(_lerEstimativaSdk());
@@ -124,7 +134,8 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
         !navegacaoAtiva ||
         processandoChegada ||
         !mounted ||
-        _timerEstimativa == null) {
+        _timerEstimativa == null ||
+        !_retryEstimativa.canAttempt) {
       return;
     }
     final revisao = _revisaoEstimativa;
@@ -134,7 +145,10 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       if (revisao == _revisaoEstimativa) {
         _atualizarEstimativa(dados.time, dados.distance);
       }
-    } catch (_) {
+    } catch (error) {
+      if (mounted && revisao == _revisaoEstimativa) {
+        _retryEstimativa.failed(error);
+      }
       // O SDK pode ainda estar recalculando a rota.
     } finally {
       _consultaEstimativaEmVoo = false;
@@ -167,6 +181,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       tempoRestanteSegundos = tempo.round();
       distanciaRestanteMetros = distancia;
     });
+    _retryEstimativa.succeeded();
     solicitacoesViewModel?.publicarEstimativa(
       solicitacao: solicitacao,
       tempoRestanteSegundos: tempo,
@@ -175,7 +190,10 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
     );
   }
 
-  void _pararEstimativa({bool preservarIntervalo = false}) {
+  void _pararEstimativa({
+    bool preservarIntervalo = false,
+    bool suspender = false,
+  }) {
     _revisaoEstimativa++;
     _timerEstimativa?.cancel();
     _timerEstimativa = null;
@@ -187,8 +205,11 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
     distanciaRestanteMetros = null;
     if (preservarIntervalo) {
       solicitacoesViewModel?.descartarEstimativaPendente();
+    } else if (suspender) {
+      solicitacoesViewModel?.suspenderPublicacaoEstimativa();
     } else {
       solicitacoesViewModel?.pararPublicacaoEstimativa();
+      _retryEstimativa.succeeded();
     }
   }
 
@@ -349,7 +370,15 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
     }
 
     processandoChegada = true;
-    var revisaoParaRetomar = _revisaoEstimativa;
+    final corrida = solicitacaoSelecionada;
+    final pontoAnterior = pontoAtual;
+    bool mesmaNavegacao() =>
+        mounted &&
+        navegacaoAtiva &&
+        corridaAceita &&
+        corrida != null &&
+        solicitacaoSelecionada?.id == corrida.id &&
+        solicitacaoSelecionada?.categoria == corrida.categoria;
 
     try {
       // ========================================================
@@ -358,19 +387,17 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
 
       if (pontoAtual < pontosDaRota.length - 1) {
         _pararEstimativa(preservarIntervalo: true);
-        revisaoParaRetomar = _revisaoEstimativa;
 
         // ======================================================
         // MANDA O GOOGLE NAVIGATION CONTINUAR PARA O PRÓXIMO
         // ======================================================
 
         await GoogleMapsNavigator.continueToNextDestination();
-        if (!mounted ||
-            !navegacaoAtiva ||
-            revisaoParaRetomar != _revisaoEstimativa) {
+        if (!mesmaNavegacao() || pontoAtual != pontoAnterior) {
           return;
         }
-        setState(() => pontoAtual++);
+        setState(() => pontoAtual = pontoAnterior + 1);
+        _retryEstimativa.succeeded();
       } else {
         // ======================================================
         // CHEGOU AO ÚLTIMO PONTO
@@ -390,9 +417,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       if (mounted) widget.onTituloChanged('Falha na navegação');
     } finally {
       processandoChegada = false;
-      if (mounted &&
-          navegacaoAtiva &&
-          revisaoParaRetomar == _revisaoEstimativa) {
+      if (mesmaNavegacao()) {
         _iniciarEstimativa();
       }
     }
@@ -654,6 +679,9 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _appAtivo =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
     unawaited(inicializarNavegacao());
 
@@ -665,7 +693,21 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       )..addListener(_aoAtualizarSolicitacoes);
 
       solicitacoesViewModel!.carregar();
-      solicitacoesViewModel!.iniciarAtualizacaoAutomatica();
+      solicitacoesViewModel!.configurarPolling(
+        online: widget.online,
+        ativa: _appAtivo,
+      );
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant Corrida oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.online != widget.online) {
+      solicitacoesViewModel?.configurarPolling(
+        online: widget.online,
+        ativa: _appAtivo,
+      );
     }
   }
 
@@ -674,13 +716,12 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
     _appAtivo = state == AppLifecycleState.resumed;
     final viewModel = solicitacoesViewModel;
     if (viewModel == null) return;
+    viewModel.configurarPolling(online: widget.online, ativa: _appAtivo);
     if (state == AppLifecycleState.resumed) {
       unawaited(viewModel.carregar(silenciosa: true));
-      viewModel.iniciarAtualizacaoAutomatica();
       _iniciarEstimativa();
     } else {
-      viewModel.pararAtualizacaoAutomatica();
-      _pararEstimativa();
+      _pararEstimativa(suspender: true);
     }
   }
 

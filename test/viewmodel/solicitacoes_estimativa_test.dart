@@ -28,7 +28,7 @@ void main() {
     destino: ponto,
   );
 
-  testWidgets('Publica o primeiro valor e coalesce eventos em 15 segundos', (
+  testWidgets('Publica o primeiro valor e coalesce eventos em 30 segundos', (
     tester,
   ) async {
     final envios = <Map<String, dynamic>>[];
@@ -78,7 +78,7 @@ void main() {
       distanciaRestanteMetros: 700,
       pontoAtual: 0,
     );
-    await tester.pump(const Duration(seconds: 14));
+    await tester.pump(const Duration(seconds: 29));
     expect(envios, hasLength(1));
     await tester.pump(const Duration(seconds: 1));
     expect(envios, [
@@ -237,5 +237,100 @@ void main() {
     expect(tokens.last.isCancelled, isTrue);
     await tester.pump(const Duration(seconds: 30));
     expect(envios, hasLength(2));
+  });
+
+  testWidgets(
+    'Pausa e retomada conservam os trinta segundos entre publicações',
+    (tester) async {
+      final dio = _Dio();
+      var envios = 0;
+      when(
+        () => dio.put<dynamic>(
+          any(),
+          data: any(named: 'data'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((call) async {
+        envios++;
+        return Response(
+          requestOptions: RequestOptions(
+            path: '/corridas-passageiro/corrida-1',
+          ),
+        );
+      });
+      final vm = SolicitacoesViewModel(
+        mototaxistaId: 'moto-1',
+        repository: CorridaRepository(dio: dio),
+      );
+      void publicar() => vm.publicarEstimativa(
+        solicitacao: corrida,
+        tempoRestanteSegundos: 120,
+        distanciaRestanteMetros: 900,
+        pontoAtual: 0,
+      );
+      publicar();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 10));
+      vm.suspenderPublicacaoEstimativa();
+      publicar();
+      await tester.pump();
+      expect(envios, 1);
+      await tester.pump(const Duration(seconds: 19));
+      expect(envios, 1);
+      await tester.pump(const Duration(seconds: 1));
+      expect(envios, 2);
+      vm.dispose();
+    },
+  );
+
+  testWidgets('Publicação respeita quota mesmo ao retomar ou mudar de etapa', (
+    tester,
+  ) async {
+    final dio = _Dio();
+    var agora = DateTime.utc(2026, 10, 2);
+    var envios = 0;
+    when(
+      () => dio.put<dynamic>(
+        any(),
+        data: any(named: 'data'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((call) async {
+      envios++;
+      final request = RequestOptions(path: '/corridas-passageiro/corrida-1');
+      throw DioException(
+        requestOptions: request,
+        response: Response(
+          requestOptions: request,
+          statusCode: 503,
+          headers: Headers.fromMap({
+            'retry-after': ['300'],
+          }),
+        ),
+      );
+    });
+    final vm = SolicitacoesViewModel(
+      mototaxistaId: 'moto-1',
+      repository: CorridaRepository(dio: dio),
+      clock: () => agora,
+    );
+    void publicar(int ponto) => vm.publicarEstimativa(
+      solicitacao: corrida,
+      tempoRestanteSegundos: 120,
+      distanciaRestanteMetros: 900,
+      pontoAtual: ponto,
+    );
+    publicar(0);
+    await tester.pump();
+    vm.suspenderPublicacaoEstimativa();
+    publicar(0);
+    publicar(1);
+    await tester.pump(const Duration(seconds: 30));
+    expect(envios, 1);
+    agora = agora.add(const Duration(minutes: 5));
+    publicar(1);
+    await tester.pump();
+    expect(envios, 2);
+    vm.dispose();
   });
 }

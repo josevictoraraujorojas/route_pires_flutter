@@ -69,14 +69,18 @@ void main() {
     tester,
   ) async {
     await abrir(tester);
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 14));
     await tester.pump();
+    expect(consultas, 0);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(consultas, 1);
     expect(find.text('2 min • 900 m'), findsOneWidget);
     expect(find.text('Google Maps'), findsOneWidget);
 
     resposta['tempoRestanteSegundos'] = 60;
     resposta['distanciaRestanteMetros'] = 400.0;
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 15));
     await tester.pump();
     expect(find.text('1 min • 400 m'), findsOneWidget);
     expect(find.text('2 min • 900 m'), findsNothing);
@@ -95,7 +99,7 @@ void main() {
       expect(find.text('2 min • 900 m'), findsNothing);
 
       resposta['estimativaAtualizadaEm'] = null;
-      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 15));
       await tester.pump();
       expect(find.text('Aguardando previsão'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
@@ -128,7 +132,7 @@ void main() {
   testWidgets('Finalização encerra polling e remove previsão', (tester) async {
     await abrir(tester);
     resposta['status'] = 'FINALIZADO';
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 15));
     await tester.pump();
     final antes = consultas;
     await tester.pump(const Duration(seconds: 15));
@@ -136,6 +140,34 @@ void main() {
     expect(consultas, antes);
     expect(find.text('2 min • 900 m'), findsNothing);
     expect(find.text('Aguardando previsão'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Acompanhamento pausa no background e em outra rota', (
+    tester,
+  ) async {
+    await abrir(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    expect(consultas, 0);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(milliseconds: 1));
+    final antes = consultas;
+    final context = tester.element(find.byType(AndamentoCorridaPage));
+    final navigator = Navigator.of(context);
+    navigator.push(
+      CupertinoPageRoute<void>(builder: (_) => const Text('Outra tela')),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    expect(consultas, antes);
+    navigator.pop();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 15));
+    await tester.pump();
+    expect(consultas, greaterThan(antes));
     await tester.pumpWidget(const SizedBox());
   });
 }

@@ -78,8 +78,6 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
 
   @override
   Widget build(BuildContext context) {
-    final mototaxistaId = context.watch<LoginViewModel>().usuario?.id;
-
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
         backgroundColor: CupertinoColors.white,
@@ -114,6 +112,13 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
           case 0:
             return CupertinoTabView(
               builder: (context) {
+                final mototaxistaId = context
+                    .watch<LoginViewModel>()
+                    .usuario
+                    ?.id;
+                final online = context.select<MototaxistaViewModel, bool>(
+                  (viewModel) => viewModel.disponivel,
+                );
                 return CupertinoPageScaffold(
                   backgroundColor: CupertinoColors.white,
                   navigationBar: CupertinoNavigationBar(
@@ -121,9 +126,11 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
                     middle: Text(tituloCorrida),
                   ),
                   child: Corrida(
+                    key: ValueKey(mototaxistaId),
                     onTituloChanged: alterarTituloCorrida,
                     mototaxistaId: mototaxistaId,
                     onAtendimentoChanged: _atendimentoMudou,
+                    online: online,
                   ),
                 );
               },
@@ -191,7 +198,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
                   ),
                   child: Corrida(
                     onTituloChanged: alterarTituloCorrida,
-                    mototaxistaId: mototaxistaId,
+                    mototaxistaId: context.watch<LoginViewModel>().usuario?.id,
                     onAtendimentoChanged: _atendimentoMudou,
                   ),
                 );

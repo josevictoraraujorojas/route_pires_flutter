@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
@@ -20,11 +21,15 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
   static const _itensHistoricoPorPagina = 10;
   final _repository = CorridaRepository();
   final _cancelToken = CancelToken();
-  List<SolicitacaoCorrida> _corridas = const [];
+  final _retry = ApiRetryGate();
+  List<SolicitacaoCorrida> _ativas = const [];
+  List<SolicitacaoCorrida> _historico = const [];
   bool _carregando = false;
+  bool _carregandoMais = false;
+  bool _temMais = false;
+  String? _aposId;
   String? _cancelandoId;
   String? _erro;
-  int _limiteHistorico = _itensHistoricoPorPagina;
 
   @override
   void initState() {
@@ -41,7 +46,7 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
   }
 
   Future<void> _carregar() async {
-    if (_carregando) return;
+    if (_carregando || _carregandoMais || !_retry.canAttempt) return;
     final id = context.read<LoginViewModel>().usuario?.id;
     if (id == null || id.isEmpty) {
       setState(() => _erro = 'Faça login para ver suas corridas.');
@@ -52,28 +57,86 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
       _erro = null;
     });
     try {
-      final corridas = await _repository.listarMinhas(
-        passageiroId: id,
-        cancelToken: _cancelToken,
-      );
+      final respostas = await Future.wait<Object>([
+        _repository.listarMinhas(passageiroId: id, cancelToken: _cancelToken),
+        _repository.listarHistorico(
+          passageiroId: id,
+          limite: _itensHistoricoPorPagina,
+          cancelToken: _cancelToken,
+        ),
+      ]);
       if (!mounted) return;
+      final pagina = respostas[1] as PaginaHistorico;
+      _retry.succeeded();
       setState(() {
-        _corridas = corridas;
-        _limiteHistorico = _itensHistoricoPorPagina;
+        _ativas = respostas[0] as List<SolicitacaoCorrida>;
+        _historico = pagina.corridas;
+        _aposId = pagina.aposId;
+        _temMais = pagina.temMais;
       });
     } on DioException catch (e) {
       if (!mounted || e.type == DioExceptionType.cancel) return;
+      _retry.failed(e);
       setState(
         () => _erro = mensagemErroDio(
           e,
           fallback: 'Não foi possível carregar suas corridas.',
         ),
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      _retry.failed(e);
       setState(() => _erro = 'Não foi possível carregar suas corridas.');
     } finally {
       if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  Future<void> _carregarMais() async {
+    if (_carregando || _carregandoMais || !_temMais || !_retry.canAttempt) {
+      return;
+    }
+    final id = context.read<LoginViewModel>().usuario?.id;
+    if (id == null || id.isEmpty) return;
+    setState(() => _carregandoMais = true);
+    try {
+      final pagina = await _repository.listarHistorico(
+        passageiroId: id,
+        aposId: _aposId,
+        limite: _itensHistoricoPorPagina,
+        cancelToken: _cancelToken,
+      );
+      if (!mounted) return;
+      _retry.succeeded();
+      setState(() {
+        final conhecidas = {
+          for (final c in _historico) '${c.categoria.name}:${c.id}',
+        };
+        _historico = [
+          ..._historico,
+          ...pagina.corridas.where(
+            (c) => conhecidas.add('${c.categoria.name}:${c.id}'),
+          ),
+        ];
+        _aposId = pagina.aposId ?? _aposId;
+        _temMais = pagina.temMais;
+        _erro = null;
+      });
+    } catch (e) {
+      if (!mounted || (e is DioException && e.type == DioExceptionType.cancel)) {
+        return;
+      }
+      _retry.failed(e);
+      setState(
+        () => _erro = e is DioException
+            ? mensagemErroDio(
+                e,
+                fallback: 'Não foi possível carregar o histórico.',
+              )
+            : 'Não foi possível carregar o histórico.',
+      );
+    } finally {
+      if (mounted) setState(() => _carregandoMais = false);
     }
   }
 
@@ -125,21 +188,13 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
 
   @override
   Widget build(BuildContext context) {
-    final ativas = _corridas
+    final ativas = _ativas
         .where(
           (c) =>
               c.status.toUpperCase() == 'PENDENTE' ||
               c.status.toUpperCase() == 'ANDAMENTO',
         )
         .toList();
-    final historico = _corridas
-        .where(
-          (c) =>
-              c.status.toUpperCase() != 'PENDENTE' &&
-              c.status.toUpperCase() != 'ANDAMENTO',
-        )
-        .toList();
-    final historicoVisivel = historico.take(_limiteHistorico).toList();
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
       navigationBar: CupertinoNavigationBar(
@@ -147,12 +202,12 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
         middle: const Text('Minhas corridas'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: _carregando ? null : _carregar,
+          onPressed: _carregando || _carregandoMais ? null : _carregar,
           child: const Text('Atualizar'),
         ),
       ),
       child: SafeArea(
-        child: _carregando && _corridas.isEmpty
+        child: _carregando && _ativas.isEmpty && _historico.isEmpty
             ? const Center(child: CupertinoActivityIndicator())
             : ListView(
                 padding: const EdgeInsets.all(16),
@@ -167,7 +222,7 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
                       child: const Text('Tentar novamente'),
                     ),
                   ],
-                  if (_corridas.isEmpty && _erro == null)
+                  if (_ativas.isEmpty && _historico.isEmpty && _erro == null)
                     const Text(
                       'Você ainda não tem corridas.',
                       style: TextStyle(color: Color(0xFF1F2024)),
@@ -176,24 +231,22 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
                     const _TituloSecao('Em andamento'),
                     for (final corrida in ativas) _cartao(corrida),
                   ],
-                  if (historico.isNotEmpty) ...[
+                  if (_historico.isNotEmpty) ...[
                     const _TituloSecao('Histórico'),
-                    for (final corrida in historicoVisivel)
+                    for (final corrida in _historico)
                       _cartao(
                         corrida,
                         key: ValueKey(
                           '${corrida.categoria.name}:${corrida.id}',
                         ),
                       ),
-                    if (historicoVisivel.length < historico.length)
+                    if (_temMais)
                       Center(
                         child: CupertinoButton(
-                          onPressed: () => setState(() {
-                            _limiteHistorico += _itensHistoricoPorPagina;
-                          }),
-                          child: Text(
-                            'Carregar mais ${historico.length - historicoVisivel.length} corridas',
-                          ),
+                          onPressed: _carregandoMais ? null : _carregarMais,
+                          child: _carregandoMais
+                              ? const CupertinoActivityIndicator()
+                              : const Text('Carregar mais corridas'),
                         ),
                       ),
                   ],

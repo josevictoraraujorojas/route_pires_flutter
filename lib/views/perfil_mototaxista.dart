@@ -295,6 +295,14 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
 
             const SizedBox(height: 10),
 
+            const Text(
+              'Enquanto estiver disponível ou atendendo, mantenha o aplicativo aberto e a tela ligada.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 13),
+            ),
+
+            const SizedBox(height: 10),
+
             Center(
               child: carregandoDisponibilidade || alterandoDisponibilidade
                   ? const SizedBox(

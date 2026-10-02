@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
@@ -20,10 +21,12 @@ class AndamentoCorridaPage extends StatefulWidget {
   State<AndamentoCorridaPage> createState() => _AndamentoCorridaPageState();
 }
 
-class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
+class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
+    with WidgetsBindingObserver {
   final _repository = CorridaRepository();
   final _mototaxistas = MototaxistaRepository();
   final _cancelToken = CancelToken();
+  final _retry = ApiRetryGate();
   Timer? _relogio;
   late SolicitacaoCorrida _corrida;
   late String _status;
@@ -32,10 +35,20 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
   String? _motoristaConsultado;
   String? _erro;
   bool _atualizandoStatus = false;
+  bool _appAtivo = true;
+  bool get _visivel =>
+      mounted &&
+      _appAtivo &&
+      TickerMode.valuesOf(context).enabled &&
+      ModalRoute.of(context)?.isCurrent != false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _appAtivo =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     _corrida = widget.corridaInicial;
     _status = _corrida.status.toUpperCase();
     _acompanhamento = _corrida.acompanhamento;
@@ -43,16 +56,26 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
       if (!mounted) return;
       _buscarMototaxista(_corrida.mototaxistaId);
     });
-    _relogio = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted && !_finalizada) _atualizarStatus();
+    _relogio = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (_visivel && !_finalizada) {
+        setState(() {});
+        _atualizarStatus();
+      }
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _relogio?.cancel();
     _cancelToken.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appAtivo = state == AppLifecycleState.resumed;
+    if (_visivel) unawaited(_atualizarStatus());
   }
 
   bool _statusFinal(String status) => const {
@@ -68,7 +91,9 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
   bool get _cancelada => _status == 'CANCELADO' || _status == 'CANCELADA';
 
   Future<void> _atualizarStatus() async {
-    if (_atualizandoStatus || _finalizada) return;
+    if (!_visivel || _atualizandoStatus || _finalizada || !_retry.canAttempt) {
+      return;
+    }
     _atualizandoStatus = true;
     try {
       final atual = await _repository.buscarPorId(
@@ -77,6 +102,7 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
         cancelToken: _cancelToken,
       );
       if (!mounted) return;
+      _retry.succeeded();
       final status = atual.status?.toUpperCase();
       setState(() {
         _status = status ?? _status;
@@ -86,14 +112,16 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage> {
       if (_finalizada) _relogio?.cancel();
     } on DioException catch (e) {
       if (!mounted || e.type == DioExceptionType.cancel) return;
+      _retry.failed(e);
       setState(
         () => _erro = mensagemErroDio(
           e,
           fallback: 'Não foi possível consultar o andamento da corrida.',
         ),
       );
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
+        _retry.failed(e);
         setState(
           () => _erro = 'Não foi possível consultar o andamento da corrida.',
         );

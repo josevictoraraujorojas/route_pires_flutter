@@ -15,11 +15,13 @@ class Corrida extends StatefulWidget {
     required this.onTituloChanged,
     this.mototaxistaId,
     this.onAtendimentoChanged,
+    this.online = false,
   });
 
   final ValueChanged<String> onTituloChanged;
   final String? mototaxistaId;
   final ValueChanged<bool>? onAtendimentoChanged;
+  final bool online;
 
   @override
   State<Corrida> createState() => _CorridaWebState();
@@ -29,29 +31,40 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
   SolicitacoesViewModel? _viewModel;
   SolicitacaoCorrida? _selecionada;
   int _ultimaRevisaoLista = 0;
+  bool _appAtivo = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _appAtivo =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     final id = widget.mototaxistaId;
     if (id != null && id.isNotEmpty) {
       _viewModel = SolicitacoesViewModel(mototaxistaId: id)
         ..addListener(_atualizar)
         ..carregar()
-        ..iniciarAtualizacaoAutomatica();
+        ..configurarPolling(online: widget.online, ativa: _appAtivo);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant Corrida oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.online != widget.online) {
+      _viewModel?.configurarPolling(online: widget.online, ativa: _appAtivo);
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appAtivo = state == AppLifecycleState.resumed;
     final viewModel = _viewModel;
     if (viewModel == null) return;
+    viewModel.configurarPolling(online: widget.online, ativa: _appAtivo);
     if (state == AppLifecycleState.resumed) {
       unawaited(viewModel.carregar(silenciosa: true));
-      viewModel.iniciarAtualizacaoAutomatica();
-    } else {
-      viewModel.pararAtualizacaoAutomatica();
     }
   }
 

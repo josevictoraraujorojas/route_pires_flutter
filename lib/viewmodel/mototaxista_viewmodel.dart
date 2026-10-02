@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/config/localizacao_atual.dart';
 import 'package:route_pires_flutter/config/safe_change_notifier.dart';
 import 'package:route_pires_flutter/config/validacao.dart';
@@ -11,9 +14,17 @@ import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
 
 class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
   final MototaxistaRepository _repository;
+  final DateTime Function() _clock;
+  final ApiRetryGate _retryLocalizacao;
+  final ApiRetryGate _retryDisponibilidade;
 
-  MototaxistaViewModel({MototaxistaRepository? repository})
-    : _repository = repository ?? MototaxistaRepository();
+  MototaxistaViewModel({
+    MototaxistaRepository? repository,
+    DateTime Function()? clock,
+  }) : _repository = repository ?? MototaxistaRepository(),
+       _clock = clock ?? DateTime.now,
+       _retryLocalizacao = ApiRetryGate(clock: clock),
+       _retryDisponibilidade = ApiRetryGate(clock: clock);
 
   MototaxistaRascunho rascunho = MototaxistaRascunho();
   bool _carregando = false;
@@ -27,14 +38,24 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
   CancelToken? _cancelLocalizacao;
   int _geracaoLocalizacao = 0;
   int _revisaoDisponibilidade = 0;
+  String? _idDisponibilidade;
+  String? _idConsultaDisponibilidade;
+  Future<bool?>? _consultaDisponibilidade;
+  LatLng? _ultimoPontoPublicado;
+  DateTime? _ultimaPublicacao;
+  DateTime? _ultimaTentativa;
 
   bool get carregando => _carregando;
   String? get erro => _erro;
+  bool get disponivel => _disponivel;
+  bool get emAtendimento => _emAtendimento;
 
   void definirEmAtendimento({required String id, required bool emAtendimento}) {
+    final mudou = _emAtendimento != emAtendimento;
     _idLocalizacao = id;
     _emAtendimento = emAtendimento;
     _sincronizarLocalizacao();
+    if (mudou) avisar();
   }
 
   void definirLocalizacaoAtiva(bool ativa) {
@@ -43,11 +64,21 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
   }
 
   void pararLocalizacao() {
+    final mudou = _disponivel || _emAtendimento;
     _geracaoLocalizacao++;
     _idLocalizacao = null;
+    _idDisponibilidade = null;
+    _idConsultaDisponibilidade = null;
+    _consultaDisponibilidade = null;
     _disponivel = false;
     _emAtendimento = false;
+    _ultimoPontoPublicado = null;
+    _ultimaPublicacao = null;
+    _ultimaTentativa = null;
+    _retryLocalizacao.succeeded();
+    _retryDisponibilidade.succeeded();
     _sincronizarLocalizacao();
+    if (mudou) avisar();
   }
 
   void limparRascunho() {
@@ -56,7 +87,25 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
     avisar();
   }
 
-  Future<bool?> consultarDisponibilidade({required String id}) async {
+  Future<bool?> consultarDisponibilidade({required String id}) {
+    if (foiDisposed) return Future.value(null);
+    if (_idDisponibilidade == id) return Future.value(_disponivel);
+    if (_idConsultaDisponibilidade == id && _consultaDisponibilidade != null) {
+      return _consultaDisponibilidade!;
+    }
+    if (!_retryDisponibilidade.canAttempt) return Future.value(null);
+    _idConsultaDisponibilidade = id;
+    late final Future<bool?> consulta;
+    consulta = _consultarDisponibilidade(id).whenComplete(() {
+      if (identical(_consultaDisponibilidade, consulta)) {
+        _consultaDisponibilidade = null;
+        _idConsultaDisponibilidade = null;
+      }
+    });
+    return _consultaDisponibilidade = consulta;
+  }
+
+  Future<bool?> _consultarDisponibilidade(String id) async {
     final geracao = _geracaoLocalizacao;
     final revisao = ++_revisaoDisponibilidade;
     _erro = null;
@@ -66,11 +115,16 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
           geracao == _geracaoLocalizacao &&
           revisao == _revisaoDisponibilidade) {
         _idLocalizacao = id;
+        _idDisponibilidade = id;
         _disponivel = disponivel;
+        _retryDisponibilidade.succeeded();
         _sincronizarLocalizacao();
+        avisar();
       }
-      return disponivel;
+      return _idDisponibilidade == id ? _disponivel : null;
     } on DioException catch (e) {
+      if (foiDisposed || geracao != _geracaoLocalizacao) return null;
+      _retryDisponibilidade.failed(e);
       _erro = mensagemErroDio(
         e,
         fallback: 'Não foi possível consultar sua disponibilidade',
@@ -81,7 +135,9 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
       );
       avisar();
       return null;
-    } catch (_) {
+    } catch (error) {
+      if (foiDisposed || geracao != _geracaoLocalizacao) return null;
+      _retryDisponibilidade.failed(error);
       _erro = 'Não foi possível consultar sua disponibilidade';
       avisar();
       return null;
@@ -105,8 +161,11 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
           geracao == _geracaoLocalizacao &&
           revisao == _revisaoDisponibilidade) {
         _idLocalizacao = id;
+        _idDisponibilidade = id;
         _disponivel = disponivel;
+        _retryDisponibilidade.succeeded();
         _sincronizarLocalizacao();
+        avisar();
       }
 
       return true;
@@ -155,22 +214,52 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
         id == null ||
         cancelToken == null ||
         cancelToken.isCancelled ||
-        foiDisposed) {
+        foiDisposed ||
+        !_retryLocalizacao.canAttempt) {
       return;
     }
     _enviandoLocalizacao = true;
     try {
-      final ponto = await posicaoAtual();
+      final ponto = await posicaoAtual(usarCache: false);
       if (foiDisposed || cancelToken.isCancelled || _idLocalizacao != id) {
         return;
       }
+      final agora = _clock();
+      final ultimaTentativa = _ultimaTentativa;
+      if (ultimaTentativa != null &&
+          agora.difference(ultimaTentativa) < const Duration(seconds: 30)) {
+        return;
+      }
+      final ultimoPonto = _ultimoPontoPublicado;
+      final ultimaPublicacao = _ultimaPublicacao;
+      if (ultimoPonto != null &&
+          ultimaPublicacao != null &&
+          agora.difference(ultimaPublicacao) < const Duration(seconds: 60) &&
+          Geolocator.distanceBetween(
+                ultimoPonto.latitude,
+                ultimoPonto.longitude,
+                ponto.latitude,
+                ponto.longitude,
+              ) <
+              20) {
+        return;
+      }
+      _ultimaTentativa = agora;
       await _repository.publicarLocalizacao(
         id,
         ponto.latitude,
         ponto.longitude,
         cancelToken: cancelToken,
       );
-    } catch (_) {
+      if (!foiDisposed && !cancelToken.isCancelled && _idLocalizacao == id) {
+        _ultimoPontoPublicado = ponto;
+        _ultimaPublicacao = _clock();
+        _retryLocalizacao.succeeded();
+      }
+    } catch (error) {
+      if (!foiDisposed && !cancelToken.isCancelled && _idLocalizacao == id) {
+        _retryLocalizacao.failed(error);
+      }
       // A localização não impede disponibilidade, aceite ou encerramento.
     } finally {
       _enviandoLocalizacao = false;
@@ -179,7 +268,9 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
 
   @override
   void dispose() {
-    pararLocalizacao();
+    _geracaoLocalizacao++;
+    _timerLocalizacao?.cancel();
+    _cancelLocalizacao?.cancel();
     super.dispose();
   }
 

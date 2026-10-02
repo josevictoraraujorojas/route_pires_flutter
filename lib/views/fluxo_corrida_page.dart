@@ -37,7 +37,8 @@ class FluxoCorridaPage extends StatefulWidget {
   State<FluxoCorridaPage> createState() => _FluxoCorridaPageState();
 }
 
-class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
+class _FluxoCorridaPageState extends State<FluxoCorridaPage>
+    with WidgetsBindingObserver {
   late final CorridaViewModel viewModel;
   Timer? _relogio;
   int _segundosDecorridos = 0;
@@ -45,10 +46,22 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
   bool _confirmandoTroca = false;
   bool _mostrarAcompanhamentoNaLista = true;
   Route<void>? _rotaEspera;
+  bool _appAtivo = true;
+
+  bool get _visivel =>
+      mounted &&
+      _appAtivo &&
+      TickerMode.valuesOf(context).enabled &&
+      (ModalRoute.of(context)?.isCurrent != false ||
+          _rotaEspera?.isCurrent == true);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _appAtivo =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     viewModel = CorridaViewModel(
       passageiroId: widget.passageiroId,
       categoria: widget.categoria,
@@ -62,10 +75,10 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
     viewModel.addListener(_sincronizarEspera);
     viewModel.iniciar();
     _relogio = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
+      if (!_visivel) return;
       if (viewModel.etapa == EtapaCorrida.aceita) {
         setState(() {});
-        if (++_segundosDecorridos % 5 == 0) {
+        if (++_segundosDecorridos % 15 == 0) {
           unawaited(viewModel.atualizarSolicitacao());
         }
         return;
@@ -73,7 +86,9 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
       if (viewModel.etapa != EtapaCorrida.aguardando) return;
       setState(() {});
       if (viewModel.segundosRestantes == 0) {
-        if (!_tentouEncerrarPrazo && !viewModel.atualizandoSolicitacao) {
+        if (!_tentouEncerrarPrazo &&
+            !viewModel.atualizandoSolicitacao &&
+            viewModel.podeConsultarSolicitacao) {
           _tentouEncerrarPrazo = true;
           unawaited(viewModel.encerrarEspera(porTempo: true));
         }
@@ -85,10 +100,17 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _relogio?.cancel();
     viewModel.removeListener(_sincronizarEspera);
     viewModel.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appAtivo = state == AppLifecycleState.resumed;
+    if (_visivel) unawaited(viewModel.atualizarSolicitacao());
   }
 
   void _sincronizarEspera() {

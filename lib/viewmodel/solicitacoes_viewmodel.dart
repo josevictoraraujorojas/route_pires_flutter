@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 
@@ -10,7 +11,10 @@ class SolicitacoesViewModel extends ChangeNotifier {
   SolicitacoesViewModel({
     required this.mototaxistaId,
     CorridaRepository? repository,
-  }) : _repository = repository ?? CorridaRepository();
+    DateTime Function()? clock,
+  }) : _repository = repository ?? CorridaRepository(),
+       _retryConsulta = ApiRetryGate(clock: clock),
+       _retryEstimativa = ApiRetryGate(clock: clock);
 
   final String mototaxistaId;
   final CorridaRepository _repository;
@@ -25,18 +29,37 @@ class SolicitacoesViewModel extends ChangeNotifier {
   int _revisaoLista = 0;
   bool _disposed = false;
   Timer? _atualizacaoAutomatica;
+  Duration? _periodoPolling;
+  bool _online = false;
+  bool _pollAtiva = true;
+  bool _bootstrapFeito = false;
+  bool _consultaInicialTentada = false;
+  final ApiRetryGate _retryConsulta;
+  final ApiRetryGate _retryEstimativa;
   Timer? _intervaloEstimativa;
+  String? _ultimaEstimativaCorrida;
+  int? _ultimaEstimativaEtapa;
   CancelToken? _cancelEstimativa;
   bool _publicandoEstimativa = false;
   ({SolicitacaoCorrida solicitacao, int tempo, double distancia, int ponto})?
   _estimativaPendente;
-  DateTime? _proximaTentativa;
 
   bool get carregando => _carregando;
   bool get atualizandoStatus => _atualizandoStatus;
   String? get erro => _erro;
   List<SolicitacaoCorrida> get solicitacoes => _solicitacoes;
   int get revisaoLista => _revisaoLista;
+
+  bool get _emAtendimento =>
+      _solicitacoes.any((item) => item.status.toUpperCase() == 'ANDAMENTO');
+
+  void configurarPolling({required bool online, bool ativa = true}) {
+    _online = online;
+    _pollAtiva = ativa;
+    _sincronizarPolling();
+  }
+
+  void suspenderPublicacaoEstimativa() => descartarEstimativaPendente();
 
   void publicarEstimativa({
     required SolicitacaoCorrida solicitacao,
@@ -64,15 +87,23 @@ class SolicitacoesViewModel extends ChangeNotifier {
   }
 
   Future<void> _enviarEstimativa() async {
-    if (_disposed || _publicandoEstimativa || _intervaloEstimativa != null) {
+    if (_disposed || _publicandoEstimativa || !_retryEstimativa.canAttempt) {
       return;
     }
     final dados = _estimativaPendente;
     if (dados == null) return;
+    final chave = _chave(dados.solicitacao);
+    final mudouEtapa =
+        chave != _ultimaEstimativaCorrida ||
+        dados.ponto != _ultimaEstimativaEtapa;
+    if (!mudouEtapa && _intervaloEstimativa != null) return;
     _estimativaPendente = null;
     _publicandoEstimativa = true;
+    _ultimaEstimativaCorrida = chave;
+    _ultimaEstimativaEtapa = dados.ponto;
     final cancelToken = _cancelEstimativa = CancelToken();
-    _intervaloEstimativa = Timer(const Duration(seconds: 15), () {
+    _intervaloEstimativa?.cancel();
+    _intervaloEstimativa = Timer(const Duration(seconds: 30), () {
       _intervaloEstimativa = null;
       unawaited(_enviarEstimativa());
     });
@@ -85,11 +116,13 @@ class SolicitacoesViewModel extends ChangeNotifier {
         pontoAtual: dados.ponto,
         cancelToken: cancelToken,
       );
-    } catch (_) {
+      _retryEstimativa.succeeded();
+    } catch (erro) {
+      _retryEstimativa.failed(erro);
       // A previsão é complementar; não bloqueia as ações da corrida.
     } finally {
       _publicandoEstimativa = false;
-      if (_intervaloEstimativa == null) unawaited(_enviarEstimativa());
+      unawaited(_enviarEstimativa());
     }
   }
 
@@ -97,6 +130,8 @@ class SolicitacoesViewModel extends ChangeNotifier {
     descartarEstimativaPendente();
     _intervaloEstimativa?.cancel();
     _intervaloEstimativa = null;
+    _ultimaEstimativaCorrida = null;
+    _ultimaEstimativaEtapa = null;
   }
 
   void descartarEstimativaPendente() {
@@ -113,19 +148,33 @@ class SolicitacoesViewModel extends ChangeNotifier {
   }
 
   void iniciarAtualizacaoAutomatica() {
-    _atualizacaoAutomatica ??= Timer.periodic(const Duration(seconds: 15), (_) {
-      final proximaTentativa = _proximaTentativa;
-      if (proximaTentativa != null &&
-          DateTime.now().isBefore(proximaTentativa)) {
-        return;
-      }
+    _sincronizarPolling();
+  }
+
+  void _sincronizarPolling() {
+    if (_disposed ||
+        !_pollAtiva ||
+        !_consultaInicialTentada ||
+        (!_online && !_emAtendimento)) {
+      _atualizacaoAutomatica?.cancel();
+      _atualizacaoAutomatica = null;
+      _periodoPolling = null;
+      return;
+    }
+    final periodo = Duration(seconds: _emAtendimento ? 30 : 15);
+    if (_atualizacaoAutomatica != null && _periodoPolling == periodo) return;
+    _atualizacaoAutomatica?.cancel();
+    _periodoPolling = periodo;
+    _atualizacaoAutomatica = Timer.periodic(periodo, (_) {
       unawaited(carregar(silenciosa: true));
     });
   }
 
   void pararAtualizacaoAutomatica() {
+    _pollAtiva = false;
     _atualizacaoAutomatica?.cancel();
     _atualizacaoAutomatica = null;
+    _periodoPolling = null;
   }
 
   String _chave(SolicitacaoCorrida corrida) =>
@@ -182,16 +231,23 @@ class SolicitacoesViewModel extends ChangeNotifier {
           }.contains(status) ||
           (atual.mototaxistaId != null && atual.mototaxistaId != mototaxistaId);
     } on DioException catch (e) {
-      return e.response?.statusCode == 404;
-    } catch (_) {
-      return false;
+      if (e.response?.statusCode == 404) return true;
+      rethrow;
     }
   }
 
   Future<void> carregar({bool silenciosa = false}) async {
-    if (_disposed || _carregando || _atualizandoStatus) return;
+    if (_disposed ||
+        _carregando ||
+        _atualizandoStatus ||
+        !_pollAtiva ||
+        !_retryConsulta.canAttempt ||
+        (!_online && _bootstrapFeito && !_emAtendimento)) {
+      return;
+    }
     final erroAnterior = _erro;
     var listaMudou = false;
+    _consultaInicialTentada = true;
     _carregando = true;
     if (!silenciosa) {
       _erro = null;
@@ -251,25 +307,24 @@ class SolicitacoesViewModel extends ChangeNotifier {
         _solicitacoes = novas;
         _revisaoLista++;
       }
-      _proximaTentativa = null;
+      _bootstrapFeito = true;
+      _retryConsulta.succeeded();
       _erro = null;
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
-      if (e.response?.statusCode == 429) {
-        _proximaTentativa = DateTime.now().add(const Duration(minutes: 5));
-      } else if (e.response == null || (e.response!.statusCode ?? 0) >= 500) {
-        _proximaTentativa = DateTime.now().add(const Duration(minutes: 1));
-      }
+      _retryConsulta.failed(e);
       _erro = mensagemErroDio(
         e,
         fallback: 'Erro ao buscar solicitações',
         porStatus: const {500: 'Erro interno no servidor'},
       );
-    } catch (_) {
+    } catch (e) {
       if (_disposed) return;
+      _retryConsulta.failed(e);
       _erro = 'Ocorreu um erro inesperado';
     } finally {
       _carregando = false;
+      _sincronizarPolling();
       if (!silenciosa || listaMudou || _erro != erroAnterior) _avisar();
     }
   }
@@ -319,6 +374,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
+      _sincronizarPolling();
       _avisar();
     }
   }
@@ -371,6 +427,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
+      _sincronizarPolling();
       _avisar();
     }
   }
@@ -411,6 +468,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
+      _sincronizarPolling();
       _avisar();
     }
   }
@@ -455,6 +513,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
+      _sincronizarPolling();
       _avisar();
     }
   }

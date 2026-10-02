@@ -18,6 +18,13 @@ void main() {
 
   late SolicitacoesViewModel viewModel;
   late MockCorridaRepository repository;
+  var descartado = false;
+
+  void descartar() {
+    if (descartado) return;
+    descartado = true;
+    viewModel.dispose();
+  }
 
   const origem = LocalizacaoPonto(
     latitude: -17.3037,
@@ -43,12 +50,15 @@ void main() {
   );
 
   setUp(() {
+    descartado = false;
     repository = MockCorridaRepository();
     viewModel = SolicitacoesViewModel(
       mototaxistaId: 'moto-1',
       repository: repository,
     );
+    viewModel.configurarPolling(online: true);
   });
+  tearDown(descartar);
 
   void mockCarregar([List<SolicitacaoCorrida>? solicitacoes]) {
     when(
@@ -91,7 +101,7 @@ void main() {
         await viewModel.carregar(silenciosa: true);
         expect(viewModel.solicitacoes.single.pontoAtual, 1);
         expect(avisos, 1);
-        viewModel.dispose();
+        descartar();
       },
     );
 
@@ -115,7 +125,7 @@ void main() {
       ).called(2);
       expect(avisos, 0);
       expect(viewModel.revisaoLista, 1);
-      viewModel.dispose();
+      descartar();
     });
 
     test('Deve carregar solicitações pendentes do mototaxista', () async {

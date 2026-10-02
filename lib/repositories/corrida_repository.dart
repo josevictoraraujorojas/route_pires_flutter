@@ -1,16 +1,24 @@
 import 'package:dio/dio.dart';
 import 'package:route_pires_flutter/config/api_client.dart';
 import 'package:route_pires_flutter/config/api_config.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
+
+typedef PaginaHistorico = ({
+  List<SolicitacaoCorrida> corridas,
+  String? aposId,
+  bool temMais,
+});
 
 class CorridaRepository {
   CorridaRepository({Dio? dio}) : _dio = dio ?? ApiClient().dio;
 
   final Dio _dio;
   final Map<String, (DateTime, _PassageiroResumo)> _resumosPassageiros = {};
+  final Map<String, ApiRetryGate> _retryResumos = {};
 
   static const statusInicial = 'PENDENTE';
   static const _statusFinalizados = {
@@ -156,8 +164,16 @@ class CorridaRepository {
     CancelToken? cancelToken,
   }) async {
     final respostas = await Future.wait([
-      _dio.get(ApiConfig.corridasPassageiro, cancelToken: cancelToken),
-      _dio.get(ApiConfig.corridaFrete, cancelToken: cancelToken),
+      _dio.get(
+        ApiConfig.corridasPassageiro,
+        queryParameters: {'status': 'PENDENTE,ANDAMENTO'},
+        cancelToken: cancelToken,
+      ),
+      _dio.get(
+        ApiConfig.corridaFrete,
+        queryParameters: {'status': 'PENDENTE,ANDAMENTO'},
+        cancelToken: cancelToken,
+      ),
     ]);
 
     final solicitacoes = [
@@ -205,8 +221,16 @@ class CorridaRepository {
     CancelToken? cancelToken,
   }) async {
     final respostas = await Future.wait([
-      _dio.get(ApiConfig.corridasPassageiro, cancelToken: cancelToken),
-      _dio.get(ApiConfig.corridaFrete, cancelToken: cancelToken),
+      _dio.get(
+        ApiConfig.corridasPassageiro,
+        queryParameters: {'status': 'PENDENTE,ANDAMENTO'},
+        cancelToken: cancelToken,
+      ),
+      _dio.get(
+        ApiConfig.corridaFrete,
+        queryParameters: {'status': 'PENDENTE,ANDAMENTO'},
+        cancelToken: cancelToken,
+      ),
     ]);
     final corridas = [
       ..._extrairSolicitacoes(
@@ -224,6 +248,59 @@ class CorridaRepository {
       ),
     );
     return corridas;
+  }
+
+  Future<PaginaHistorico> listarHistorico({
+    required String passageiroId,
+    String? aposId,
+    int limite = 10,
+    CancelToken? cancelToken,
+  }) async {
+    final parametros = <String, dynamic>{
+      'status': 'FINALIZADO,CANCELADO',
+      'limite': limite,
+      'aposId': ?aposId,
+    };
+    final respostas = await Future.wait([
+      _dio.get(
+        ApiConfig.corridasPassageiro,
+        queryParameters: parametros,
+        cancelToken: cancelToken,
+      ),
+      _dio.get(
+        ApiConfig.corridaFrete,
+        queryParameters: parametros,
+        cancelToken: cancelToken,
+      ),
+    ]);
+    final todas = [
+      ..._extrairSolicitacoes(
+        respostas[0].data,
+        categoria: CategoriaCorrida.corrida,
+      ),
+      ..._extrairSolicitacoes(
+        respostas[1].data,
+        categoria: CategoriaCorrida.frete,
+      ),
+    ].where((c) => c.passageiroId == passageiroId).toList();
+    todas.sort((a, b) {
+      final dataA = a.dataHoraSolicitacao;
+      final dataB = b.dataHoraSolicitacao;
+      if (dataA == null && dataB != null) return 1;
+      if (dataA != null && dataB == null) return -1;
+      final porData = dataA == null ? 0 : dataB!.compareTo(dataA);
+      return porData != 0 ? porData : b.id.compareTo(a.id);
+    });
+    final pagina = todas.take(limite).toList();
+    return (
+      corridas: pagina,
+      aposId: pagina.isEmpty ? null : pagina.last.id,
+      temMais:
+          todas.length > limite ||
+          respostas.any(
+            (r) => r.data is List && (r.data as List).length == limite,
+          ),
+    );
   }
 
   Future<CorridaResponse> buscarPorId({
@@ -253,6 +330,8 @@ class CorridaRepository {
           resultado[id] = emCache.$2;
           return;
         }
+        final retry = _retryResumos.putIfAbsent(id, ApiRetryGate.new);
+        if (!retry.canAttempt) return;
         try {
           final response = await _dio.get(
             ApiConfig.passageiroResumo(id),
@@ -274,6 +353,7 @@ class CorridaRepository {
               DateTime.now().add(const Duration(minutes: 15)),
               resumo,
             );
+            retry.succeeded();
           }
         } on DioException catch (e) {
           if (e.response?.statusCode == 401 ||
@@ -281,8 +361,10 @@ class CorridaRepository {
               e.type == DioExceptionType.cancel) {
             rethrow;
           }
+          retry.failed(e);
           // Melhor esforço para outras falhas: mantém o nome padrão.
-        } catch (_) {
+        } catch (e) {
+          retry.failed(e);
           // Melhor esforço: se a busca falhar, mantém o nome padrão.
         }
       }),
