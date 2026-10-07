@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
+import 'package:route_pires_flutter/views/chat_list_view.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
 import 'package:route_pires_flutter/views/perfil_mototaxista.dart';
 
@@ -184,11 +185,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
               builder: (context) {
                 return const CupertinoPageScaffold(
                   backgroundColor: CupertinoColors.white,
-                  navigationBar: CupertinoNavigationBar(
-                    backgroundColor: CupertinoColors.white,
-                    middle: Text('Negociação'),
-                  ),
-                  child: Center(child: Text('Negociação')),
+                  child: SafeArea(child: ChatListView()),
                 );
               },
             );
