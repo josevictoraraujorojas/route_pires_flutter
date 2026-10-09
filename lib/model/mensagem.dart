@@ -3,12 +3,14 @@ class Mensagem {
   final String conteudo;
   final DateTime? horarioEnvio;
   final String remetente;
+  final String status;
 
   Mensagem({
     required this.id,
     required this.conteudo,
     required this.remetente,
     this.horarioEnvio,
+    this.status = 'PENDENTE',
   });
 
   factory Mensagem.fromJson(Map<String, dynamic> json) {
@@ -19,6 +21,7 @@ class Mensagem {
       horarioEnvio: json['horarioEnvio'] != null
           ? DateTime.tryParse(json['horarioEnvio'].toString())
           : null,
+      status: json['status']?.toString() ?? 'PENDENTE',
     );
   }
 }

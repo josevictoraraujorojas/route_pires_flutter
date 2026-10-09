@@ -1,126 +1,115 @@
 import 'package:flutter/cupertino.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
-import 'package:route_pires_flutter/config/token_storage.dart';
+import 'package:flutter/material.dart' show Icons;
+import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/mensagem.dart';
-import 'package:route_pires_flutter/repositories/chat_repository.dart';
-import 'package:route_pires_flutter/repositories/chat_websocket_repository.dart';
+import 'package:route_pires_flutter/viewmodel/chat_viewmodel.dart';
 
-class ChatView extends StatefulWidget {
+class ChatView extends StatelessWidget {
   final String chatId;
   final String nomeParticipante;
+  final DateTime? dataCriacao;
+  final DateTime? dataEncerramento;
 
   const ChatView({
     super.key,
     required this.chatId,
     required this.nomeParticipante,
+    this.dataCriacao,
+    this.dataEncerramento,
+  });
+
+  bool get encerrado => dataEncerramento != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<ChatViewModel>(
+      create: (_) =>
+          ChatViewModel(chatId: chatId, encerrado: encerrado)..inicializar(),
+      child: _ChatViewContent(
+        nomeParticipante: nomeParticipante,
+        dataCriacao: dataCriacao,
+        dataEncerramento: dataEncerramento,
+      ),
+    );
+  }
+}
+
+class _ChatViewContent extends StatefulWidget {
+  final String nomeParticipante;
+  final DateTime? dataCriacao;
+  final DateTime? dataEncerramento;
+
+  const _ChatViewContent({
+    required this.nomeParticipante,
+    this.dataCriacao,
+    this.dataEncerramento,
   });
 
   @override
-  State<ChatView> createState() => _ChatViewState();
+  State<_ChatViewContent> createState() => _ChatViewContentState();
 }
 
-class _ChatViewState extends State<ChatView> {
-  final TokenStorage _tokenStorage = createTokenStorage();
-
-  final ChatRepository _chatRepository = ChatRepository();
-
-  final ChatWebSocketRepository _webSocket = ChatWebSocketRepository();
-
+class _ChatViewContentState extends State<_ChatViewContent> {
   final TextEditingController _mensagemController = TextEditingController();
-
-  final List<Mensagem> _mensagens = [];
-
-  bool _carregandoMensagens = true;
-
-  String? _meuUsuarioId;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _carregarMensagens();
-    _conectar();
-  }
-
-  Future<void> _carregarMensagens() async {
-    try {
-      final mensagens = await _chatRepository.listarMensagens(widget.chatId);
-
-      if (!mounted) return;
-
-      setState(() {
-        _mensagens
-          ..clear()
-          ..addAll(mensagens);
-
-        _carregandoMensagens = false;
-      });
-    } catch (e) {
-      print('Erro ao carregar mensagens: $e');
-
-      if (!mounted) return;
-
-      setState(() {
-        _carregandoMensagens = false;
-      });
-    }
-  }
-
-  Future<void> _conectar() async {
-    final token = await _tokenStorage.read();
-
-    if (token == null || token.isEmpty) {
-      print('JWT não encontrado');
-      return;
-    }
-
-    final payload = JwtDecoder.decode(token);
-
-    _meuUsuarioId = payload['sub']?.toString();
-
-    print('JWT encontrado');
-    print('Usuário logado: $_meuUsuarioId');
-    print('Conectando ao chat: ${widget.chatId}');
-
-    _webSocket.conectar(
-      token: token,
-      chatId: widget.chatId,
-      onMensagem: (mensagem) {
-        print('MENSAGEM RECEBIDA: $mensagem');
-
-        if (!mounted) return;
-
-        final novaMensagem = Mensagem.fromJson(mensagem);
-
-        setState(() {
-          _mensagens.add(novaMensagem);
-        });
-      },
-    );
-  }
-
-  void _enviarMensagem() {
-    final conteudo = _mensagemController.text.trim();
-
-    if (conteudo.isEmpty) {
-      return;
-    }
-
-    _webSocket.enviarMensagem(chatId: widget.chatId, conteudo: conteudo);
-
-    _mensagemController.clear();
-  }
 
   @override
   void dispose() {
-    _webSocket.desconectar();
     _mensagemController.dispose();
-
     super.dispose();
+  }
+
+  String _formatarData(DateTime? data) {
+    if (data == null) {
+      return '';
+    }
+
+    final local = data.toLocal();
+
+    final dia = local.day.toString().padLeft(2, '0');
+    final mes = local.month.toString().padLeft(2, '0');
+    final ano = local.year.toString();
+    final hora = local.hour.toString().padLeft(2, '0');
+    final minuto = local.minute.toString().padLeft(2, '0');
+
+    return '$dia/$mes/$ano $hora:$minuto';
+  }
+
+  void _enviarMensagem() {
+    final viewModel = context.read<ChatViewModel>();
+
+    final enviada = viewModel.enviarMensagem(_mensagemController.text);
+
+    if (enviada) {
+      _mensagemController.clear();
+    }
+  }
+
+  IconData _iconeStatus(String status) {
+    switch (status.toUpperCase()) {
+      case 'PENDENTE':
+        return Icons.access_time;
+
+      case 'VISUALIZADA':
+        return Icons.done_all;
+
+      case 'ENVIADA':
+      default:
+        return Icons.done;
+    }
+  }
+
+  Color _corStatus(String status) {
+    if (status.toUpperCase() == 'VISUALIZADA') {
+      return const Color(0xFFB3E5FC);
+    }
+
+    return CupertinoColors.white.withOpacity(0.75);
   }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<ChatViewModel>();
+
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: Text(
@@ -131,20 +120,80 @@ class _ChatViewState extends State<ChatView> {
       child: SafeArea(
         child: Column(
           children: [
-            Expanded(child: _buildMensagens()),
-            _buildCampoMensagem(),
+            _buildInformacoesChat(),
+            Expanded(child: _buildMensagens(viewModel)),
+            if (viewModel.encerrado)
+              _buildChatEncerrado()
+            else
+              _buildCampoMensagem(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMensagens() {
-    if (_carregandoMensagens) {
+  Widget _buildInformacoesChat() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        children: [
+          if (widget.dataCriacao != null)
+            Text(
+              'Chat criado em '
+              '${_formatarData(widget.dataCriacao)}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.systemGrey,
+              ),
+            ),
+          if (widget.dataEncerramento != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Chat encerrado em '
+                '${_formatarData(widget.dataEncerramento)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMensagens(ChatViewModel viewModel) {
+    if (viewModel.carregandoMensagens) {
       return const Center(child: CupertinoActivityIndicator());
     }
 
-    if (_mensagens.isEmpty) {
+    if (viewModel.erro != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(viewModel.erro!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              CupertinoButton(
+                onPressed: () {
+                  context.read<ChatViewModel>().carregarMensagens();
+                },
+                child: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final mensagens = viewModel.mensagens;
+
+    if (mensagens.isEmpty) {
       return const Center(
         child: Text(
           'Nenhuma mensagem ainda',
@@ -155,17 +204,15 @@ class _ChatViewState extends State<ChatView> {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      itemCount: _mensagens.length,
+      itemCount: mensagens.length,
       itemBuilder: (context, index) {
-        final mensagem = _mensagens[index];
-
-        return _buildMensagem(mensagem);
+        return _buildMensagem(mensagens[index], viewModel);
       },
     );
   }
 
-  Widget _buildMensagem(Mensagem mensagem) {
-    final minhaMensagem = mensagem.remetente == _meuUsuarioId;
+  Widget _buildMensagem(Mensagem mensagem, ChatViewModel viewModel) {
+    final minhaMensagem = viewModel.ehMinhaMensagem(mensagem);
 
     return Align(
       alignment: minhaMensagem ? Alignment.centerRight : Alignment.centerLeft,
@@ -179,14 +226,31 @@ class _ChatViewState extends State<ChatView> {
               : CupertinoColors.systemGrey6,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: Text(
-          mensagem.conteudo,
-          style: TextStyle(
-            fontSize: 16,
-            color: minhaMensagem
-                ? CupertinoColors.white
-                : CupertinoColors.label,
-          ),
+        child: Column(
+          crossAxisAlignment: minhaMensagem
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              mensagem.conteudo,
+              style: TextStyle(
+                fontSize: 16,
+                color: minhaMensagem
+                    ? CupertinoColors.white
+                    : CupertinoColors.label,
+              ),
+            ),
+            if (minhaMensagem)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Icon(
+                  _iconeStatus(mensagem.status),
+                  size: 14,
+                  color: _corStatus(mensagem.status),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -209,14 +273,10 @@ class _ChatViewState extends State<ChatView> {
                 color: CupertinoColors.systemGrey6,
                 borderRadius: BorderRadius.circular(20),
               ),
-              onSubmitted: (_) {
-                _enviarMensagem();
-              },
+              onSubmitted: (_) => _enviarMensagem(),
             ),
           ),
-
           const SizedBox(width: 8),
-
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _enviarMensagem,
@@ -227,6 +287,23 @@ class _ChatViewState extends State<ChatView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChatEncerrado() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Text(
+        'Esta conversa foi encerrada.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 14, color: CupertinoColors.systemGrey),
       ),
     );
   }

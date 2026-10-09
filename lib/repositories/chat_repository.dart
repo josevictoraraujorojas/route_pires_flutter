@@ -45,4 +45,22 @@ class ChatRepository {
         .map((item) => Mensagem.fromJson(Map<String, dynamic>.from(item)))
         .toList();
   }
+
+  Future<void> marcarMensagensVisualizadas(String chatId) async {
+    await _dio.put('${ApiConfig.chats}/$chatId/mensagens/visualizadas');
+  }
+
+  Future<int> contarMensagensNaoLidas(String chatId, String userId) async {
+    final response = await _dio.get(
+      '${ApiConfig.chats}/$chatId/nao-lidas/$userId',
+    );
+
+    final data = response.data;
+
+    if (data is num) {
+      return data.toInt();
+    }
+
+    return int.tryParse(data.toString()) ?? 0;
+  }
 }
