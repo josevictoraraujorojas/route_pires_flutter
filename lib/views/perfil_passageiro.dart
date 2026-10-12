@@ -1,6 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/viewmodel/editar_perfil_viewmodel.dart';
+import 'package:route_pires_flutter/viewmodel/historico_corridas_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
+
+import 'package:route_pires_flutter/views/editar_perfil_page.dart';
+import 'package:route_pires_flutter/views/historico_corridas_page.dart';
 
 class PerfilPassageiro extends StatefulWidget {
   const PerfilPassageiro({super.key});
@@ -13,10 +18,8 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
   // ============================================================
   // LOGOUT
   // ============================================================
-
   Future<void> _fazerLogout() async {
     final loginViewModel = context.read<LoginViewModel>();
-
     final saiu = await loginViewModel.sair();
 
     if (!mounted) return;
@@ -39,10 +42,6 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
     }
   }
 
-  // ============================================================
-  // CONFIRMAR LOGOUT
-  // ============================================================
-
   void _confirmarLogout() {
     showCupertinoDialog(
       context: context,
@@ -55,18 +54,13 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
           ),
           actions: [
             CupertinoDialogAction(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancelar'),
             ),
             CupertinoDialogAction(
               isDestructiveAction: true,
               onPressed: () async {
-                // Fecha o diálogo
                 Navigator.of(dialogContext).pop();
-
-                // Faz logout
                 await _fazerLogout();
               },
               child: const Text('Sair'),
@@ -78,61 +72,91 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
   }
 
   // ============================================================
-  // BUILD
+  // COMPONENTES DA TELA
   // ============================================================
+  Widget _buildMenuItem(String title, VoidCallback onTap, {bool isLast = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: CupertinoColors.black,
+                  ),
+                ),
+                const Icon(
+                  CupertinoIcons.chevron_right,
+                  color: CupertinoColors.systemGrey,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+          if (!isLast)
+            Container(height: 1, color: CupertinoColors.systemGrey5),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final usuario = context.watch<LoginViewModel>().usuario;
-
     final nome = usuario?.nome ?? 'Passageiro';
+    final email = usuario?.email ?? '@passageiro';
 
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
       navigationBar: const CupertinoNavigationBar(
         backgroundColor: CupertinoColors.white,
-        middle: Text('Perfil'),
+        middle: Text('Perfil', style: TextStyle(fontWeight: FontWeight.bold)),
+        border: null, 
       ),
-
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           children: [
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
 
-            // ========================================================
-            // ÍCONE / FOTO DO PERFIL
-            // ========================================================
+            // FOTO DO PERFIL
             Center(
               child: Stack(
                 children: [
                   Container(
-                    width: 80,
-                    height: 80,
+                    width: 90,
+                    height: 90,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEAF3FF),
-                      borderRadius: BorderRadius.circular(24),
+                      color: const Color(0xFFD6E8FF), 
+                      borderRadius: BorderRadius.circular(45),
                     ),
                     child: const Icon(
                       CupertinoIcons.person_fill,
-                      size: 42,
-                      color: Color(0xFF9BCBFF),
+                      size: 50,
+                      color: Color(0xFFA3C9FF),
                     ),
                   ),
-
                   Positioned(
-                    right: -1,
-                    bottom: -1,
+                    right: 0,
+                    bottom: 0,
                     child: Container(
-                      width: 25,
-                      height: 25,
-                      decoration: const BoxDecoration(
-                        color: CupertinoColors.systemBlue,
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0066FF),
                         shape: BoxShape.circle,
+                        border: Border.all(color: CupertinoColors.white, width: 2),
                       ),
                       child: const Icon(
                         CupertinoIcons.pencil,
-                        size: 13,
+                        size: 14,
                         color: CupertinoColors.white,
                       ),
                     ),
@@ -140,78 +164,58 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
 
-            const SizedBox(height: 14),
-
-            // ========================================================
-            // NOME
-            // ========================================================
+            // NOME E USERNAME
             Center(
               child: Text(
                 nome,
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: CupertinoColors.black,
                 ),
               ),
             ),
-
             const SizedBox(height: 4),
-
-            // ========================================================
-            // USUÁRIO
-            // ========================================================
-            const Center(
+            Center(
               child: Text(
-                '@passageiro',
-                style: TextStyle(
+                email, 
+                style: const TextStyle(
                   fontSize: 14,
                   color: CupertinoColors.systemGrey,
                 ),
               ),
             ),
+            const SizedBox(height: 40),
 
-            const SizedBox(height: 28),
-
-            // ========================================================
-            // LINHA SEPARADORA
-            // ========================================================
-            Container(height: 1, color: CupertinoColors.separator),
-
-            // ========================================================
-            // SAIR DA CONTA
-            // ========================================================
-            CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-              onPressed: _confirmarLogout,
-              child: const Row(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Sair da conta',
-                        style: TextStyle(
-                          color: CupertinoColors.label,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
+            // MENUS
+            _buildMenuItem('Editar perfil', () {
+              Navigator.push(
+                context, 
+                CupertinoPageRoute(
+                  builder: (_) => ChangeNotifierProvider(
+                    create: (_) => EditarPerfilViewModel(),
+                    child: const EditarPerfilPage(),
+                  )
+                )
+              );
+            }),
+            _buildMenuItem('Histórico de corridas', () {
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (_) => ChangeNotifierProvider(
+                    create: (_) => HistoricoCorridasViewModel(),
+                    child: const HistoricoCorridasPage(),
                   ),
-
-                  Icon(
-                    CupertinoIcons.chevron_right,
-                    size: 20,
-                    color: CupertinoColors.systemGrey,
-                  ),
-                ],
-              ),
-            ),
-
-            // ========================================================
-            // LINHA INFERIOR
-            // ========================================================
-            Container(height: 1, color: CupertinoColors.separator),
+                ),
+              );
+            }),
+            _buildMenuItem('Notificações', () {
+              // Navegar para notificações
+            }),
+            _buildMenuItem('Sair da conta', _confirmarLogout, isLast: true),
           ],
         ),
       ),

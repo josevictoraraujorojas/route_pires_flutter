@@ -134,6 +134,11 @@ class LoginViewModel extends ChangeNotifier {
     }
   }
 
+  void atualizarUsuarioLocal(UsuarioResponse usuarioAtualizado) {
+    _usuario = usuarioAtualizado;
+    notifyListeners();
+  }
+
   Future<bool> realizarLogin({
     required String email,
     required String senha,

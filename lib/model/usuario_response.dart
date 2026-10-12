@@ -19,6 +19,28 @@ class UsuarioResponse {
     required this.historicoCorridas,
   });
 
+  UsuarioResponse copyWith({
+    String? id,
+    String? nome,
+    String? email,
+    String? telefone,
+    DateTime? dataCadastro,
+    String? tipo,
+    String? fotoUrl,
+    List<String>? historicoCorridas,
+  }) {
+    return UsuarioResponse(
+      id: id ?? this.id,
+      nome: nome ?? this.nome,
+      email: email ?? this.email,
+      telefone: telefone ?? this.telefone,
+      dataCadastro: dataCadastro ?? this.dataCadastro,
+      tipo: tipo ?? this.tipo,
+      fotoUrl: fotoUrl ?? this.fotoUrl,
+      historicoCorridas: historicoCorridas ?? this.historicoCorridas,
+    );
+  }
+
   factory UsuarioResponse.fromJson(Map<String, dynamic> json) {
     return UsuarioResponse(
       id: json['id'] ?? '',
