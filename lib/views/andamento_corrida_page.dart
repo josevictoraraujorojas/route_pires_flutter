@@ -101,6 +101,7 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
         id: _corrida.id,
         cancelToken: _cancelToken,
       );
+
       if (!mounted) return;
       _retry.succeeded();
       final status = atual.status?.toUpperCase();

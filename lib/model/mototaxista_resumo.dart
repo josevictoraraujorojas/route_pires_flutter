@@ -5,6 +5,9 @@ class MototaxistaResumo {
     this.avaliacaoMedia = 0,
     this.fotoUrl,
     this.disponivel = true,
+    this.precoZonaUrbana,
+    this.precoBairrosAfastados,
+    this.precoBandeira2,
   });
 
   final String id;
@@ -13,11 +16,20 @@ class MototaxistaResumo {
   final String? fotoUrl;
   final bool disponivel;
 
-  int get estrelas {
-    final valor = avaliacaoMedia.round();
-    if (valor < 0) return 0;
-    if (valor > 5) return 5;
-    return valor;
+  final double? precoZonaUrbana;
+  final double? precoBairrosAfastados;
+  final double? precoBandeira2;
+
+  int get estrelas => avaliacaoMedia.round().clamp(0, 5);
+
+  static double? _lerPreco(dynamic valor) {
+    if (valor is num) return valor.toDouble();
+
+    if (valor is String) {
+      return double.tryParse(valor.trim().replaceAll(',', '.'));
+    }
+
+    return null;
   }
 
   factory MototaxistaResumo.fromJson(Map<String, dynamic> json) {
@@ -27,6 +39,9 @@ class MototaxistaResumo {
       avaliacaoMedia: (json['avaliacaoMedia'] as num?)?.toDouble() ?? 0,
       fotoUrl: json['fotoUrl'] as String?,
       disponivel: json['disponivel'] as bool? ?? true,
+      precoZonaUrbana: _lerPreco(json['precoZonaUrbana']),
+      precoBairrosAfastados: _lerPreco(json['precoBairrosAfastados']),
+      precoBandeira2: _lerPreco(json['precoBandeira2']),
     );
   }
 
@@ -37,10 +52,21 @@ class MototaxistaResumo {
         other.nome == nome &&
         other.avaliacaoMedia == avaliacaoMedia &&
         other.fotoUrl == fotoUrl &&
-        other.disponivel == disponivel;
+        other.disponivel == disponivel &&
+        other.precoZonaUrbana == precoZonaUrbana &&
+        other.precoBairrosAfastados == precoBairrosAfastados &&
+        other.precoBandeira2 == precoBandeira2;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, nome, avaliacaoMedia, fotoUrl, disponivel);
+  int get hashCode => Object.hash(
+    id,
+    nome,
+    avaliacaoMedia,
+    fotoUrl,
+    disponivel,
+    precoZonaUrbana,
+    precoBairrosAfastados,
+    precoBandeira2,
+  );
 }

@@ -16,6 +16,7 @@ class ChatListViewModel extends ChangeNotifier {
   Map<String, int> _mensagensNaoLidas = {};
 
   bool _carregando = true;
+  bool _atualizacaoEmAndamento = false;
   bool _disposed = false;
   String? _erro;
 
@@ -43,7 +44,16 @@ class ChatListViewModel extends ChangeNotifier {
   }
 
   Future<void> carregarChatsEContagens() async {
-    _carregando = true;
+    // Evita requisições simultâneas.
+    if (_atualizacaoEmAndamento || _disposed) return;
+
+    _atualizacaoEmAndamento = true;
+
+    // Só exibe o carregamento central na primeira consulta.
+    if (_chats.isEmpty) {
+      _carregando = true;
+    }
+
     _erro = null;
     _notificarListeners();
 
@@ -61,34 +71,31 @@ class ChatListViewModel extends ChangeNotifier {
       _erro = 'Não foi possível carregar os chats.';
       debugPrint('Erro ao carregar chats: $e');
     } finally {
+      _atualizacaoEmAndamento = false;
       _carregando = false;
       _notificarListeners();
     }
   }
 
-  // Mantém compatibilidade com chamadas antigas que usavam carregarChats().
+  // Mantém compatibilidade com chamadas antigas.
   Future<void> carregarChats() => carregarChatsEContagens();
 
   Future<void> _carregarContagensNaoLidas(List<Chat> chats) async {
-    _mensagensNaoLidas = {};
-
     try {
       final token = await _tokenStorage.read();
 
       if (_disposed) return;
 
       if (token == null || token.isEmpty) {
+        _mensagensNaoLidas = {};
         return;
       }
 
       final payload = JwtDecoder.decode(token);
       final userId = _normalizarId(payload['sub']?.toString());
 
-      if (userId == null) {
-        return;
-      }
-
-      if (chats.isEmpty) {
+      if (userId == null || chats.isEmpty) {
+        _mensagensNaoLidas = {};
         return;
       }
 
@@ -117,7 +124,8 @@ class ChatListViewModel extends ChangeNotifier {
       _mensagensNaoLidas = Map.fromEntries(resultados);
     } catch (e) {
       debugPrint('Erro ao carregar contagens de mensagens: $e');
-      _mensagensNaoLidas = {};
+
+      // Preserva as contagens anteriores se a consulta falhar.
     }
   }
 

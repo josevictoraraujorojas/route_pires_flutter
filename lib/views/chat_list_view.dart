@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/chat.dart';
@@ -26,14 +28,29 @@ class _ChatListViewContent extends StatefulWidget {
 class _ChatListViewContentState extends State<_ChatListViewContent> {
   final TextEditingController _buscaController = TextEditingController();
 
+  Timer? _timerAtualizacao;
+
   bool _encerradasExpandida = true;
+  bool _atualizando = false;
+
   String _nomeBusca = '';
 
   DateTime? _dataCriacao;
   DateTime? _dataEncerramento;
 
   @override
+  void initState() {
+    super.initState();
+
+    // Atualiza a lista automaticamente a cada 30 segundos.
+    _timerAtualizacao = Timer.periodic(const Duration(seconds: 30), (_) {
+      _recarregarChats();
+    });
+  }
+
+  @override
   void dispose() {
+    _timerAtualizacao?.cancel();
     _buscaController.dispose();
     super.dispose();
   }
@@ -152,18 +169,34 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
   }
 
   Future<void> _recarregarChats() async {
-    await context.read<ChatListViewModel>().carregarChatsEContagens();
+    if (!mounted || _atualizando) return;
+
+    setState(() {
+      _atualizando = true;
+    });
+
+    try {
+      await context.read<ChatListViewModel>().carregarChatsEContagens();
+    } catch (e) {
+      debugPrint('Erro ao atualizar lista de chats: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _atualizando = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ChatListViewModel>();
 
-    if (viewModel.carregando) {
+    if (viewModel.carregando && viewModel.chats.isEmpty) {
       return const Center(child: CupertinoActivityIndicator());
     }
 
-    if (viewModel.erro != null) {
+    if (viewModel.erro != null && viewModel.chats.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -187,10 +220,6 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
       );
     }
 
-    if (viewModel.chats.isEmpty) {
-      return const Center(child: Text('Você ainda não possui conversas.'));
-    }
-
     final chatsFiltrados = _filtrarChats(viewModel.chats);
 
     final chatsAtivos = chatsFiltrados
@@ -204,9 +233,25 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
     return Column(
       children: [
         _buildCabecalho(),
+        if (viewModel.erro != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              'Não foi possível atualizar os dados. '
+              'Exibindo as informações anteriores.',
+              style: const TextStyle(
+                color: CupertinoColors.systemRed,
+                fontSize: 12,
+              ),
+            ),
+          ),
         _buildBusca(),
         const SizedBox(height: 10),
-        Expanded(child: _buildLista(chatsAtivos, chatsEncerrados)),
+        Expanded(
+          child: viewModel.chats.isEmpty
+              ? const Center(child: Text('Você ainda não possui conversas.'))
+              : _buildLista(chatsAtivos, chatsEncerrados),
+        ),
       ],
     );
   }
@@ -241,17 +286,37 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
   }
 
   Widget _buildCabecalho() {
-    return const SizedBox(
+    return SizedBox(
       height: 58,
-      child: Center(
-        child: Text(
-          'Negociações',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: CupertinoColors.label,
+      child: Row(
+        children: [
+          const Expanded(
+            child: Center(
+              child: Text(
+                'Negociações',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.label,
+                ),
+              ),
+            ),
           ),
-        ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            onPressed: _atualizando ? null : _recarregarChats,
+            child: _atualizando
+                ? const CupertinoActivityIndicator()
+                : const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CupertinoIcons.refresh, size: 18),
+                      SizedBox(width: 5),
+                      Text('Atualizar'),
+                    ],
+                  ),
+          ),
+        ],
       ),
     );
   }

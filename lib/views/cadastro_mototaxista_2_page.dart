@@ -21,7 +21,9 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
   @override
   void initState() {
     super.initState();
+
     final rascunho = context.read<MototaxistaViewModel>().rascunho;
+
     _cnhController.text = rascunho.cnh;
     _dataValidadeController.text = rascunho.dataValidade;
   }
@@ -30,7 +32,6 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
   void dispose() {
     _cnhController.dispose();
     _dataValidadeController.dispose();
-
     super.dispose();
   }
 
@@ -56,16 +57,21 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
   void _salvarRascunho() {
     final rascunho = context.read<MototaxistaViewModel>().rascunho;
+
     rascunho.cnh = _cnhController.text;
     rascunho.dataValidade = _dataValidadeController.text;
   }
 
   Future<void> irParaProximoPasso() async {
     if (!_formKey.currentState!.validate()) return;
+
     _salvarRascunho();
-    await Navigator.push(
+
+    await Navigator.push<void>(
       context,
-      CupertinoPageRoute(builder: (_) => const CadastroMototaxista3Page()),
+      CupertinoPageRoute<void>(
+        builder: (_) => const CadastroMototaxista3Page(),
+      ),
     );
   }
 
@@ -77,47 +83,42 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      // Permite que o sistema execute a navegação normalmente.
+      canPop: true,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        voltar();
+        if (didPop) {
+          // Os campos já são sincronizados enquanto o usuário digita.
+          // Esta chamada também reforça a sincronização na saída.
+          _salvarRascunho();
+        }
       },
       child: CupertinoPageScaffold(
         backgroundColor: CupertinoColors.white,
-
         navigationBar: CupertinoNavigationBar(
           backgroundColor: CupertinoColors.white,
-
-          middle: const Text("Cadastro de Mototaxista - Passo 2/3"),
-
+          middle: const Text('Cadastro de Mototaxista - Passo 2/3'),
           leading: CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: voltar,
             child: const Icon(CupertinoIcons.back),
           ),
         ),
-
         child: SizedBox(
           width: double.infinity,
-
           child: SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
-
             child: Form(
               key: _formKey,
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
-
                 children: [
                   const SizedBox(height: 10),
 
                   CampoFormulario(
-                    label: "Número de CNH",
-                    placeholder: "69314369120",
+                    label: 'Número de CNH',
+                    placeholder: '69314369120',
                     controller: _cnhController,
                     keyboardType: TextInputType.number,
-
                     onChanged: (valor) {
                       valor = valor.replaceAll(RegExp(r'\D'), '');
 
@@ -131,17 +132,17 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
                           offset: valor.length,
                         ),
                       );
-                    },
 
+                      // Mantém o rascunho atualizado durante a digitação.
+                      context.read<MototaxistaViewModel>().rascunho.cnh = valor;
+                    },
                     validator: (valor) {
                       if (valor == null || valor.trim().isEmpty) {
-                        return "Informe sua CNH";
+                        return 'Informe sua CNH';
                       }
 
-                      final regex = RegExp(r'^\d{11}$');
-
-                      if (!regex.hasMatch(valor)) {
-                        return "A CNH deve possuir 11 números";
+                      if (!RegExp(r'^\d{11}$').hasMatch(valor)) {
+                        return 'A CNH deve possuir 11 números';
                       }
 
                       return null;
@@ -151,11 +152,10 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
                   const SizedBox(height: 16),
 
                   CampoFormulario(
-                    label: "Data de validade",
-                    placeholder: "21/12/2034",
+                    label: 'Data de validade',
+                    placeholder: '21/12/2034',
                     controller: _dataValidadeController,
                     keyboardType: TextInputType.datetime,
-
                     onChanged: (valor) {
                       final data = formatarData(valor);
 
@@ -163,33 +163,41 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
                         text: data,
                         selection: TextSelection.collapsed(offset: data.length),
                       );
-                    },
 
+                      // Guarda a data já formatada.
+                      context
+                              .read<MototaxistaViewModel>()
+                              .rascunho
+                              .dataValidade =
+                          data;
+                    },
                     validator: (valor) {
                       if (valor == null || valor.trim().isEmpty) {
-                        return "Informe a data de validade";
+                        return 'Informe a data de validade';
                       }
 
-                      final regex = RegExp(r'^\d{2}/\d{2}/\d{4}$');
-
-                      if (!regex.hasMatch(valor)) {
-                        return "Informe a data no formato DD/MM/AAAA";
+                      if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(valor)) {
+                        return 'Informe a data no formato DD/MM/AAAA';
                       }
 
                       final dia = int.parse(valor.substring(0, 2));
                       final mes = int.parse(valor.substring(3, 5));
                       final ano = int.parse(valor.substring(6));
+
                       final data = DateTime(ano, mes, dia);
+
                       if (data.day != dia ||
                           data.month != mes ||
                           data.year != ano) {
-                        return "Informe uma data de validade real";
+                        return 'Informe uma data de validade real';
                       }
+
                       final hoje = DateTime.now();
+
                       if (data.isBefore(
                         DateTime(hoje.year, hoje.month, hoje.day),
                       )) {
-                        return "A CNH está vencida";
+                        return 'A CNH está vencida';
                       }
 
                       return null;
@@ -200,20 +208,16 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
-
                     child: SizedBox(
                       width: double.infinity,
                       height: 48,
-
                       child: CupertinoButton(
                         padding: EdgeInsets.zero,
                         color: const Color(0xFF006FFD),
                         borderRadius: BorderRadius.circular(12),
-
                         onPressed: irParaProximoPasso,
-
                         child: const Text(
-                          "PRÓXIMO PASSO",
+                          'PRÓXIMO PASSO',
                           style: TextStyle(
                             color: CupertinoColors.white,
                             fontSize: 15,

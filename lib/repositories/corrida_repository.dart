@@ -311,7 +311,9 @@ class CorridaRepository {
     final path = categoria == CategoriaCorrida.corrida
         ? ApiConfig.corridasPassageiro
         : ApiConfig.corridaFrete;
+
     final response = await _dio.get('$path/$id', cancelToken: cancelToken);
+
     return _parseResposta(response.data);
   }
 

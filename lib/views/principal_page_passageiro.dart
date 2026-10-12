@@ -3,7 +3,6 @@ import 'package:route_pires_flutter/views/chat_list_view.dart';
 import 'package:route_pires_flutter/views/perfil_passageiro.dart';
 import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
-import 'package:route_pires_flutter/views/websocket_test_page.dart';
 
 class PrincipalPagePassageiro extends StatefulWidget {
   const PrincipalPagePassageiro({super.key});
