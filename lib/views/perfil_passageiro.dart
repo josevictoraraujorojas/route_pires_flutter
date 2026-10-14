@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 
 import 'package:route_pires_flutter/views/editar_perfil_page.dart';
 import 'package:route_pires_flutter/views/historico_corridas_page.dart';
+import 'package:route_pires_flutter/views/notificacoes_page.dart';
 
 class PerfilPassageiro extends StatefulWidget {
   const PerfilPassageiro({super.key});
@@ -213,7 +214,12 @@ class _PerfilPassageiroState extends State<PerfilPassageiro> {
               );
             }),
             _buildMenuItem('Notificações', () {
-              // Navegar para notificações
+              Navigator.push(
+                context, 
+                CupertinoPageRoute(
+                  builder: (_) => const NotificacoesPage(),
+                ),
+              );
             }),
             _buildMenuItem('Sair da conta', _confirmarLogout, isLast: true),
           ],
