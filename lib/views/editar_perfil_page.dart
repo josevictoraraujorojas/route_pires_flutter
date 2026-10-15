@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/editar_perfil_viewmodel.dart';
 
@@ -16,18 +17,52 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
   late TextEditingController _nomeController;
   late TextEditingController _emailController;
   late TextEditingController _telefoneController;
+
   final _senhaController = TextEditingController();
+
+  final _nomeFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _telefoneFocus = FocusNode();
+  final _senhaFocus = FocusNode();
+
+  bool _nomeEmFoco = false;
+  bool _emailEmFoco = false;
+  bool _telefoneEmFoco = false;
+  bool _senhaEmFoco = false;
+
+  bool _senhaVisivel = false;
 
   @override
   void initState() {
     super.initState();
+
     final usuario = context.read<LoginViewModel>().usuario;
 
     _nomeController = TextEditingController(text: usuario?.nome ?? '');
+
     _emailController = TextEditingController(text: usuario?.email ?? '');
-    
+
     final telefoneInicial = usuario?.telefone ?? '';
-    _telefoneController = TextEditingController(text: formatarTelefone(telefoneInicial));
+
+    _telefoneController = TextEditingController(
+      text: formatarTelefone(telefoneInicial),
+    );
+
+    _nomeFocus.addListener(_atualizarFoco);
+    _emailFocus.addListener(_atualizarFoco);
+    _telefoneFocus.addListener(_atualizarFoco);
+    _senhaFocus.addListener(_atualizarFoco);
+  }
+
+  void _atualizarFoco() {
+    if (!mounted) return;
+
+    setState(() {
+      _nomeEmFoco = _nomeFocus.hasFocus;
+      _emailEmFoco = _emailFocus.hasFocus;
+      _telefoneEmFoco = _telefoneFocus.hasFocus;
+      _senhaEmFoco = _senhaFocus.hasFocus;
+    });
   }
 
   @override
@@ -36,6 +71,17 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
     _emailController.dispose();
     _telefoneController.dispose();
     _senhaController.dispose();
+
+    _nomeFocus.removeListener(_atualizarFoco);
+    _emailFocus.removeListener(_atualizarFoco);
+    _telefoneFocus.removeListener(_atualizarFoco);
+    _senhaFocus.removeListener(_atualizarFoco);
+
+    _nomeFocus.dispose();
+    _emailFocus.dispose();
+    _telefoneFocus.dispose();
+    _senhaFocus.dispose();
+
     super.dispose();
   }
 
@@ -45,32 +91,74 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
     if (valor.length > 11) {
       valor = valor.substring(0, 11);
     }
+
+    if (valor.isEmpty) {
+      return '';
+    }
+
     if (valor.length <= 2) {
       return '($valor';
     }
+
     if (valor.length <= 7) {
       return '(${valor.substring(0, 2)}) ${valor.substring(2)}';
     }
+
     return '(${valor.substring(0, 2)}) '
         '${valor.substring(2, 7)}-'
         '${valor.substring(7)}';
   }
 
+  BoxDecoration _decoracaoCampo({required bool emFoco, bool comErro = false}) {
+    return BoxDecoration(
+      border: Border.all(
+        color: comErro
+            ? CupertinoColors.systemRed
+            : emFoco
+            ? const Color(0xFF0066FF)
+            : CupertinoColors.systemGrey4,
+        width: emFoco ? 1.5 : 1,
+      ),
+      borderRadius: BorderRadius.circular(10),
+    );
+  }
+
+  Widget _iconeCampo({
+    required bool emFoco,
+    IconData icone = CupertinoIcons.pencil_circle_fill,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Icon(
+        icone,
+        color: emFoco ? const Color(0xFF34C759) : CupertinoColors.systemGrey,
+        size: 24,
+      ),
+    );
+  }
+
   Future<void> _atualizar() async {
     FocusManager.instance.primaryFocus?.unfocus();
+
     await Future.delayed(const Duration(milliseconds: 100));
 
     if (!_formKey.currentState!.validate()) return;
 
     final loginViewModel = context.read<LoginViewModel>();
     final usuarioAnterior = loginViewModel.usuario;
+
     if (usuarioAnterior == null) return;
 
     final viewModel = context.read<EditarPerfilViewModel>();
-    
+
     final novoNome = _nomeController.text.trim();
     final novoEmail = _emailController.text.trim();
-    final telefoneSomenteNumeros = _telefoneController.text.replaceAll(RegExp(r'\D'), '');
+
+    // A API recebe o telefone somente com números.
+    final telefoneSomenteNumeros = _telefoneController.text.replaceAll(
+      RegExp(r'\D'),
+      '',
+    );
 
     final ok = await viewModel.atualizarPerfil(
       id: usuarioAnterior.id,
@@ -88,10 +176,10 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
         email: novoEmail,
         telefone: formatarTelefone(telefoneSomenteNumeros),
       );
-      
+
       loginViewModel.atualizarUsuarioLocal(usuarioLocalMemory);
 
-      showCupertinoDialog(
+      await showCupertinoDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('Sucesso'),
@@ -99,8 +187,8 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
           actions: [
             CupertinoDialogAction(
               onPressed: () {
-                Navigator.of(dialogContext).pop(); 
-                Navigator.of(context).pop(); 
+                Navigator.of(dialogContext).pop();
+                Navigator.of(context).pop();
               },
               child: const Text('OK'),
             ),
@@ -108,7 +196,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
         ),
       );
     } else {
-      showCupertinoDialog(
+      await showCupertinoDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('Erro'),
@@ -116,7 +204,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
           actions: [
             CupertinoDialogAction(
               onPressed: () {
-                Navigator.of(dialogContext).pop(); 
+                Navigator.of(dialogContext).pop();
               },
               child: const Text('OK'),
             ),
@@ -128,10 +216,28 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
 
   Widget _buildFieldTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0, top: 16.0),
+      padding: const EdgeInsets.only(bottom: 8, top: 16),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: CupertinoColors.black),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: CupertinoColors.black,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErro(String? erro) {
+    if (erro == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 4),
+      child: Text(
+        erro,
+        style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12),
       ),
     );
   }
@@ -140,10 +246,13 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
-      navigationBar: CupertinoNavigationBar(
+      navigationBar: const CupertinoNavigationBar(
         backgroundColor: CupertinoColors.white,
         previousPageTitle: 'Voltar',
-        middle: const Text('Editar perfil', style: TextStyle(fontWeight: FontWeight.w400)),
+        middle: Text(
+          'Editar perfil',
+          style: TextStyle(fontWeight: FontWeight.w400),
+        ),
         border: null,
       ),
       child: SafeArea(
@@ -152,148 +261,171 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
+              // Nome completo
               _buildFieldTitle('Nome completo'),
-              FormField<String>(
-                  initialValue: _nomeController.text,
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) return 'Informe seu nome';
-                    return null;
-                  },
-                  builder: (state) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CupertinoTextField(
-                          controller: _nomeController,
-                          padding: const EdgeInsets.all(16),
-                          onChanged: (valor) => state.didChange(valor),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: state.hasError
-                                    ? CupertinoColors.systemRed
-                                    : const Color(0xFF0066FF),
-                                width: 1.5),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          suffix: const Padding(
-                            padding: EdgeInsets.only(right: 12.0),
-                            child: Icon(CupertinoIcons.pencil_circle_fill, color: Color(0xFF34C759), size: 24),
-                          ),
-                        ),
-                        if (state.hasError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4, left: 4),
-                            child: Text(state.errorText!, style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12)),
-                          )
-                      ],
-                    );
-                  }),
 
+              FormField<String>(
+                initialValue: _nomeController.text,
+                validator: (valor) {
+                  if (valor == null || valor.trim().isEmpty) {
+                    return 'Informe seu nome';
+                  }
+
+                  return null;
+                },
+                builder: (state) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CupertinoTextField(
+                        controller: _nomeController,
+                        focusNode: _nomeFocus,
+                        padding: const EdgeInsets.all(16),
+                        onChanged: state.didChange,
+                        decoration: _decoracaoCampo(
+                          emFoco: _nomeEmFoco,
+                          comErro: state.hasError,
+                        ),
+                        suffix: _iconeCampo(emFoco: _nomeEmFoco),
+                      ),
+                      _buildErro(state.errorText),
+                    ],
+                  );
+                },
+              ),
+
+              // E-mail
               _buildFieldTitle('E-mail'),
-              FormField<String>(
-                  initialValue: _emailController.text,
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) return 'Informe seu e-mail';
-                    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(valor.trim())) return 'Informe um e-mail válido';
-                    return null;
-                  },
-                  builder: (state) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CupertinoTextField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          padding: const EdgeInsets.all(16),
-                          onChanged: (valor) => state.didChange(valor),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: state.hasError
-                                    ? CupertinoColors.systemRed
-                                    : CupertinoColors.systemGrey4),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          suffix: const Padding(
-                            padding: EdgeInsets.only(right: 12.0),
-                            child: Icon(CupertinoIcons.pencil_circle_fill, color: CupertinoColors.systemGrey, size: 24),
-                          ),
-                        ),
-                        if (state.hasError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4, left: 4),
-                            child: Text(state.errorText!, style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12)),
-                          )
-                      ],
-                    );
-                  }),
 
+              FormField<String>(
+                initialValue: _emailController.text,
+                validator: (valor) {
+                  if (valor == null || valor.trim().isEmpty) {
+                    return 'Informe seu e-mail';
+                  }
+
+                  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                      .hasMatch(valor.trim())) {
+                    return 'Informe um e-mail válido';
+                  }
+
+                  return null;
+                },
+                builder: (state) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CupertinoTextField(
+                        controller: _emailController,
+                        focusNode: _emailFocus,
+                        keyboardType: TextInputType.emailAddress,
+                        padding: const EdgeInsets.all(16),
+                        onChanged: state.didChange,
+                        decoration: _decoracaoCampo(
+                          emFoco: _emailEmFoco,
+                          comErro: state.hasError,
+                        ),
+                        suffix: _iconeCampo(emFoco: _emailEmFoco),
+                      ),
+                      _buildErro(state.errorText),
+                    ],
+                  );
+                },
+              ),
+
+              // Telefone
               _buildFieldTitle('Número de telefone'),
-              FormField<String>(
-                  initialValue: _telefoneController.text,
-                  validator: (valor) {
-                    if (valor == null || valor.trim().isEmpty) return 'Informe seu telefone';
-                    if (!RegExp(r'^\(\d{2}\) \d{5}-\d{4}$').hasMatch(valor)) return 'Informe um telefone válido';
-                    return null;
-                  },
-                  builder: (state) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CupertinoTextField(
-                          controller: _telefoneController,
-                          keyboardType: TextInputType.phone,
-                          padding: const EdgeInsets.all(16),
-                          onChanged: (valor) {
-                            final telefone = formatarTelefone(valor);
-                            _telefoneController.value = TextEditingValue(
-                              text: telefone,
-                              selection: TextSelection.collapsed(offset: telefone.length),
-                            );
-                            state.didChange(telefone);
-                          },
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: state.hasError
-                                    ? CupertinoColors.systemRed
-                                    : CupertinoColors.systemGrey4),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          suffix: const Padding(
-                            padding: EdgeInsets.only(right: 12.0),
-                            child: Icon(CupertinoIcons.pencil_circle_fill, color: CupertinoColors.systemGrey, size: 24),
-                          ),
-                        ),
-                        if (state.hasError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4, left: 4),
-                            child: Text(state.errorText!, style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12)),
-                          )
-                      ],
-                    );
-                  }),
 
+              FormField<String>(
+                initialValue: _telefoneController.text,
+                validator: (valor) {
+                  if (valor == null || valor.trim().isEmpty) {
+                    return 'Informe seu telefone';
+                  }
+
+                  if (!RegExp(r'^\(\d{2}\) \d{5}-\d{4}$').hasMatch(valor)) {
+                    return 'Informe um telefone válido';
+                  }
+
+                  return null;
+                },
+                builder: (state) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CupertinoTextField(
+                        controller: _telefoneController,
+                        focusNode: _telefoneFocus,
+                        keyboardType: TextInputType.phone,
+                        padding: const EdgeInsets.all(16),
+                        onChanged: (valor) {
+                          final telefone = formatarTelefone(valor);
+
+                          _telefoneController.value = TextEditingValue(
+                            text: telefone,
+                            selection: TextSelection.collapsed(
+                              offset: telefone.length,
+                            ),
+                          );
+
+                          state.didChange(telefone);
+                        },
+                        decoration: _decoracaoCampo(
+                          emFoco: _telefoneEmFoco,
+                          comErro: state.hasError,
+                        ),
+                        suffix: _iconeCampo(emFoco: _telefoneEmFoco),
+                      ),
+                      _buildErro(state.errorText),
+                    ],
+                  );
+                },
+              ),
+
+              // Senha
               _buildFieldTitle('Senha'),
+
               CupertinoTextField(
                 controller: _senhaController,
-                obscureText: true,
-                placeholder: '******',
+                focusNode: _senhaFocus,
+                obscureText: !_senhaVisivel,
+                placeholder: 'Deixe em branco para manter a senha',
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: CupertinoColors.systemGrey4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                suffix: const Padding(
-                  padding: EdgeInsets.only(right: 12.0),
-                  child: Icon(CupertinoIcons.pencil_circle_fill, color: CupertinoColors.systemGrey, size: 24),
+                decoration: _decoracaoCampo(emFoco: _senhaEmFoco),
+                suffix: CupertinoButton(
+                  padding: const EdgeInsets.only(left: 8, right: 12),
+                  minSize: 32,
+                  onPressed: () {
+                    setState(() {
+                      _senhaVisivel = !_senhaVisivel;
+                    });
+                  },
+                  child: Icon(
+                    _senhaVisivel
+                        ? CupertinoIcons.eye
+                        : CupertinoIcons.eye_slash,
+                    color: _senhaEmFoco
+                        ? const Color(0xFF34C759)
+                        : CupertinoColors.systemGrey,
+                    size: 21,
+                  ),
                 ),
               ),
+
               const Padding(
-                padding: EdgeInsets.only(top: 4.0, left: 4.0),
-                child: Text('Deixe em branco caso não queira alterar.', style: TextStyle(fontSize: 12, color: CupertinoColors.systemGrey)),
+                padding: EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  'Deixe em branco caso não queira alterar.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: CupertinoColors.systemGrey,
+                  ),
+                ),
               ),
 
               const SizedBox(height: 32),
 
+              // Botão Atualizar
               Consumer<EditarPerfilViewModel>(
                 builder: (context, viewModel, child) {
                   return SizedBox(
@@ -303,14 +435,24 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                       borderRadius: BorderRadius.circular(10),
                       onPressed: viewModel.carregando ? null : _atualizar,
                       child: viewModel.carregando
-                          ? const CupertinoActivityIndicator(color: CupertinoColors.white)
-                          : const Text('Atualizar', style: TextStyle(color: CupertinoColors.white, fontWeight: FontWeight.bold)),
+                          ? const CupertinoActivityIndicator(
+                              color: CupertinoColors.white,
+                            )
+                          : const Text(
+                              'Atualizar',
+                              style: TextStyle(
+                                color: CupertinoColors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   );
                 },
               ),
+
               const SizedBox(height: 16),
 
+              // Botão Cancelar
               Consumer<EditarPerfilViewModel>(
                 builder: (context, viewModel, child) {
                   return SizedBox(
@@ -318,8 +460,16 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                     child: CupertinoButton(
                       color: const Color(0xFFFF5C66),
                       borderRadius: BorderRadius.circular(10),
-                      onPressed: viewModel.carregando ? null : () => Navigator.pop(context),
-                      child: const Text('Cancelar', style: TextStyle(color: CupertinoColors.white, fontWeight: FontWeight.bold)),
+                      onPressed: viewModel.carregando
+                          ? null
+                          : () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          color: CupertinoColors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   );
                 },
