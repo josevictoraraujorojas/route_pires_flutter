@@ -1,0 +1,12 @@
+.git
+.dart_tool
+build
+android
+ios
+linux
+macos
+windows
+test
+*.jks
+*.keystore
+*.properties

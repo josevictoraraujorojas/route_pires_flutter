@@ -1,0 +1,258 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
+import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/endereco_corrida.dart';
+import 'package:route_pires_flutter/views/lista_passageiros.dart';
+import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
+
+/// No navegador, mantém as solicitações e mudanças de status sem carregar a
+/// SDK de navegação nativa.
+class Corrida extends StatefulWidget {
+  const Corrida({
+    super.key,
+    required this.onTituloChanged,
+    this.mototaxistaId,
+    this.onAtendimentoChanged,
+    this.online = false,
+  });
+
+  final ValueChanged<String> onTituloChanged;
+  final String? mototaxistaId;
+  final ValueChanged<bool>? onAtendimentoChanged;
+  final bool online;
+
+  @override
+  State<Corrida> createState() => _CorridaWebState();
+}
+
+class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
+  SolicitacoesViewModel? _viewModel;
+  SolicitacaoCorrida? _selecionada;
+  int _ultimaRevisaoLista = 0;
+  bool _appAtivo = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _appAtivo =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    final id = widget.mototaxistaId;
+    if (id != null && id.isNotEmpty) {
+      _viewModel = SolicitacoesViewModel(mototaxistaId: id)
+        ..addListener(_atualizar)
+        ..carregar()
+        ..configurarPolling(online: widget.online, ativa: _appAtivo);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant Corrida oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.online != widget.online) {
+      _viewModel?.configurarPolling(online: widget.online, ativa: _appAtivo);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appAtivo = state == AppLifecycleState.resumed;
+    final viewModel = _viewModel;
+    if (viewModel == null) return;
+    viewModel.configurarPolling(online: widget.online, ativa: _appAtivo);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(viewModel.carregar(silenciosa: true));
+    }
+  }
+
+  void _atualizar() {
+    if (!mounted) return;
+    final viewModel = _viewModel;
+    widget.onAtendimentoChanged?.call(
+      viewModel?.solicitacoes.any(
+            (corrida) => corrida.status.toUpperCase() == 'ANDAMENTO',
+          ) ??
+          false,
+    );
+    if (viewModel != null && viewModel.revisaoLista != _ultimaRevisaoLista) {
+      _ultimaRevisaoLista = viewModel.revisaoLista;
+      final selecionada = _selecionada;
+      if (selecionada != null) {
+        SolicitacaoCorrida? atual;
+        for (final item in viewModel.solicitacoes) {
+          if (item.id == selecionada.id &&
+              item.categoria == selecionada.categoria) {
+            atual = item;
+            break;
+          }
+        }
+        _selecionada = atual;
+        if (atual == null) widget.onTituloChanged('Procurando Corrida');
+      }
+    }
+    setState(() {});
+  }
+
+  void _selecionar(SolicitacaoCorrida solicitacao) {
+    setState(() => _selecionada = solicitacao);
+    widget.onTituloChanged(
+      solicitacao.ehEntrega ? 'Detalhes da Entrega' : 'Detalhes da Corrida',
+    );
+  }
+
+  void _voltar() {
+    setState(() => _selecionada = null);
+    widget.onTituloChanged('Procurando Corrida');
+  }
+
+  Future<void> _executar(Future<bool> Function() acao) async {
+    final viewModel = _viewModel;
+    if (viewModel == null) return;
+    final sucesso = await acao();
+    if (!mounted) return;
+    if (sucesso) {
+      _voltar();
+      await viewModel.carregar();
+      return;
+    }
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Erro'),
+        content: Text(viewModel.erro ?? 'Não foi possível atualizar a corrida'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _cancelar(SolicitacaoCorrida solicitacao) async {
+    final viewModel = _viewModel;
+    if (viewModel == null ||
+        viewModel.atualizandoStatus ||
+        solicitacao.status.toUpperCase() != 'ANDAMENTO') {
+      return;
+    }
+    final motivo = await solicitarMotivoCancelamento(
+      context,
+      mototaxista: true,
+    );
+    if (!mounted || motivo == null || _selecionada?.id != solicitacao.id) {
+      return;
+    }
+    await _executar(() => viewModel.cancelar(solicitacao, motivo: motivo));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = _viewModel;
+    if (viewModel == null) {
+      return const Center(
+        child: Text('Faça login como mototaxista para ver solicitações.'),
+      );
+    }
+    final selecionada = _selecionada;
+    return SafeArea(
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: CupertinoButton(
+              onPressed: viewModel.carregando ? null : viewModel.carregar,
+              child: const Text('Atualizar'),
+            ),
+          ),
+          Expanded(
+            child: selecionada == null
+                ? ListaPassageiros(
+                    solicitacoes: viewModel.solicitacoes,
+                    onPassageiroSelecionado: _selecionar,
+                    carregando: viewModel.carregando,
+                    erro: viewModel.erro,
+                  )
+                : _detalhes(selecionada, viewModel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detalhes(
+    SolicitacaoCorrida solicitacao,
+    SolicitacoesViewModel viewModel,
+  ) {
+    final emAndamento = solicitacao.status.toUpperCase() == 'ANDAMENTO';
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        CupertinoButton(
+          onPressed: _voltar,
+          child: const Text('Voltar às solicitações'),
+        ),
+        Text('Categoria: ${solicitacao.categoria.label}'),
+        const SizedBox(height: 8),
+        Text('Passageiro: ${solicitacao.passageiroNome}'),
+        const SizedBox(height: 8),
+        Text('Status: ${solicitacao.status}'),
+        const SizedBox(height: 8),
+        Text('Pagamento: ${_rotuloPagamento(solicitacao.formaPagamento)}'),
+        if (solicitacao.ehEntrega) ...[
+          const SizedBox(height: 8),
+          Text('Carga: ${solicitacao.descricaoCarga ?? 'Não informada'}'),
+          if (solicitacao.pesoCarga != null)
+            Text('Peso: ${solicitacao.pesoCarga} kg'),
+          Text('Frágil: ${solicitacao.cargaFragil == true ? 'Sim' : 'Não'}'),
+        ],
+        const SizedBox(height: 8),
+        EnderecoCorrida(ponto: solicitacao.origem, prefixo: 'Origem: '),
+        const SizedBox(height: 8),
+        EnderecoCorrida(ponto: solicitacao.destino, prefixo: 'Destino: '),
+        const SizedBox(height: 16),
+        const Text('Navegação passo a passo disponível no aplicativo mobile.'),
+        const SizedBox(height: 16),
+        CupertinoButton.filled(
+          onPressed: viewModel.atualizandoStatus
+              ? null
+              : () => _executar(
+                  () => emAndamento
+                      ? viewModel.finalizar(solicitacao)
+                      : viewModel.aceitar(solicitacao),
+                ),
+          child: Text(emAndamento ? 'Finalizar corrida' : 'Iniciar corrida'),
+        ),
+        if (emAndamento) ...[
+          const SizedBox(height: 8),
+          CupertinoButton(
+            onPressed: viewModel.atualizandoStatus
+                ? null
+                : () => _cancelar(solicitacao),
+            child: const Text('Cancelar corrida'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _rotuloPagamento(String? valor) => switch (valor) {
+    'DEBITO' => 'Débito',
+    'CREDITO' => 'Crédito',
+    'DINHEIRO' => 'Dinheiro',
+    'PIX' => 'PIX',
+    _ => 'Não informado',
+  };
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _viewModel?.removeListener(_atualizar);
+    _viewModel?.dispose();
+    super.dispose();
+  }
+}

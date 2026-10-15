@@ -1,20 +1,27 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
-  /// Override at run time:
-  /// flutter run --dart-define=API_BASE_URL=https://routepires.otavio.win
+  /// Web usa a mesma origem da página; mobile aceita override para debug.
   static const String _fromEnv = String.fromEnvironment('API_BASE_URL');
 
   static String get baseUrl {
+    if (kIsWeb) {
+      return Uri.base.origin;
+    }
     if (_fromEnv.isNotEmpty) {
       return _fromEnv;
     }
-    if (kIsWeb) {
-      return 'https://routepires.otavio.win';
-    }
-    return 'http://10.0.2.2:8080';
+    return 'https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.2.sslip.io';
   }
 
   static const String health = '/actuator/health/liveness';
+  static const String chats = '/chat';
   static const String passageiros = '/passageiros';
+  static const String mototaxistas = '/mototaxistas';
+  static const String mototaxistasDisponiveis = '/mototaxistas/disponiveis';
+  static String perfilMototaxistaParaPassageiro(String id) =>
+      '$passageiros/mototaxista/$id/perfil';
+  static String passageiroResumo(String id) => '$passageiros/$id/resumo';
+  static const String corridasPassageiro = '/corridas-passageiro';
+  static const String corridaFrete = '/corrida-frete';
 }

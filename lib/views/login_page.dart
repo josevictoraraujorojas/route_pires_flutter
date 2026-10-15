@@ -2,6 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
+import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
+import 'package:route_pires_flutter/views/cadastro_mototaxista_1_page.dart';
+import 'package:route_pires_flutter/views/cadastro_passageiro_page.dart';
+import 'package:route_pires_flutter/views/text_field_padrao.dart';
+import 'package:route_pires_flutter/views/text_field_senha.dart';
+import 'package:route_pires_flutter/views/tipo_cadastro_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,48 +34,12 @@ class _LoginPageState extends State<LoginPage> {
 
     final requisicao = await loginViewModel.realizarLogin(
       email: emailController.text.trim(),
-      senha: senhaController.text.trim(),
+      senha: senhaController.text,
     );
 
     if (!mounted) return;
 
-    if (requisicao) {
-      final usuario = loginViewModel.usuario;
-
-      if (usuario?.tipo == "PASSAGEIRO") {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text("Login realizado Passageiro!"),
-            content: Text("Bem-vindo, ${usuario?.nome}!"),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text("OK"),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      } else {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text("Login realizado! Mototaxista"),
-            content: Text("Bem-vindo, ${usuario?.nome}!"),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text("OK"),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      }
-    } else {
+    if (!requisicao) {
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
@@ -148,25 +118,9 @@ class _LoginPageState extends State<LoginPage> {
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 24),
 
-                          child: CupertinoTextField(
+                          child: TextFieldPadrao(
                             controller: emailController,
-
-                            keyboardType: TextInputType.emailAddress,
-
-                            style: const TextStyle(color: Color(0xFF1F2024)),
-
                             placeholder: "Email",
-
-                            placeholderStyle: const TextStyle(
-                              color: Color(0xFF8F9098),
-                            ),
-
-                            padding: const EdgeInsets.all(15),
-
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Color(0xFFC5C6CC)),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
                           ),
                         ),
 
@@ -176,44 +130,16 @@ class _LoginPageState extends State<LoginPage> {
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 24),
 
-                          child: CupertinoTextField(
+                          child: TextFieldSenha(
                             controller: senhaController,
-
+                            placeholder: "Senha",
                             obscureText: isObscureText,
 
-                            style: const TextStyle(color: Color(0xFF1F2024)),
-
-                            placeholder: "Senha",
-
-                            placeholderStyle: const TextStyle(
-                              color: Color(0xFF8F9098),
-                            ),
-
-                            suffix: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  isObscureText = !isObscureText;
-                                });
-                              },
-
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 10),
-                                child: Icon(
-                                  isObscureText
-                                      ? CupertinoIcons.eye_slash_fill
-                                      : CupertinoIcons.eye_fill,
-                                  color: Color(0xFF8F9098),
-                                ),
-                              ),
-                            ),
-
-                            padding: const EdgeInsets.all(15),
-
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Color(0xFFC5C6CC)),
-
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            onTap: () {
+                              setState(() {
+                                isObscureText = !isObscureText;
+                              });
+                            },
                           ),
                         ),
 
@@ -287,7 +213,38 @@ class _LoginPageState extends State<LoginPage> {
                                 padding: EdgeInsets.zero,
                                 minimumSize: Size.zero,
                                 alignment: Alignment.centerLeft,
-                                onPressed: () {},
+                                onPressed: () async {
+                                  final tipo = await TipoCadastroDialog.show(
+                                    context,
+                                  );
+
+                                  if (!context.mounted || tipo == null) {
+                                    return;
+                                  }
+
+                                  if (tipo == TipoCadastro.passageiro) {
+                                    Navigator.push(
+                                      context,
+                                      CupertinoPageRoute(
+                                        builder: (_) =>
+                                            const CadastroPassageiroPage(),
+                                      ),
+                                    );
+                                  }
+
+                                  if (tipo == TipoCadastro.mototaxista) {
+                                    context
+                                        .read<MototaxistaViewModel>()
+                                        .limparRascunho();
+                                    Navigator.push(
+                                      context,
+                                      CupertinoPageRoute(
+                                        builder: (_) =>
+                                            const CadastroMototaxista1Page(),
+                                      ),
+                                    );
+                                  }
+                                },
                                 child: Text(
                                   " Registre-se agora",
                                   style: TextStyle(

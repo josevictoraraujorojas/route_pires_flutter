@@ -1,0 +1,24 @@
+FROM debian:bookworm-slim AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl git unzip xz-utils zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Mesma revisão Flutter 3.47.0 usada para validar este projeto.
+RUN git clone --depth 1 --branch 3.47.0 \
+    https://github.com/flutter/flutter.git /opt/flutter
+ENV PATH="/opt/flutter/bin:${PATH}" CI=true
+RUN flutter config --no-analytics && flutter precache --web
+
+WORKDIR /app
+COPY pubspec.yaml pubspec.lock ./
+RUN flutter pub get
+COPY lib ./lib
+COPY web ./web
+COPY assets ./assets
+RUN flutter build web --release --base-href /app/ --no-wasm-dry-run
+
+FROM nginx:1.29-alpine
+COPY deploy/nginx-web.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/build/web /usr/share/nginx/html
+EXPOSE 80

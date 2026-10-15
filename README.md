@@ -1,127 +1,76 @@
 # Route Pires Flutter
 
-App da equipe. A API **não pede senha**. Backend: [RoutePires](https://github.com/josevictoraraujorojas/RoutePires) (`master`).
+Cliente Flutter da API Route Pires. Login, cadastro, corridas e perfis existem para passageiro e mototaxista.
 
-- API: https://routepires.otavio.win
-- Swagger: https://routepires.otavio.win/swagger-ui/index.html
-- Saúde: https://routepires.otavio.win/actuator/health/liveness
-
-A tela pronta é o **login** (`POST /login`). Cadastro e “esqueci senha” ainda não fazem nada.
-
-No campus do IF o `.win` às vezes reseta. Aí use a API **no PC**.
-
-## 1. Rodar o app
+## Executar
 
 ```text
-git clone https://github.com/josevictoraraujorojas/route_pires_flutter.git
-cd route_pires_flutter
 flutter pub get
-```
-
-| Onde o app roda | `API_BASE_URL` |
-|---|---|
-| Chrome / Flutter web | `https://routepires.otavio.win` (padrão no web) |
-| Emulador Android + API no PC | `http://10.0.2.2:8080` (padrão no Android) |
-| Simulador iOS + API no PC | `http://127.0.0.1:8080` |
-| Celular na mesma Wi‑Fi | `http://IP_DO_PC:8080` (`ipconfig`) |
-| API na nuvem (qualquer device) | `https://routepires.otavio.win` |
-
-```text
-rem Web / Chrome (já cai na API da nuvem)
-flutter run -d chrome
-
-rem Emulador Android + API no PC (padrão 10.0.2.2)
 flutter run
-
-rem API na nuvem (emulador, celular, etc.)
-flutter run --dart-define=API_BASE_URL=https://routepires.otavio.win
-
-rem Celular físico (troque o IP)
-flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
 ```
 
-Sem barra no final da URL. Emulador Android **não** usa `localhost`; usa `10.0.2.2`.
+No Android e iOS, a API padrão é `https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.2.sslip.io`. Para usar uma API local durante desenvolvimento, informe `--dart-define=API_BASE_URL=http://10.0.2.2:8080` no emulador Android ou a URL alcançável pelo aparelho. O Android permite HTTP local apenas no build de debug. Configure `GOOGLE_MAPS_API_KEY` em `android/local.properties` para compilar o app Android; não versione a chave.
 
-Android já permite HTTP local (`INTERNET` + `usesCleartextTraffic`).
+## Autenticação
 
-## 2. API no PC (quando o .win não abrir)
+- Mobile: `POST /login` recebe e-mail e senha, retorna o perfil com `accessToken`. O token fica no `flutter_secure_storage`; após abrir o app, `GET /auth/me` valida o token antes de mostrar a home. Chamadas protegidas usam `Authorization: Bearer`.
+- Web: `POST /auth/web/login` cria uma sessão em cookie HttpOnly. O cliente busca `GET /auth/web/csrf` e envia o header retornado nas escritas autenticadas. O navegador não salva nem recebe JWT em armazenamento JavaScript. `GET /auth/me` valida o cookie ao abrir o app; `POST /auth/web/logout` encerra a sessão.
+- `401` em chamada protegida limpa a sessão local e volta ao login. `403` mostra erro de permissão e preserva a sessão. Cadastro de passageiro e mototaxista continua público.
+- O cliente de geocodificação acessa `photon.komoot.io` separadamente, sem credenciais da Route Pires.
 
-Na pasta do backend `RoutePires`:
+## Corridas
 
-1. JDK **17** (Temurin). O Java 25 do Android Studio **não serve**.
-2. `firebase-runtime.json` em `secrets/firebase-runtime.json` (não vai para o Git).
-3. `scripts\run-local.cmd`
+- O passageiro escolhe Corrida ou Frete e informa PIX, débito, crédito ou dinheiro. O pagamento é apenas informativo; o aplicativo não cobra valores.
+- Fretes exigem descrição e peso da carga. Em **Minhas corridas**, o passageiro atualiza os estados, consulta o histórico e cancela solicitações pendentes sem apagar o registro.
+- O mototaxista vê categoria, pagamento e dados da carga. Se a navegação nativa não iniciar, as ações da corrida permanecem disponíveis e o botão permite tentar novamente.
+- **Restaurar** na solicitação volta à categoria, pagamento e locais recebidos da tela anterior.
 
-Swagger local: http://localhost:8080/swagger-ui/index.html
+O passageiro busca motoristas pelo embarque; a API aplica raio de 2 km e GPS
+recebido nos últimos 120 segundos. O motorista publica GPS ao ficar disponível,
+a cada 30 segundos com movimento acumulado de pelo menos 20 metros, ou a cada
+60 segundos parado. Depois do aceite, o
+SDK calcula a previsão até o próximo ponto e o app envia os valores no PUT
+existente da corrida, no máximo a cada 30 segundos; primeiro valor e mudança
+de etapa são imediatos. `pontoAtual: 0` representa
+embarque e `1` representa destino final.
+
+O polling do passageiro mostra minutos arredondados para cima e distância,
+mesmo sem mudança de status. Sem previsão ou após 120 segundos, mostra
+**Aguardando previsão**. O crédito **Google Maps** acompanha os valores do SDK;
+as [políticas oficiais](https://developers.google.com/maps/documentation/navigation/android-sdk/policies)
+orientam sua exibição. GPS, SDK e publicação podem falhar sem impedir as ações
+da corrida. O Web lê a previsão produzida pelo SDK Android/iOS.
+
+Motorista online consulta solicitações a cada 15 segundos; em atendimento,
+a cada 30 segundos. Offline, sem atendimento, encerra o polling após a consulta
+inicial. Passageiro consulta a cada 3 segundos enquanto aguarda o aceite, com
+prazo de 60 segundos, e a cada 15 segundos após o aceite. Background pausa os
+ciclos, sem zerar os intervalos e a espera após falhas. `503` preserva a sessão;
+a espera progressiva respeita `Retry-After`, inclusive nos resumos.
+
+O histórico carrega dez registros por modalidade, combina por data/ID e
+exibe dez por página. O botão para carregar mais usa o último ID exibido como
+cursor comum; não há polling do histórico. Consulte os payloads e requisitos
+da API em [firebase-consumo.md](https://github.com/josevictoraraujorojas/RoutePires/blob/develop/docs/firebase-consumo.md).
+
+## Publicar Flutter Web em `/app/`
+
+```powershell
+./scripts/build-web.ps1
+```
+
+Publique o conteúdo de `build/web` em `/app/` no mesmo domínio da API. O build usa `<base href="/app/">`; se o proxy remover o prefixo `/app` ao encaminhar, os arquivos devem estar na raiz do servidor estático (`/assets`, `/flutter_bootstrap.js` etc.). O código Web usa a origem da página como URL da API, portanto `/login`, `/auth/*` e os demais endpoints devem chegar ao backend na mesma origem. Para validar login por cookie em desenvolvimento, sirva o build por esse proxy ou pela API; `flutter run -d chrome` em outra origem não reproduz a sessão de produção.
+
+No Coolify, a aplicação estática pode usar `Dockerfile.web` (porta 80) e encaminhar `/app/` para ela. O Dockerfile compila o Flutter no servidor; `deploy/nginx-web.conf` aceita tanto URLs com `/app/` quanto o prefixo removido pelo proxy e devolve `index.html` para rotas do app. Encaminhe as rotas da API separadamente ao backend.
+
+O Web usa URLs por caminho (sem `#`). Qualquer acesso direto ou atualização em `/app/...` retorna o app, que valida `/auth/me` antes de mostrar a tela do usuário.
+
+A navegação passo a passo do Google fica no Android/iOS. No Web, o mototaxista vê as solicitações e altera seu status sem a SDK nativa; o passageiro escolhe o local pela busca de endereço, coordenadas ou geolocalização.
+
+## Verificar
 
 ```text
-curl http://127.0.0.1:8080/actuator/health/liveness
+flutter analyze
+flutter test
+flutter build web --release --base-href /app/ --no-wasm-dry-run
 ```
-
-Tem que voltar `{"status":"UP"}`.
-
-## 3. Consumir a API (Dio)
-
-Cliente: `lib/config/api_client.dart` (`ApiConfig.baseUrl`). Caminhos **relativos**. Sem header de senha. Sem CSRF.
-
-### Saúde
-
-```dart
-final response = await ApiClient().dio.get(ApiConfig.health);
-// 200 → { "status": "UP" }
-```
-
-### Login
-
-A tela já chama isto (`lib/repositories/login_repository.dart`):
-
-```dart
-final response = await ApiClient().dio.post(
-  '/login',
-  data: {'email': email, 'senha': senha},
-);
-```
-
-| HTTP | Significado |
-|---|---|
-| 200 | `id`, `nome`, `email`, `telefone`, `tipo` (`PASSAGEIRO` ou `MOTOTAXISTA`), `fotoUrl`, `dataCadastro`, `historicoCorridas` |
-| 400 | email/senha em branco |
-| 401 | senha errada |
-| 404 | email não cadastrado no Firestore |
-
-O `tipo` na resposta decide o diálogo de boas-vindas (passageiro vs mototaxista).
-
-### Listar passageiros
-
-```dart
-final response = await ApiClient().dio.get(ApiConfig.passageiros);
-// 200 lista JSON, ou 204 se vazio
-```
-
-### Cadastrar passageiro
-
-`POST /passageiros` cria dado **de verdade** no Firestore. Não use como lixo de teste.
-
-```json
-{
-  "nome": "João Gomes",
-  "telefone": "64999558833",
-  "senha": "senh4b0a",
-  "fotoUrl": "https://exemplo.com/fotos/passageiro.jpg",
-  "metodoPagamentoPreferido": "PIX"
-}
-```
-
-Pagamento: `CREDITO`, `DEBITO`, `PIX`, `DINHEIRO`. Resposta **201**.
-
-Outras rotas no Swagger: `/mototaxistas`, `/corridas-passageiro`, `/corrida-frete`, `/chat`, `/mensagem`, `/denuncias`, `/avaliacoes-mototaxista`.
-
-## 4. Se não conectar
-
-- API no ar? Liveness ou Swagger.
-- Campus / `.win` resetando → API no PC.
-- Emulador Android → `10.0.2.2`, não `localhost`.
-- Celular e PC na mesma rede; firewall do Windows liberando 8080.
-- `API_BASE_URL` **sem** barra no final.
-- Sem header de senha. Sem CSRF neste ambiente.
-- Flutter web só tem CORS para `http://localhost:*` (e `127.0.0.1`). Não abre a API de um site em outro domínio.

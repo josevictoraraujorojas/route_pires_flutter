@@ -1,0 +1,1174 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
+import 'package:google_navigation_flutter/google_navigation_flutter.dart';
+import 'package:route_pires_flutter/config/localizacao_atual.dart';
+import 'package:route_pires_flutter/config/api_retry.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
+import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/drawer_corrida.dart';
+import 'package:route_pires_flutter/views/drawer_entrega.dart';
+import 'package:route_pires_flutter/views/endereco_corrida.dart';
+import 'package:route_pires_flutter/views/lista_passageiros.dart';
+import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
+
+enum TipoSolicitacao { corrida, entrega }
+
+class Corrida extends StatefulWidget {
+  final Function(String) onTituloChanged;
+  final String? mototaxistaId;
+  final ValueChanged<bool>? onAtendimentoChanged;
+  final bool online;
+
+  const Corrida({
+    super.key,
+    required this.onTituloChanged,
+    this.mototaxistaId,
+    this.onAtendimentoChanged,
+    this.online = false,
+  });
+
+  @override
+  State<Corrida> createState() => _CorridaState();
+}
+
+class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
+  bool navegacaoInicializada = false;
+
+  bool inicializandoNavegacao = false;
+
+  String? erroNavegacao;
+
+  bool iniciandoNavegacao = false;
+
+  bool navegacaoAtiva = false;
+
+  bool corridaAceita = false;
+
+  bool mostrandoPassageiro = false;
+
+  bool listaExpandida = true;
+
+  SolicitacaoCorrida? solicitacaoSelecionada;
+
+  TipoSolicitacao? tipoSolicitacao;
+
+  SolicitacoesViewModel? solicitacoesViewModel;
+  int _ultimaRevisaoLista = 0;
+  bool _limpandoSelecaoRemota = false;
+
+  GoogleNavigationViewController? mapController;
+
+  Future<bool>? _inicializacaoEmVoo;
+
+  // ============================================================
+  // DESTINOS DA ROTA
+  // ============================================================
+
+  NavigationWaypoint? destinoCliente;
+
+  NavigationWaypoint? destinoFinal;
+
+  final List<NavigationWaypoint> pontosDaRota = [];
+
+  // Índice do ponto que está sendo atendido.
+  //
+  // 0 = primeiro ponto
+  // 1 = segundo ponto
+  // 2 = terceiro ponto
+  // etc.
+  int pontoAtual = 0;
+
+  // Evita que o mesmo evento de chegada seja processado
+  // mais de uma vez simultaneamente.
+  bool processandoChegada = false;
+
+  // Listener do evento de chegada.
+  StreamSubscription<OnArrivalEvent>? arrivalSubscription;
+
+  int? tempoRestanteSegundos;
+  double? distanciaRestanteMetros;
+
+  StreamSubscription<RemainingTimeOrDistanceChangedEvent>?
+  remainingTimeDistanceSubscription;
+  Timer? _timerEstimativa;
+  bool _consultaEstimativaEmVoo = false;
+  bool _appAtivo = true;
+  int _revisaoEstimativa = 0;
+  final _retryEstimativa = ApiRetryGate();
+
+  void _iniciarEstimativa() {
+    if (!_appAtivo ||
+        !navegacaoAtiva ||
+        !corridaAceita ||
+        processandoChegada ||
+        !mounted) {
+      return;
+    }
+    final revisao = _revisaoEstimativa;
+    remainingTimeDistanceSubscription ??=
+        GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener(
+          (event) {
+            if (revisao == _revisaoEstimativa) {
+              _atualizarEstimativa(
+                event.remainingTime,
+                event.remainingDistance,
+              );
+            }
+          },
+          remainingTimeThresholdSeconds: 30,
+          remainingDistanceThresholdMeters: 50,
+        );
+    arrivalSubscription ??= GoogleMapsNavigator.setOnArrivalListener((event) {
+      if (revisao == _revisaoEstimativa) unawaited(_aoChegarNoPonto(event));
+    });
+    _timerEstimativa ??= Timer.periodic(const Duration(seconds: 30), (_) {
+      unawaited(_lerEstimativaSdk());
+    });
+    unawaited(_lerEstimativaSdk());
+  }
+
+  Future<void> _lerEstimativaSdk() async {
+    if (_consultaEstimativaEmVoo ||
+        !_appAtivo ||
+        !navegacaoAtiva ||
+        processandoChegada ||
+        !mounted ||
+        _timerEstimativa == null ||
+        !_retryEstimativa.canAttempt) {
+      return;
+    }
+    final revisao = _revisaoEstimativa;
+    _consultaEstimativaEmVoo = true;
+    try {
+      final dados = await GoogleMapsNavigator.getCurrentTimeAndDistance();
+      if (revisao == _revisaoEstimativa) {
+        _atualizarEstimativa(dados.time, dados.distance);
+      }
+    } catch (error) {
+      if (mounted && revisao == _revisaoEstimativa) {
+        _retryEstimativa.failed(error);
+      }
+      // O SDK pode ainda estar recalculando a rota.
+    } finally {
+      _consultaEstimativaEmVoo = false;
+      if (revisao != _revisaoEstimativa &&
+          mounted &&
+          navegacaoAtiva &&
+          _appAtivo &&
+          _timerEstimativa != null) {
+        unawaited(_lerEstimativaSdk());
+      }
+    }
+  }
+
+  void _atualizarEstimativa(double tempo, double distancia) {
+    final solicitacao = solicitacaoSelecionada;
+    if (!mounted ||
+        !_appAtivo ||
+        !navegacaoAtiva ||
+        !corridaAceita ||
+        _timerEstimativa == null ||
+        processandoChegada ||
+        solicitacao == null ||
+        !tempo.isFinite ||
+        tempo < 0 ||
+        !distancia.isFinite ||
+        distancia < 0) {
+      return;
+    }
+    setState(() {
+      tempoRestanteSegundos = tempo.round();
+      distanciaRestanteMetros = distancia;
+    });
+    _retryEstimativa.succeeded();
+    solicitacoesViewModel?.publicarEstimativa(
+      solicitacao: solicitacao,
+      tempoRestanteSegundos: tempo,
+      distanciaRestanteMetros: distancia,
+      pontoAtual: pontoAtual,
+    );
+  }
+
+  void _pararEstimativa({
+    bool preservarIntervalo = false,
+    bool suspender = false,
+  }) {
+    _revisaoEstimativa++;
+    _timerEstimativa?.cancel();
+    _timerEstimativa = null;
+    remainingTimeDistanceSubscription?.cancel();
+    remainingTimeDistanceSubscription = null;
+    arrivalSubscription?.cancel();
+    arrivalSubscription = null;
+    tempoRestanteSegundos = null;
+    distanciaRestanteMetros = null;
+    if (preservarIntervalo) {
+      solicitacoesViewModel?.descartarEstimativaPendente();
+    } else if (suspender) {
+      solicitacoesViewModel?.suspenderPublicacaoEstimativa();
+    } else {
+      solicitacoesViewModel?.pararPublicacaoEstimativa();
+      _retryEstimativa.succeeded();
+    }
+  }
+
+  // ============================================================
+  // INICIALIZAÇÃO DA NAVEGAÇÃO
+  // ============================================================
+
+  Future<bool> inicializarNavegacao() {
+    if (navegacaoInicializada) return Future.value(true);
+    final emVoo = _inicializacaoEmVoo;
+    if (emVoo != null) return emVoo;
+    return _inicializacaoEmVoo = _inicializarNavegacao().whenComplete(() {
+      _inicializacaoEmVoo = null;
+    });
+  }
+
+  Future<bool> _inicializarNavegacao() async {
+    setState(() {
+      inicializandoNavegacao = true;
+      erroNavegacao = null;
+    });
+
+    try {
+      await verificarPermissaoLocalizacao();
+      final termosAceitos = await GoogleMapsNavigator.areTermsAccepted();
+      if (!termosAceitos) {
+        final aceitou = await GoogleMapsNavigator.showTermsAndConditionsDialog(
+          'Google Navigation',
+          'Route Pires',
+        );
+        if (!aceitou) {
+          if (mounted) {
+            setState(() {
+              erroNavegacao = 'Os termos da navegação não foram aceitos. As solicitações continuam disponíveis.';
+            });
+          }
+          return false;
+        }
+      }
+
+      await GoogleMapsNavigator.initializeNavigationSession();
+
+      if (!mounted) {
+        await GoogleMapsNavigator.cleanup();
+        return false;
+      }
+
+      setState(() {
+        navegacaoInicializada = true;
+        erroNavegacao = null;
+      });
+      return true;
+    } on SessionInitializationException catch (e) {
+      final motivo = switch (e.code) {
+        SessionInitializationError.notAuthorized => 'A chave do Google Maps/Navigation não está autorizada para este aplicativo.',
+        SessionInitializationError.locationPermissionMissing =>
+          'Permita o acesso à localização para iniciar o Google Navigation.',
+        SessionInitializationError.termsNotAccepted =>
+          'Os termos da navegação não foram aceitos.',
+      };
+      if (mounted) {
+        setState(() {
+          erroNavegacao = '$motivo As solicitações continuam disponíveis.';
+        });
+      }
+      return false;
+    } on FalhaLocalizacao catch (e) {
+      if (mounted) {
+        setState(() {
+          erroNavegacao =
+              '${e.mensagem} As solicitações continuam disponíveis.';
+        });
+      }
+      return false;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          erroNavegacao = 'Não foi possível iniciar o Google Navigation. As solicitações continuam disponíveis.';
+        });
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          inicializandoNavegacao = false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // CRIA OS DESTINOS
+  // ============================================================
+
+  Destinations criarDestinos() {
+    final solicitacao = solicitacaoSelecionada;
+
+    if (solicitacao == null) {
+      throw Exception('Nenhuma solicitação selecionada.');
+    }
+
+    // Limpa a lista antes de criar novamente.
+    pontosDaRota.clear();
+
+    // ==========================================================
+    // PONTO 1 - CLIENTE
+    // ==========================================================
+
+    destinoCliente = NavigationWaypoint.withLatLngTarget(
+      title: solicitacao.passageiroNome,
+      target: LatLng(
+        latitude: solicitacao.origem.latitude,
+        longitude: solicitacao.origem.longitude,
+      ),
+    );
+
+    pontosDaRota.add(destinoCliente!);
+
+    // ==========================================================
+    // PONTO 2 - DESTINO FINAL
+    // ==========================================================
+
+    destinoFinal = NavigationWaypoint.withLatLngTarget(
+      title: 'Destino final',
+      target: LatLng(
+        latitude: solicitacao.destino.latitude,
+        longitude: solicitacao.destino.longitude,
+      ),
+    );
+
+    pontosDaRota.add(destinoFinal!);
+
+    pontoAtual = pontoAtual == 1 || solicitacao.pontoAtual == 1 ? 1 : 0;
+
+    return Destinations(
+      waypoints: pontosDaRota.skip(pontoAtual).toList(),
+      displayOptions: NavigationDisplayOptions(),
+      routingOptions: criarOpcoesDeRota(),
+    );
+  }
+
+  // ============================================================
+  // OPÇÕES DE ROTA
+  // ============================================================
+
+  RoutingOptions criarOpcoesDeRota() {
+    return RoutingOptions(travelMode: NavigationTravelMode.driving);
+  }
+
+  // ============================================================
+  // EVENTO DE CHEGADA A UM PONTO
+  // ============================================================
+
+  Future<void> _aoChegarNoPonto(OnArrivalEvent _) async {
+    // Impede processamento duplicado.
+    if (processandoChegada || !mounted || !navegacaoAtiva || !corridaAceita) {
+      return;
+    }
+
+    processandoChegada = true;
+    final corrida = solicitacaoSelecionada;
+    final pontoAnterior = pontoAtual;
+    bool mesmaNavegacao() =>
+        mounted &&
+        navegacaoAtiva &&
+        corridaAceita &&
+        corrida != null &&
+        solicitacaoSelecionada?.id == corrida.id &&
+        solicitacaoSelecionada?.categoria == corrida.categoria;
+
+    try {
+      // ========================================================
+      // AINDA EXISTE OUTRO PONTO?
+      // ========================================================
+
+      if (pontoAtual < pontosDaRota.length - 1) {
+        _pararEstimativa(preservarIntervalo: true);
+
+        // ======================================================
+        // MANDA O GOOGLE NAVIGATION CONTINUAR PARA O PRÓXIMO
+        // ======================================================
+
+        await GoogleMapsNavigator.continueToNextDestination();
+        if (!mesmaNavegacao() || pontoAtual != pontoAnterior) {
+          return;
+        }
+        setState(() => pontoAtual = pontoAnterior + 1);
+        _retryEstimativa.succeeded();
+      } else {
+        // ======================================================
+        // CHEGOU AO ÚLTIMO PONTO
+        // ======================================================
+
+        if (mounted) {
+          widget.onTituloChanged('Destino final alcançado');
+
+          setState(() {});
+        }
+
+        // Não chama finalizarNavegacao() automaticamente.
+        //
+        // O botão "Finalizar navegação" continuará disponível.
+      }
+    } catch (_) {
+      if (mounted) widget.onTituloChanged('Falha na navegação');
+    } finally {
+      processandoChegada = false;
+      if (mesmaNavegacao()) {
+        _iniciarEstimativa();
+      }
+    }
+  }
+
+  // ============================================================
+  // INICIAR NAVEGAÇÃO
+  // ============================================================
+
+  Future<void> iniciarNavegacao() async {
+    if (iniciandoNavegacao) return;
+
+    final viewModel = solicitacoesViewModel;
+    final atual = solicitacaoSelecionada;
+
+    if (viewModel == null || atual == null) {
+      return;
+    }
+
+    setState(() {
+      iniciandoNavegacao = true;
+    });
+
+    try {
+      // O estado da corrida não depende do SDK de navegação. Se o mapa falhar,
+      // o mototaxista ainda pode finalizar ou cancelar a corrida.
+      if (!corridaAceita) {
+        final aceitou = await viewModel.aceitar(atual);
+        if (!mounted) return;
+        if (!aceitou) {
+          _mostrarErroCorrida(
+            viewModel.erro ?? 'Não foi possível aceitar a corrida',
+          );
+          return;
+        }
+        setState(() {
+          corridaAceita = true;
+          solicitacaoSelecionada = atual.copyWith(status: 'ANDAMENTO');
+        });
+      }
+
+      if (!navegacaoInicializada && !await inicializarNavegacao()) return;
+      if (!mounted) return;
+
+      final destinos = criarDestinos();
+      final status = await GoogleMapsNavigator.setDestinations(destinos);
+      if (status != NavigationRouteStatus.statusOk) {
+        if (!mounted) return;
+        setState(() {
+          erroNavegacao = 'Não foi possível traçar a rota. A corrida segue em andamento; tente a navegação novamente ou use as ações abaixo.';
+        });
+        return;
+      }
+
+      await GoogleMapsNavigator.startGuidance();
+      if (!mounted) return;
+      setState(() {
+        navegacaoAtiva = true;
+        erroNavegacao = null;
+        mostrandoPassageiro = false;
+        listaExpandida = false;
+      });
+      widget.onTituloChanged('Em Navegação');
+      _iniciarEstimativa();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        erroNavegacao = 'A navegação falhou. A corrida segue em andamento; tente novamente ou use as ações abaixo.';
+      });
+    } finally {
+      if (mounted) setState(() => iniciandoNavegacao = false);
+    }
+  }
+
+  // ============================================================
+  // FINALIZAR NAVEGAÇÃO
+  // ============================================================
+
+  Future<void> finalizarNavegacao() async {
+    final viewModel = solicitacoesViewModel;
+    final atual = solicitacaoSelecionada;
+    if (viewModel == null ||
+        atual == null ||
+        iniciandoNavegacao ||
+        viewModel.atualizandoStatus) {
+      return;
+    }
+
+    setState(() => iniciandoNavegacao = true);
+
+    try {
+      final finalizou = await viewModel.finalizar(atual);
+      if (!mounted) return;
+      if (!finalizou) {
+        _mostrarErroCorrida(
+          viewModel.erro ?? 'Não foi possível finalizar a corrida',
+        );
+        return;
+      }
+
+      await _pararNavegacao();
+      if (!mounted) return;
+      _limparCorridaSelecionada();
+      unawaited(viewModel.carregar());
+    } catch (_) {
+      if (mounted) {
+        _mostrarErroCorrida('Não foi possível finalizar a corrida');
+      }
+    } finally {
+      if (mounted) setState(() => iniciandoNavegacao = false);
+    }
+  }
+
+  Future<void> _pararNavegacao() async {
+    if (mounted) setState(() => navegacaoAtiva = false);
+    _pararEstimativa();
+    if (!navegacaoInicializada) return;
+    try {
+      await GoogleMapsNavigator.stopGuidance();
+    } catch (_) {
+      // O status confirmado pela API não depende do encerramento do SDK.
+    }
+    try {
+      await GoogleMapsNavigator.clearDestinations();
+    } catch (_) {
+      // Continua a atualização da interface mesmo se o mapa falhar.
+    }
+  }
+
+  void _mostrarErroCorrida(String mensagem) {
+    if (!mounted) return;
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('Erro'),
+        content: Text(mensagem),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _limparCorridaSelecionada() {
+    _pararEstimativa();
+    setState(() {
+      navegacaoAtiva = false;
+      mostrandoPassageiro = false;
+      solicitacaoSelecionada = null;
+      tipoSolicitacao = null;
+      corridaAceita = false;
+      listaExpandida = true;
+      erroNavegacao = null;
+      destinoCliente = null;
+      destinoFinal = null;
+      pontosDaRota.clear();
+      pontoAtual = 0;
+      processandoChegada = false;
+    });
+    widget.onTituloChanged('Procurando Corrida');
+  }
+
+  // ============================================================
+  // ABRIR PASSAGEIRO
+  // ============================================================
+
+  void abrirPassageiro(SolicitacaoCorrida solicitacao) {
+    _pararEstimativa();
+    setState(() {
+      solicitacaoSelecionada = solicitacao;
+      pontoAtual = solicitacao.pontoAtual == 1 ? 1 : 0;
+
+      mostrandoPassageiro = true;
+
+      corridaAceita = solicitacao.status.toUpperCase() == 'ANDAMENTO';
+
+      tipoSolicitacao = solicitacao.ehEntrega
+          ? TipoSolicitacao.entrega
+          : TipoSolicitacao.corrida;
+    });
+
+    widget.onTituloChanged(
+      solicitacao.ehEntrega ? 'Detalhes da Entrega' : 'Detalhes da Corrida',
+    );
+  }
+
+  // ============================================================
+  // CANCELAR SOLICITAÇÃO
+  // ============================================================
+
+  Future<void> cancelarSolicitacao() async {
+    final viewModel = solicitacoesViewModel;
+
+    final atual = solicitacaoSelecionada;
+
+    if (viewModel == null ||
+        atual == null ||
+        !corridaAceita ||
+        viewModel.atualizandoStatus) {
+      return;
+    }
+
+    final motivo = await solicitarMotivoCancelamento(
+      context,
+      mototaxista: true,
+    );
+    if (!mounted || motivo == null || solicitacaoSelecionada?.id != atual.id) {
+      return;
+    }
+
+    final cancelou = await viewModel.cancelar(atual, motivo: motivo);
+
+    if (!mounted) return;
+
+    if (cancelou) {
+      await _pararNavegacao();
+      if (!mounted) return;
+      _limparCorridaSelecionada();
+      unawaited(viewModel.carregar());
+      return;
+    }
+
+    _mostrarErroCorrida(
+      viewModel.erro ?? 'Não foi possível cancelar a solicitação',
+    );
+  }
+
+  // ============================================================
+  // VOLTAR PARA LISTA
+  // ============================================================
+
+  void voltarParaLista() {
+    _pararEstimativa();
+    setState(() {
+      mostrandoPassageiro = false;
+
+      solicitacaoSelecionada = null;
+
+      tipoSolicitacao = null;
+
+      corridaAceita = false;
+
+      if (navegacaoInicializada) erroNavegacao = null;
+    });
+
+    widget.onTituloChanged('Procurando Corrida');
+    final viewModel = solicitacoesViewModel;
+    if (viewModel != null) unawaited(viewModel.carregar());
+  }
+
+  // ============================================================
+  // INIT STATE
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _appAtivo =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+    unawaited(inicializarNavegacao());
+
+    final mototaxistaId = widget.mototaxistaId;
+
+    if (mototaxistaId != null && mototaxistaId.isNotEmpty) {
+      solicitacoesViewModel = SolicitacoesViewModel(
+        mototaxistaId: mototaxistaId,
+      )..addListener(_aoAtualizarSolicitacoes);
+
+      solicitacoesViewModel!.carregar();
+      solicitacoesViewModel!.configurarPolling(
+        online: widget.online,
+        ativa: _appAtivo,
+      );
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant Corrida oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.online != widget.online) {
+      solicitacoesViewModel?.configurarPolling(
+        online: widget.online,
+        ativa: _appAtivo,
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appAtivo = state == AppLifecycleState.resumed;
+    final viewModel = solicitacoesViewModel;
+    if (viewModel == null) return;
+    viewModel.configurarPolling(online: widget.online, ativa: _appAtivo);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(viewModel.carregar(silenciosa: true));
+      _iniciarEstimativa();
+    } else {
+      _pararEstimativa(suspender: true);
+    }
+  }
+
+  // ============================================================
+  // ATUALIZAÇÃO DAS SOLICITAÇÕES
+  // ============================================================
+
+  void _aoAtualizarSolicitacoes() {
+    if (!mounted) return;
+    final viewModel = solicitacoesViewModel;
+    widget.onAtendimentoChanged?.call(
+      viewModel?.solicitacoes.any(
+            (corrida) => corrida.status.toUpperCase() == 'ANDAMENTO',
+          ) ??
+          false,
+    );
+    if (viewModel != null && viewModel.revisaoLista != _ultimaRevisaoLista) {
+      _ultimaRevisaoLista = viewModel.revisaoLista;
+      final selecionada = solicitacaoSelecionada;
+      if (selecionada != null && !_limpandoSelecaoRemota) {
+        SolicitacaoCorrida? atual;
+        for (final item in viewModel.solicitacoes) {
+          if (item.id == selecionada.id &&
+              item.categoria == selecionada.categoria) {
+            atual = item;
+            break;
+          }
+        }
+        if (atual == null) {
+          unawaited(_retirarSelecaoEncerrada());
+        } else {
+          solicitacaoSelecionada = atual;
+          corridaAceita =
+              corridaAceita || atual.status.toUpperCase() == 'ANDAMENTO';
+        }
+      }
+    }
+    setState(() {});
+  }
+
+  Future<void> _retirarSelecaoEncerrada() async {
+    if (_limpandoSelecaoRemota || solicitacaoSelecionada == null) return;
+    _limpandoSelecaoRemota = true;
+    try {
+      await _pararNavegacao();
+      if (!mounted) return;
+      _limparCorridaSelecionada();
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Solicitação encerrada'),
+          content: const Text('Esta solicitação não está mais disponível.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      _limpandoSelecaoRemota = false;
+    }
+  }
+
+  Future<void> _tentarNavegacao() async {
+    if (corridaAceita && solicitacaoSelecionada != null) {
+      await iniciarNavegacao();
+      return;
+    }
+    if (!navegacaoInicializada) {
+      await inicializarNavegacao();
+      return;
+    }
+
+    final controller = mapController;
+    if (controller == null) return;
+    try {
+      await controller.setMyLocationEnabled(true);
+      await controller.followMyLocation(
+        CameraPerspective.tilted,
+        zoomLevel: 18,
+      );
+      if (mounted) setState(() => erroNavegacao = null);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          erroNavegacao = 'Não foi possível acompanhar sua localização. As solicitações continuam disponíveis.';
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: navegacaoInicializada
+                ? GoogleMapsNavigationView(
+                    onViewCreated: (controller) async {
+                      mapController = controller;
+                      try {
+                        await controller.setMyLocationEnabled(true);
+                        await controller.followMyLocation(
+                          CameraPerspective.tilted,
+                          zoomLevel: 18,
+                        );
+                      } catch (_) {
+                        if (mounted) {
+                          setState(() {
+                            erroNavegacao = 'O mapa não conseguiu acompanhar sua localização. As ações da corrida continuam disponíveis.';
+                          });
+                        }
+                      }
+                    },
+                  )
+                : const ColoredBox(
+                    color: Color(0xFFEAF2FF),
+                    child: Center(
+                      child: Icon(
+                        CupertinoIcons.location,
+                        size: 72,
+                        color: CupertinoColors.systemGrey2,
+                      ),
+                    ),
+                  ),
+          ),
+
+          if (!navegacaoInicializada || erroNavegacao != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              top: 12,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: CupertinoColors.systemGrey4,
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      inicializandoNavegacao
+                          ? 'Iniciando navegação...'
+                          : erroNavegacao ?? 'Navegação indisponível.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Color(0xFF1F2024)),
+                    ),
+                    if (inicializandoNavegacao)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: CupertinoActivityIndicator(),
+                      )
+                    else
+                      CupertinoButton(
+                        onPressed: iniciandoNavegacao || inicializandoNavegacao
+                            ? null
+                            : _tentarNavegacao,
+                        child: const Text('Tentar navegação'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (!navegacaoAtiva)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                height: listaExpandida ? 500 : 100,
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: CupertinoColors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                      offset: Offset(0, -2),
+                      color: CupertinoColors.systemGrey4,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 45,
+                      width: double.infinity,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            listaExpandida = !listaExpandida;
+                          });
+                        },
+                        child: Center(
+                          child: Icon(
+                            listaExpandida
+                                ? CupertinoIcons.chevron_down
+                                : CupertinoIcons.chevron_up,
+                            size: 20,
+                            color: CupertinoColors.systemBlue,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Expanded(
+                      child:
+                          mostrandoPassageiro && solicitacaoSelecionada != null
+                          ? _construirDrawer()
+                          : listaExpandida
+                          ? ListaPassageiros(
+                              solicitacoes:
+                                  solicitacoesViewModel?.solicitacoes ??
+                                  const [],
+                              carregando:
+                                  solicitacoesViewModel?.carregando ?? false,
+                              erro:
+                                  solicitacoesViewModel?.erro ??
+                                  (widget.mototaxistaId == null ||
+                                          widget.mototaxistaId!.isEmpty
+                                      ? 'Faça login como mototaxista para ver solicitações'
+                                      : null),
+                              onPassageiroSelecionado: abrirPassageiro,
+                            )
+                          : const SizedBox(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (navegacaoAtiva)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (solicitacaoSelecionada case final solicitacao?) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          EnderecoCorrida(
+                            ponto: solicitacao.origem,
+                            prefixo: 'Origem: ',
+                          ),
+                          EnderecoCorrida(
+                            ponto: solicitacao.destino,
+                            prefixo: 'Destino: ',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: CupertinoButton.filled(
+                      onPressed:
+                          iniciandoNavegacao ||
+                              (solicitacoesViewModel?.atualizandoStatus ??
+                                  false)
+                          ? null
+                          : finalizarNavegacao,
+                      child: const Text(
+                        'Finalizar corrida',
+                        style: TextStyle(color: CupertinoColors.white),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: CupertinoButton(
+                      onPressed:
+                          iniciandoNavegacao ||
+                              (solicitacoesViewModel?.atualizandoStatus ??
+                                  false)
+                          ? null
+                          : cancelarSolicitacao,
+                      child: const Text('Cancelar corrida'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (iniciandoNavegacao)
+            Positioned.fill(
+              child: Container(
+                color: CupertinoColors.black.withValues(alpha: 0.15),
+                child: const Center(
+                  child: CupertinoActivityIndicator(radius: 15),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // DRAWER
+  // ============================================================
+
+  Widget _construirDrawer() {
+    final carregando =
+        (solicitacoesViewModel?.atualizandoStatus ?? false) ||
+        iniciandoNavegacao ||
+        inicializandoNavegacao;
+
+    if (corridaAceita) {
+      return _construirCorridaEmAndamento(carregando);
+    }
+
+    if (tipoSolicitacao == TipoSolicitacao.entrega) {
+      return DrawerEntrega(
+        entrega: solicitacaoSelecionada!,
+        onIniciar: iniciarNavegacao,
+        onVoltar: voltarParaLista,
+        carregando: carregando,
+      );
+    }
+
+    return DrawerCorrida(
+      corrida: solicitacaoSelecionada!,
+      onIniciar: iniciarNavegacao,
+      onVoltar: voltarParaLista,
+      carregando: carregando,
+    );
+  }
+
+  Widget _construirCorridaEmAndamento(bool carregando) {
+    final solicitacao = solicitacaoSelecionada!;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      children: [
+        Text(
+          solicitacao.ehEntrega ? 'Frete em andamento' : 'Corrida em andamento',
+          style: const TextStyle(
+            color: Color(0xFF1F2024),
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Modalidade: ${solicitacao.categoria.label}',
+          style: const TextStyle(color: Color(0xFF1F2024)),
+        ),
+        Text(
+          'Pagamento: ${solicitacao.formaPagamento ?? 'não informado'}',
+          style: const TextStyle(color: Color(0xFF1F2024)),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Passageiro: ${solicitacao.passageiroNome}',
+          style: const TextStyle(color: Color(0xFF1F2024)),
+        ),
+        const SizedBox(height: 8),
+        EnderecoCorrida(
+          ponto: solicitacao.origem,
+          prefixo: 'Origem: ',
+          style: const TextStyle(color: Color(0xFF1F2024)),
+        ),
+        EnderecoCorrida(
+          ponto: solicitacao.destino,
+          prefixo: 'Destino: ',
+          style: const TextStyle(color: Color(0xFF1F2024)),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: CupertinoButton.filled(
+            onPressed: carregando ? null : iniciarNavegacao,
+            child: Text(
+              erroNavegacao == null ? 'Iniciar navegação' : 'Tentar navegação',
+              style: const TextStyle(color: CupertinoColors.white),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        CupertinoButton(
+          onPressed: carregando ? null : finalizarNavegacao,
+          child: const Text('Finalizar corrida'),
+        ),
+        CupertinoButton(
+          onPressed: carregando ? null : cancelarSolicitacao,
+          child: const Text('Cancelar corrida'),
+        ),
+        CupertinoButton(
+          onPressed: carregando ? null : voltarParaLista,
+          child: const Text('Voltar às solicitações'),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pararEstimativa();
+
+    final viewModel = solicitacoesViewModel;
+
+    if (viewModel != null) {
+      viewModel.removeListener(_aoAtualizarSolicitacoes);
+
+      viewModel.dispose();
+    }
+
+    if (navegacaoInicializada) {
+      GoogleMapsNavigator.cleanup();
+    }
+
+    super.dispose();
+  }
+}
