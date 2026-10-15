@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:route_pires_flutter/views/chat_list_view.dart';
 import 'package:route_pires_flutter/views/perfil_passageiro.dart';
 import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
@@ -93,11 +94,7 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
               builder: (context) {
                 return const CupertinoPageScaffold(
                   backgroundColor: CupertinoColors.white,
-                  navigationBar: CupertinoNavigationBar(
-                    backgroundColor: CupertinoColors.white,
-                    middle: Text('Negociação'),
-                  ),
-                  child: SafeArea(child: Center(child: Text('Negociação'))),
+                  child: SafeArea(child: ChatListView()),
                 );
               },
             );
@@ -108,7 +105,10 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
           case 3:
             return CupertinoTabView(
               builder: (context) {
-                return PerfilPassageiro();
+                return CupertinoPageScaffold(
+                  backgroundColor: CupertinoColors.white,
+                  child: SafeArea(child: PerfilPassageiro()),
+                );
               },
             );
 

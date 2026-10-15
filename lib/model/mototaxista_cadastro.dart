@@ -12,6 +12,11 @@ class MototaxistaCadastro {
   final String modelo;
   final String ano;
 
+  // Preços das corridas, em reais.
+  final double precoZonaUrbana;
+  final double precoBairrosAfastados;
+  final double precoBandeira2;
+
   const MototaxistaCadastro({
     required this.nome,
     required this.email,
@@ -23,6 +28,9 @@ class MototaxistaCadastro {
     required this.renavam,
     required this.modelo,
     required this.ano,
+    required this.precoZonaUrbana,
+    required this.precoBairrosAfastados,
+    required this.precoBandeira2,
   });
 
   Map<String, dynamic> toJson() {
@@ -46,6 +54,11 @@ class MototaxistaCadastro {
       'servicosOferecidos': [],
       'cnh': cnh,
       'dataValidade': dataValidade,
+
+      // Preços enviados para a API.
+      'precoZonaUrbana': precoZonaUrbana,
+      'precoBairrosAfastados': precoBairrosAfastados,
+      'precoBandeira2': precoBandeira2,
     };
   }
 }
@@ -61,7 +74,24 @@ class MototaxistaRascunho {
   String renavam = '';
   String modelo = '';
   String ano = '';
+
+  // Guardamos os preços como texto enquanto o usuário preenche o formulário.
+  String precoZonaUrbana = '';
+  String precoBairrosAfastados = '';
+  String precoBandeira2 = '';
+
   bool aceitouTermos = false;
+
+  double _converterPreco(String valor) {
+    final normalizado = valor.trim().replaceAll(',', '.');
+    final preco = double.tryParse(normalizado);
+
+    if (preco == null || !preco.isFinite || preco <= 0) {
+      throw const FormatException('Informe um preço válido maior que zero.');
+    }
+
+    return preco;
+  }
 
   MototaxistaCadastro paraCadastro() {
     return MototaxistaCadastro(
@@ -75,6 +105,9 @@ class MototaxistaRascunho {
       renavam: renavam,
       modelo: modelo,
       ano: ano,
+      precoZonaUrbana: _converterPreco(precoZonaUrbana),
+      precoBairrosAfastados: _converterPreco(precoBairrosAfastados),
+      precoBandeira2: _converterPreco(precoBandeira2),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:route_pires_flutter/config/api_client.dart';
 import 'package:route_pires_flutter/config/api_config.dart';
 import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
+import 'package:flutter/foundation.dart';
 
 class MototaxistaRepository {
   final Dio _dio;
@@ -37,6 +38,8 @@ class MototaxistaRepository {
     );
 
     final data = response.data;
+    debugPrint('=== RESPOSTA DA API DE MOTOTAXISTAS ===');
+    debugPrint('$data');
 
     if (data is! List) {
       return const [];
@@ -60,6 +63,7 @@ class MototaxistaRepository {
       cancelToken: cancelToken,
     );
     final data = response.data;
+
     if (data is! Map) {
       throw const FormatException('Resposta inválida do mototaxista');
     }

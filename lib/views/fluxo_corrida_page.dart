@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'
-    show CircleAvatar, CircularProgressIndicator;
+    show BoxFit, CircleAvatar, CircularProgressIndicator, Image;
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
@@ -40,6 +40,7 @@ class FluxoCorridaPage extends StatefulWidget {
 class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     with WidgetsBindingObserver {
   late final CorridaViewModel viewModel;
+
   Timer? _relogio;
   int _segundosDecorridos = 0;
   bool _tentouEncerrarPrazo = false;
@@ -58,10 +59,13 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
+
     _appAtivo =
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
     viewModel = CorridaViewModel(
       passageiroId: widget.passageiroId,
       categoria: widget.categoria,
@@ -72,19 +76,27 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       pesoCarga: widget.pesoCarga,
       cargaFragil: widget.cargaFragil,
     );
+
     viewModel.addListener(_sincronizarEspera);
     viewModel.iniciar();
+
     _relogio = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_visivel) return;
+
       if (viewModel.etapa == EtapaCorrida.aceita) {
         setState(() {});
+
         if (++_segundosDecorridos % 15 == 0) {
           unawaited(viewModel.atualizarSolicitacao());
         }
+
         return;
       }
+
       if (viewModel.etapa != EtapaCorrida.aguardando) return;
+
       setState(() {});
+
       if (viewModel.segundosRestantes == 0) {
         if (!_tentouEncerrarPrazo &&
             !viewModel.atualizandoSolicitacao &&
@@ -110,19 +122,24 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appAtivo = state == AppLifecycleState.resumed;
-    if (_visivel) unawaited(viewModel.atualizarSolicitacao());
+
+    if (_visivel) {
+      unawaited(viewModel.atualizarSolicitacao());
+    }
   }
 
   void _sincronizarEspera() {
     if (viewModel.etapa != EtapaCorrida.aguardando) {
       final rota = _rotaEspera;
       if (rota == null) return;
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             viewModel.etapa == EtapaCorrida.aguardando ||
             !rota.isActive) {
           return;
         }
+
         Navigator.of(context, rootNavigator: true).removeRoute(rota);
       });
     }
@@ -130,16 +147,24 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
 
   void _mostrarEspera() {
     if (_rotaEspera != null) return;
+
     final solicitacaoId = viewModel.corridaCriada?.id;
+
     final rota = CupertinoDialogRoute<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _DialogoEsperaResposta(viewModel: viewModel),
     );
+
     _rotaEspera = rota;
+
     Navigator.of(context, rootNavigator: true).push(rota).whenComplete(() {
-      if (_rotaEspera == rota) _rotaEspera = null;
+      if (_rotaEspera == rota) {
+        _rotaEspera = null;
+      }
+
       if (!mounted || viewModel.etapa != EtapaCorrida.aguardando) return;
+
       if (viewModel.corridaCriada?.id == solicitacaoId) {
         setState(() => _mostrarAcompanhamentoNaLista = true);
       }
@@ -151,23 +176,30 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
         viewModel.corridaCriada != null) {
       return;
     }
+
     final ok = await viewModel.confirmarNegociacao();
+
     if (!mounted) return;
 
     if (ok) {
       _iniciarAcompanhamento();
+
       if (viewModel.etapa == EtapaCorrida.aguardando) {
         final solicitacaoId = viewModel.corridaCriada?.id;
+
         setState(() => _mostrarAcompanhamentoNaLista = false);
+
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted ||
               viewModel.etapa != EtapaCorrida.aguardando ||
               viewModel.corridaCriada?.id != solicitacaoId) {
             return;
           }
+
           _mostrarEspera();
         });
       }
+
       return;
     }
 
@@ -176,6 +208,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
 
   Future<void> _mostrarErroCriacao() async {
     if (viewModel.erroCriacao == null) return;
+
     await showCupertinoDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -202,6 +235,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   void _iniciarAcompanhamento() {
     _segundosDecorridos = 0;
     _tentouEncerrarPrazo = false;
+
     if (viewModel.etapa == EtapaCorrida.aguardando) {
       unawaited(viewModel.atualizarSolicitacao());
     }
@@ -214,8 +248,11 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
         viewModel.encerrandoEspera) {
       return;
     }
+
     _confirmandoTroca = true;
+
     final motoristaAtual = viewModel.motorista;
+
     final confirmou = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => _DialogoTrocaMotorista(
@@ -223,10 +260,15 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
         novoMotorista: outro.nome,
       ),
     );
+
     _confirmandoTroca = false;
+
     if (!mounted || confirmou != true) return;
+
     final trocou = await viewModel.trocarMotorista(outro);
+
     if (!mounted) return;
+
     if (!trocou &&
         viewModel.erroCriacao != null &&
         viewModel.etapa != EtapaCorrida.aguardando) {
@@ -240,6 +282,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       animation: viewModel,
       builder: (context, _) {
         final bloquear = viewModel.bloqueiaSaida;
+
         return PopScope(
           canPop: !bloquear,
           child: CupertinoPageScaffold(
@@ -267,6 +310,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
 
   Widget _conteudo() {
     if (viewModel.recuperando) return _listaMotoristas();
+
     return switch (viewModel.etapa) {
       EtapaCorrida.motoristas => _listaMotoristas(),
       EtapaCorrida.negociacao => _negociacao(),
@@ -277,9 +321,11 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
 
   Widget _aguardando() {
     final prazoVencido = viewModel.segundosRestantes == 0;
+
     final outros = viewModel.motoristas
         .where((m) => m.id != viewModel.motoristaSelecionado?.id)
         .toList();
+
     return Column(
       children: [
         if (_mostrarAcompanhamentoNaLista)
@@ -329,66 +375,72 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     );
   }
 
-  Widget _aceita() => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            CupertinoIcons.check_mark_circled_solid,
-            size: 56,
-            color: CupertinoColors.activeGreen,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Você tem uma corrida em andamento.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          PrevisaoChegada(corrida: viewModel.corridaCriada),
-          const SizedBox(height: 24),
-          CupertinoButton.filled(
-            onPressed: viewModel.corridaCriada == null
-                ? null
-                : () => Navigator.pop(
-                    context,
-                    viewModel.solicitacaoAtiva ??
-                        SolicitacaoCorrida(
-                          id: viewModel.corridaCriada!.id,
-                          categoria: widget.categoria,
-                          status: 'ANDAMENTO',
-                          mototaxistaId:
-                              viewModel.motoristaSelecionado?.id ?? '',
-                          passageiroId: widget.passageiroId,
-                          origem: widget.origem,
-                          destino: widget.destino,
-                          formaPagamento: widget.formaPagamento,
-                          descricaoCarga: widget.descricaoCarga,
-                          pesoCarga: widget.pesoCarga,
-                          cargaFragil: widget.cargaFragil,
-                          tempoRestanteSegundos:
-                              viewModel.corridaCriada?.tempoRestanteSegundos,
-                          distanciaRestanteMetros:
-                              viewModel.corridaCriada?.distanciaRestanteMetros,
-                          pontoAtual: viewModel.corridaCriada?.pontoAtual,
-                          estimativaAtualizadaEm:
-                              viewModel.corridaCriada?.estimativaAtualizadaEm,
-                        ),
-                  ),
-            child: const Text('Acompanhar corrida'),
-          ),
-        ],
+  Widget _aceita() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              CupertinoIcons.check_mark_circled_solid,
+              size: 56,
+              color: CupertinoColors.activeGreen,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Você tem uma corrida em andamento.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            PrevisaoChegada(corrida: viewModel.corridaCriada),
+            const SizedBox(height: 24),
+            CupertinoButton.filled(
+              onPressed: viewModel.corridaCriada == null
+                  ? null
+                  : () => Navigator.pop(
+                      context,
+                      viewModel.solicitacaoAtiva ??
+                          SolicitacaoCorrida(
+                            id: viewModel.corridaCriada!.id,
+                            categoria: widget.categoria,
+                            status: 'ANDAMENTO',
+                            mototaxistaId:
+                                viewModel.motoristaSelecionado?.id ?? '',
+                            passageiroId: widget.passageiroId,
+                            origem: widget.origem,
+                            destino: widget.destino,
+                            formaPagamento: widget.formaPagamento,
+                            descricaoCarga: widget.descricaoCarga,
+                            pesoCarga: widget.pesoCarga,
+                            cargaFragil: widget.cargaFragil,
+                            tempoRestanteSegundos:
+                                viewModel.corridaCriada?.tempoRestanteSegundos,
+                            distanciaRestanteMetros: viewModel
+                                .corridaCriada
+                                ?.distanciaRestanteMetros,
+                            pontoAtual: viewModel.corridaCriada?.pontoAtual,
+                            estimativaAtualizadaEm:
+                                viewModel.corridaCriada?.estimativaAtualizadaEm,
+                          ),
+                    ),
+              child: const Text('Acompanhar corrida'),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   String get _textoStatusLista {
     if (viewModel.carregando) return 'Procurando Corrida...';
     if (viewModel.erro != null) return viewModel.erro!;
+
     final quantidade = viewModel.motoristas.length;
+
     if (quantidade == 0) return 'Nenhum mototaxista encontrado';
     if (quantidade == 1) return '1 mototaxista';
+
     return '$quantidade mototaxistas';
   }
 
@@ -459,10 +511,12 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     bool manterEtapaNaFalha = false,
   }) {
     final lista = motoristas ?? viewModel.motoristas;
+
     if (viewModel.carregando && lista.isEmpty) {
       if (motoristas != null) {
         return const Center(child: CupertinoActivityIndicator());
       }
+
       return Center(
         child: Image.asset(
           'assets/images/img_busca.png',
@@ -491,6 +545,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
           ),
         );
       }
+
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -511,6 +566,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
                     builder: (_) => const MinhasCorridasPage(),
                   ),
                 );
+
                 if (mounted) viewModel.iniciar();
               },
               child: const Text('Ver minhas corridas'),
@@ -534,6 +590,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       itemCount: lista.length,
       itemBuilder: (context, index) {
         final mototaxista = lista[index];
+
         return _ItemMotorista(
           mototaxista: mototaxista,
           onPressed: onSelecionar == null && motoristas != null
@@ -548,6 +605,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
 
   Widget _negociacao() {
     final mototaxista = viewModel.motoristaSelecionado;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
       child: Column(
@@ -579,22 +637,18 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
                     children: [
                       Text(
                         'Solicitar ${widget.categoria.label.toLowerCase()}?',
-                        style: TextStyle(
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
                           color: Color(0xFF303038),
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 18),
-                      const CircleAvatar(
-                        radius: 54,
-                        backgroundColor: Color(0xFFEAF2FF),
-                        child: Icon(
-                          CupertinoIcons.person_fill,
-                          size: 70,
-                          color: Color(0xFFAAD8FF),
-                        ),
-                      ),
+
+                      // Foto do mototaxista escolhido.
+                      _AvatarMotorista(fotoUrl: mototaxista?.fotoUrl, raio: 54),
+
                       const SizedBox(height: 12),
                       _Estrelas(valor: mototaxista?.estrelas ?? 0, tamanho: 28),
                       const SizedBox(height: 12),
@@ -609,6 +663,9 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
                         ),
                         child: Text(
                           viewModel.motorista,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFF303038),
                             fontSize: 24,
@@ -616,6 +673,29 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+
+                      // Tarifas do profissional selecionado.
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _TarifaMotorista(
+                            rotulo: 'Urbana',
+                            valor: mototaxista?.precoZonaUrbana,
+                          ),
+                          _TarifaMotorista(
+                            rotulo: 'Bairros afastados',
+                            valor: mototaxista?.precoBairrosAfastados,
+                          ),
+                          _TarifaMotorista(
+                            rotulo: 'Bandeira 2',
+                            valor: mototaxista?.precoBandeira2,
+                          ),
+                        ],
+                      ),
+
                       const SizedBox(height: 18),
                       Row(
                         children: [
@@ -665,6 +745,12 @@ class _IndicadorPrazo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final prazo = CorridaViewModel.prazoAceite.inSeconds;
+
+    final progresso = prazo <= 0
+        ? 0.0
+        : (segundosRestantes / prazo).clamp(0.0, 1.0);
+
     return SizedBox.square(
       dimension: tamanho,
       child: Semantics(
@@ -676,9 +762,7 @@ class _IndicadorPrazo extends StatelessWidget {
               SizedBox.square(
                 dimension: tamanho,
                 child: CircularProgressIndicator(
-                  value:
-                      segundosRestantes /
-                      CorridaViewModel.prazoAceite.inSeconds,
+                  value: progresso,
                   strokeWidth: 4,
                   backgroundColor: const Color(0xFFE4EAF3),
                   color: const Color(0xFF006FFD),
@@ -687,7 +771,7 @@ class _IndicadorPrazo extends StatelessWidget {
               Text(
                 '${segundosRestantes}s',
                 style: TextStyle(
-                  color: Color(0xFF006FFD),
+                  color: const Color(0xFF006FFD),
                   fontSize: tamanho >= 64 ? 18 : 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -709,6 +793,7 @@ class _BotaoCancelarEspera extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prazoVencido = viewModel.segundosRestantes == 0;
+
     return SizedBox(
       width: double.infinity,
       height: 42,
@@ -759,6 +844,7 @@ class _CartaoEspera extends StatelessWidget {
   Widget build(BuildContext context) {
     final segundos = viewModel.segundosRestantes;
     final prazoVencido = segundos == 0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -985,6 +1071,7 @@ class _DialogoEsperaRespostaState extends State<_DialogoEsperaResposta> {
   @override
   void initState() {
     super.initState();
+
     widget.viewModel.addListener(_atualizar);
     _relogio = Timer.periodic(const Duration(seconds: 1), (_) => _atualizar());
   }
@@ -1004,6 +1091,7 @@ class _DialogoEsperaRespostaState extends State<_DialogoEsperaResposta> {
   Widget build(BuildContext context) {
     final prazoVencido = widget.viewModel.segundosRestantes == 0;
     final encerrando = widget.viewModel.encerrandoEspera;
+
     return _CaixaDialogo(
       larguraMaxima: 320,
       child: Column(
@@ -1081,28 +1169,174 @@ class _ItemMotorista extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(vertical: 13),
-      onPressed: onPressed,
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 22,
-            backgroundColor: Color(0xFFEAF2FF),
-            child: Icon(CupertinoIcons.person_fill, color: Color(0xFFAAD8FF)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: onPressed,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CupertinoColors.white,
+            border: Border.all(color: const Color(0xFFD9E8FF)),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x10006FFD),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              mototaxista.nome,
-              style: const TextStyle(
-                color: Color(0xFF1F2024),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _AvatarMotorista(fotoUrl: mototaxista.fotoUrl, raio: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            mototaxista.nome,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF1F2024),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _Estrelas(valor: mototaxista.estrelas, tamanho: 14),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Tarifas cadastradas',
+                      style: TextStyle(
+                        color: Color(0xFF667085),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _TarifaMotorista(
+                          rotulo: 'Urbana',
+                          valor: mototaxista.precoZonaUrbana,
+                        ),
+                        _TarifaMotorista(
+                          rotulo: 'Bairros afastados',
+                          valor: mototaxista.precoBairrosAfastados,
+                        ),
+                        _TarifaMotorista(
+                          rotulo: 'Bandeira 2',
+                          valor: mototaxista.precoBandeira2,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Exibe a foto do profissional ou um ícone padrão quando não há foto.
+class _AvatarMotorista extends StatelessWidget {
+  const _AvatarMotorista({required this.fotoUrl, required this.raio});
+
+  final String? fotoUrl;
+  final double raio;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = fotoUrl?.trim();
+    final tamanho = raio * 2;
+
+    return CircleAvatar(
+      radius: raio,
+      backgroundColor: const Color(0xFFEAF2FF),
+      child: url == null || url.isEmpty
+          ? _icone(tamanho)
+          : ClipOval(
+              child: SizedBox(
+                width: tamanho,
+                height: tamanho,
+                child: Image.network(
+                  url,
+                  width: tamanho,
+                  height: tamanho,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(child: _icone(tamanho));
+                  },
+                ),
               ),
             ),
+    );
+  }
+
+  Widget _icone(double tamanho) {
+    return Icon(
+      CupertinoIcons.person_fill,
+      size: tamanho * 0.65,
+      color: const Color(0xFFAAD8FF),
+    );
+  }
+}
+
+/// Exibe uma tarifa individual em reais.
+class _TarifaMotorista extends StatelessWidget {
+  const _TarifaMotorista({required this.rotulo, required this.valor});
+
+  final String rotulo;
+  final double? valor;
+
+  String _formatarPreco(double preco) {
+    return 'R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F6FF),
+        border: Border.all(color: const Color(0xFFD9E8FF)),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            rotulo,
+            style: const TextStyle(color: Color(0xFF667085), fontSize: 10),
           ),
-          _Estrelas(valor: mototaxista.estrelas, tamanho: 17),
+          const SizedBox(height: 2),
+          Text(
+            valor == null ? 'Não informado' : _formatarPreco(valor!),
+            style: const TextStyle(
+              color: Color(0xFF006FFD),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -1121,6 +1355,7 @@ class _Estrelas extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
         final numero = index + 1;
+
         return Icon(
           numero <= valor ? CupertinoIcons.star_fill : CupertinoIcons.star,
           color: numero <= valor

@@ -18,16 +18,23 @@ class _CadastroMototaxista1PageState extends State<CadastroMototaxista1Page> {
 
   Future<void> irParaProximoPasso() async {
     if (!_formKey.currentState!.validate()) return;
+
     final dados = _dadosKey.currentState;
     if (dados == null) return;
+
     final rascunho = context.read<MototaxistaViewModel>().rascunho;
+
+    // Salva os dados pessoais no rascunho compartilhado.
     rascunho.nome = dados.nome;
     rascunho.email = dados.email;
     rascunho.telefone = dados.telefone;
     rascunho.senha = dados.senha;
-    await Navigator.push(
+
+    await Navigator.push<void>(
       context,
-      CupertinoPageRoute(builder: (_) => const CadastroMototaxista2Page()),
+      CupertinoPageRoute<void>(
+        builder: (_) => const CadastroMototaxista2Page(),
+      ),
     );
   }
 

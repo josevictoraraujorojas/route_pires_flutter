@@ -279,14 +279,37 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
 
   Future<bool> cadastrar([MototaxistaCadastro? mototaxista]) async {
     if (_carregando) return false;
-    final cadastro = mototaxista ?? rascunho.paraCadastro();
+
+    _erro = null;
+
+    late final MototaxistaCadastro cadastro;
+
+    // Converte os dados do rascunho e trata valores inválidos.
+    try {
+      cadastro = mototaxista ?? rascunho.paraCadastro();
+    } on FormatException catch (error) {
+      _erro = error.message.toString().trim().isNotEmpty
+          ? error.message.toString()
+          : 'Informe valores válidos para os preços e os demais campos.';
+      avisar();
+      return false;
+    } catch (error) {
+      debugPrint('Erro ao preparar cadastro: $error');
+      _erro = 'Não foi possível validar os dados do cadastro.';
+      avisar();
+      return false;
+    }
+
+    // Valida a senha.
     if (!senhaValida(cadastro.senha)) {
       _erro = mensagemSenhaInvalida;
       avisar();
       return false;
     }
+
+    // Valida o ano da moto.
     if (int.tryParse(cadastro.ano) == null) {
-      _erro = 'Informe um ano válido';
+      _erro = 'Informe um ano válido.';
       avisar();
       return false;
     }
@@ -309,8 +332,9 @@ class MototaxistaViewModel extends ChangeNotifier with SafeChangeNotifier {
         },
       );
       return false;
-    } catch (_) {
-      _erro = 'Ocorreu um erro inesperado ao realizar o cadastro';
+    } catch (error) {
+      debugPrint('Erro ao cadastrar mototaxista: $error');
+      _erro = 'Ocorreu um erro inesperado ao realizar o cadastro.';
       return false;
     } finally {
       _carregando = false;
