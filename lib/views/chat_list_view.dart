@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/chat.dart';
 import 'package:route_pires_flutter/viewmodel/chat_list_viewmodel.dart';
 import 'package:route_pires_flutter/views/chat_view.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class ChatListView extends StatelessWidget {
   const ChatListView({super.key});
@@ -42,9 +43,11 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
   void initState() {
     super.initState();
 
-    // Atualiza a lista automaticamente a cada 30 segundos.
+    // Mantém a compatibilidade enquanto o dispositivo não recebe eventos FCM.
     _timerAtualizacao = Timer.periodic(const Duration(seconds: 30), (_) {
-      _recarregarChats();
+      if (!AtualizacoesService().porEventos && AtualizacoesService().appAtivo) {
+        _recarregarChats();
+      }
     });
   }
 

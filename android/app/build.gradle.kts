@@ -13,6 +13,7 @@ val googleMapsApiKey = localProperties.getProperty("GOOGLE_MAPS_API_KEY")
 
 plugins {
     id("com.android.application")
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -29,15 +30,15 @@ android {
     }
 
     defaultConfig {
-    applicationId = "com.example.route_pires_flutter"
+        applicationId = "com.example.route_pires_flutter"
 
-    minSdk = 24
-    targetSdk = flutter.targetSdkVersion
+        minSdk = 24
+        targetSdk = flutter.targetSdkVersion
 
-    versionCode = flutter.versionCode
-    versionName = flutter.versionName
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
 
-    manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {

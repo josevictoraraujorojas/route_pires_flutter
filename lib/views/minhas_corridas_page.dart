@@ -9,6 +9,7 @@ import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/andamento_corrida_page.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class MinhasCorridasPage extends StatefulWidget {
   const MinhasCorridasPage({super.key});
@@ -30,10 +31,17 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
   String? _aposId;
   String? _cancelandoId;
   String? _erro;
+  late final AtualizacaoPorEvento _eventos;
 
   @override
   void initState() {
     super.initState();
+    _eventos = AtualizacaoPorEvento(
+      aceita: (e) => e.corridas && e.dados['acao'] != 'PREVISAO_ATUALIZADA',
+      atualizar: _carregar,
+      ocupado: () => _carregando || _carregandoMais || _cancelandoId != null,
+      proximaTentativa: () => _retry.nextAttempt,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _carregar();
     });
@@ -42,6 +50,7 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
   @override
   void dispose() {
     _cancelToken.cancel();
+    _eventos.dispose();
     super.dispose();
   }
 
@@ -123,7 +132,8 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
         _erro = null;
       });
     } catch (e) {
-      if (!mounted || (e is DioException && e.type == DioExceptionType.cancel)) {
+      if (!mounted ||
+          (e is DioException && e.type == DioExceptionType.cancel)) {
         return;
       }
       _retry.failed(e);

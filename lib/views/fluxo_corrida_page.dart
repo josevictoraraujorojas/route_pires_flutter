@@ -10,6 +10,7 @@ import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/corrida_viewmodel.dart';
 import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/previsao_chegada.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class FluxoCorridaPage extends StatefulWidget {
   const FluxoCorridaPage({
@@ -40,6 +41,7 @@ class FluxoCorridaPage extends StatefulWidget {
 class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     with WidgetsBindingObserver {
   late final CorridaViewModel viewModel;
+  late final AtualizacaoPorEvento _eventos;
 
   Timer? _relogio;
   int _segundosDecorridos = 0;
@@ -78,6 +80,19 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     );
 
     viewModel.addListener(_sincronizarEspera);
+    _eventos = AtualizacaoPorEvento(
+      aceita: (e) =>
+          e.corridas &&
+          (e.sincronizacao || e.corridaId == viewModel.corridaCriada?.id),
+      atualizar: viewModel.atualizarSolicitacao,
+      ocupado: () =>
+          viewModel.atualizandoSolicitacao || viewModel.encerrandoEspera,
+      habilitado: () =>
+          _visivel &&
+          (viewModel.etapa == EtapaCorrida.aguardando ||
+              viewModel.etapa == EtapaCorrida.aceita),
+      proximaTentativa: () => viewModel.proximaConsultaSolicitacao,
+    );
     viewModel.iniciar();
 
     _relogio = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -86,7 +101,8 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       if (viewModel.etapa == EtapaCorrida.aceita) {
         setState(() {});
 
-        if (++_segundosDecorridos % 15 == 0) {
+        if (!AtualizacoesService().porEventos &&
+            ++_segundosDecorridos % 15 == 0) {
           unawaited(viewModel.atualizarSolicitacao());
         }
 
@@ -104,7 +120,8 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
           _tentouEncerrarPrazo = true;
           unawaited(viewModel.encerrarEspera(porTempo: true));
         }
-      } else if (++_segundosDecorridos % 3 == 0) {
+      } else if (!AtualizacoesService().porEventos &&
+          ++_segundosDecorridos % 3 == 0) {
         unawaited(viewModel.atualizarSolicitacao());
       }
     });
@@ -114,6 +131,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _relogio?.cancel();
+    _eventos.dispose();
     viewModel.removeListener(_sincronizarEspera);
     viewModel.dispose();
     super.dispose();

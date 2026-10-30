@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/config/api_error.dart';
 import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class SolicitacoesViewModel extends ChangeNotifier {
   SolicitacoesViewModel({
@@ -14,7 +15,19 @@ class SolicitacoesViewModel extends ChangeNotifier {
     DateTime Function()? clock,
   }) : _repository = repository ?? CorridaRepository(),
        _retryConsulta = ApiRetryGate(clock: clock),
-       _retryEstimativa = ApiRetryGate(clock: clock);
+       _retryEstimativa = ApiRetryGate(clock: clock) {
+    AtualizacoesService().addListener(_sincronizarPolling);
+    _eventos = AtualizacaoPorEvento(
+      aceita: (e) => e.corridas && e.dados['acao'] != 'PREVISAO_ATUALIZADA',
+      atualizar: () => carregar(silenciosa: true),
+      ocupado: () => _carregando || _atualizandoStatus,
+      habilitado: () =>
+          _pollAtiva && (_online || !_bootstrapFeito || _emAtendimento),
+      proximaTentativa: () => _retryConsulta.nextAttempt,
+    );
+  }
+
+  late final AtualizacaoPorEvento _eventos;
 
   final String mototaxistaId;
   final CorridaRepository _repository;
@@ -54,9 +67,11 @@ class SolicitacoesViewModel extends ChangeNotifier {
       _solicitacoes.any((item) => item.status.toUpperCase() == 'ANDAMENTO');
 
   void configurarPolling({required bool online, bool ativa = true}) {
+    final retomando = ativa && (!_pollAtiva || online != _online);
     _online = online;
     _pollAtiva = ativa;
     _sincronizarPolling();
+    if (retomando && AtualizacoesService().porEventos) _eventos.solicitar();
   }
 
   void suspenderPublicacaoEstimativa() => descartarEstimativaPendente();
@@ -153,6 +168,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
 
   void _sincronizarPolling() {
     if (_disposed ||
+        AtualizacoesService().porEventos ||
         !_pollAtiva ||
         !_consultaInicialTentada ||
         (!_online && !_emAtendimento)) {
@@ -295,7 +311,8 @@ class SolicitacoesViewModel extends ChangeNotifier {
           continue;
         }
         final ausencias = (_ausenciasConsecutivas[chave] ?? 0) + 1;
-        if (ausencias < 2 || !await _naoPertenceMais(anterior)) {
+        if ((ausencias < 2 && !AtualizacoesService().porEventos) ||
+            !await _naoPertenceMais(anterior)) {
           _ausenciasConsecutivas[chave] = ausencias.clamp(0, 2);
           novas.add(anterior);
         } else {
@@ -521,6 +538,8 @@ class SolicitacoesViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _eventos.dispose();
+    AtualizacoesService().removeListener(_sincronizarPolling);
     pararPublicacaoEstimativa();
     pararAtualizacaoAutomatica();
     if (!_cancelToken.isCancelled) {

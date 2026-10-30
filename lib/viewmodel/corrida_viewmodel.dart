@@ -81,6 +81,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   bool get trocandoMotorista => _trocandoMotorista;
   bool get criacaoIncerta => _criacaoIncerta;
   bool get podeConsultarSolicitacao => _retryAcompanhamento.canAttempt;
+  DateTime? get proximaConsultaSolicitacao => _retryAcompanhamento.nextAttempt;
   int get segundosRestantes {
     final inicio = _inicioEspera;
     if (inicio == null) return prazoAceite.inSeconds;
