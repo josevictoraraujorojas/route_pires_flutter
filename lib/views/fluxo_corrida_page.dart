@@ -653,65 +653,83 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'Solicitar ${widget.categoria.label.toLowerCase()}?',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF303038),
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
+                      // Em telas baixas, rola os dados e mantém as ações visíveis.
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Solicitar ${widget.categoria.label.toLowerCase()}?',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF303038),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
 
-                      // Foto do mototaxista escolhido.
-                      _AvatarMotorista(fotoUrl: mototaxista?.fotoUrl, raio: 54),
+                              // Foto do mototaxista escolhido.
+                              _AvatarMotorista(
+                                fotoUrl: mototaxista?.fotoUrl,
+                                raio: 54,
+                              ),
 
-                      const SizedBox(height: 12),
-                      _Estrelas(valor: mototaxista?.estrelas ?? 0, tamanho: 28),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        height: 52,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.white,
-                          border: Border.all(color: const Color(0xFF006FFD)),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          viewModel.motorista,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF303038),
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                              const SizedBox(height: 12),
+                              _Estrelas(
+                                valor: mototaxista?.estrelas ?? 0,
+                                tamanho: 28,
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                height: 52,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.white,
+                                  border: Border.all(
+                                    color: const Color(0xFF006FFD),
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  viewModel.motorista,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF303038),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
 
-                      // Tarifas do profissional selecionado.
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _TarifaMotorista(
-                            rotulo: 'Urbana',
-                            valor: mototaxista?.precoZonaUrbana,
+                              // Tarifas do profissional selecionado.
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _TarifaMotorista(
+                                    rotulo: 'Urbana',
+                                    valor: mototaxista?.precoZonaUrbana,
+                                  ),
+                                  _TarifaMotorista(
+                                    rotulo: 'Bairros afastados',
+                                    valor: mototaxista?.precoBairrosAfastados,
+                                  ),
+                                  _TarifaMotorista(
+                                    rotulo: 'Bandeira 2',
+                                    valor: mototaxista?.precoBandeira2,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          _TarifaMotorista(
-                            rotulo: 'Bairros afastados',
-                            valor: mototaxista?.precoBairrosAfastados,
-                          ),
-                          _TarifaMotorista(
-                            rotulo: 'Bandeira 2',
-                            valor: mototaxista?.precoBandeira2,
-                          ),
-                        ],
+                        ),
                       ),
 
                       const SizedBox(height: 18),
@@ -745,6 +763,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
               ],
             ),
           ),
+          const SizedBox(height: 12),
           _botaoCancelar(),
         ],
       ),
