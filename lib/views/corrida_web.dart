@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/aviso_notificacoes.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/lista_passageiros.dart';
 import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
@@ -45,7 +46,7 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
       _viewModel = SolicitacoesViewModel(mototaxistaId: id)
         ..addListener(_atualizar)
         ..carregar()
-        ..configurarPolling(online: widget.online, ativa: _appAtivo);
+        ..configurarConsultas(online: widget.online, ativa: _appAtivo);
     }
   }
 
@@ -53,7 +54,7 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
   void didUpdateWidget(covariant Corrida oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.online != widget.online) {
-      _viewModel?.configurarPolling(online: widget.online, ativa: _appAtivo);
+      _viewModel?.configurarConsultas(online: widget.online, ativa: _appAtivo);
     }
   }
 
@@ -62,7 +63,7 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
     _appAtivo = state == AppLifecycleState.resumed;
     final viewModel = _viewModel;
     if (viewModel == null) return;
-    viewModel.configurarPolling(online: widget.online, ativa: _appAtivo);
+    viewModel.configurarConsultas(online: widget.online, ativa: _appAtivo);
     if (state == AppLifecycleState.resumed) {
       unawaited(viewModel.carregar(silenciosa: true));
     }
@@ -169,6 +170,7 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
               child: const Text('Atualizar'),
             ),
           ),
+          if (selecionada == null) AvisoNotificacoes(online: widget.online),
           Expanded(
             child: selecionada == null
                 ? ListaPassageiros(

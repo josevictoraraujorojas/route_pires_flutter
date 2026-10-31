@@ -44,7 +44,6 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   late final AtualizacaoPorEvento _eventos;
 
   Timer? _relogio;
-  int _segundosDecorridos = 0;
   bool _tentouEncerrarPrazo = false;
   bool _confirmandoTroca = false;
   bool _mostrarAcompanhamentoNaLista = true;
@@ -101,11 +100,6 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       if (viewModel.etapa == EtapaCorrida.aceita) {
         setState(() {});
 
-        if (!AtualizacoesService().porEventos &&
-            ++_segundosDecorridos % 15 == 0) {
-          unawaited(viewModel.atualizarSolicitacao());
-        }
-
         return;
       }
 
@@ -120,9 +114,6 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
           _tentouEncerrarPrazo = true;
           unawaited(viewModel.encerrarEspera(porTempo: true));
         }
-      } else if (!AtualizacoesService().porEventos &&
-          ++_segundosDecorridos % 3 == 0) {
-        unawaited(viewModel.atualizarSolicitacao());
       }
     });
   }
@@ -251,7 +242,6 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   }
 
   void _iniciarAcompanhamento() {
-    _segundosDecorridos = 0;
     _tentouEncerrarPrazo = false;
 
     if (viewModel.etapa == EtapaCorrida.aguardando) {

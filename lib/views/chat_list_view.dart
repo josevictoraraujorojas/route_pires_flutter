@@ -1,11 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/chat.dart';
 import 'package:route_pires_flutter/viewmodel/chat_list_viewmodel.dart';
 import 'package:route_pires_flutter/views/chat_view.dart';
-import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class ChatListView extends StatelessWidget {
   const ChatListView({super.key});
@@ -29,8 +26,6 @@ class _ChatListViewContent extends StatefulWidget {
 class _ChatListViewContentState extends State<_ChatListViewContent> {
   final TextEditingController _buscaController = TextEditingController();
 
-  Timer? _timerAtualizacao;
-
   bool _encerradasExpandida = true;
   bool _atualizando = false;
 
@@ -40,20 +35,7 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
   DateTime? _dataEncerramento;
 
   @override
-  void initState() {
-    super.initState();
-
-    // Mantém a compatibilidade enquanto o dispositivo não recebe eventos FCM.
-    _timerAtualizacao = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (!AtualizacoesService().porEventos && AtualizacoesService().appAtivo) {
-        _recarregarChats();
-      }
-    });
-  }
-
-  @override
   void dispose() {
-    _timerAtualizacao?.cancel();
     _buscaController.dispose();
     super.dispose();
   }

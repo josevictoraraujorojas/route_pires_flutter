@@ -49,7 +49,8 @@ class AtualizacaoPorEvento {
     this.ocupado,
     this.habilitado,
     this.proximaTentativa,
-  }) {
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now {
     _assinatura = AtualizacoesService().eventos
         .where(aceita)
         .listen((_) => solicitar());
@@ -58,6 +59,7 @@ class AtualizacaoPorEvento {
   final bool Function()? ocupado;
   final bool Function()? habilitado;
   final DateTime? Function()? proximaTentativa;
+  final DateTime Function() _clock;
   late final StreamSubscription<EventoAtualizacao> _assinatura;
   Timer? _timer;
   bool _executando = false;
@@ -80,8 +82,8 @@ class AtualizacaoPorEvento {
       return;
     }
     final proxima = proximaTentativa?.call();
-    if (proxima != null && proxima.isAfter(DateTime.now())) {
-      _timer = Timer(proxima.difference(DateTime.now()), _executar);
+    if (proxima != null && proxima.isAfter(_clock())) {
+      _timer = Timer(proxima.difference(_clock()), _executar);
       return;
     }
     if (ocupado?.call() == true) {
@@ -97,7 +99,7 @@ class AtualizacaoPorEvento {
     } finally {
       _executando = false;
       if (proximaTentativa?.call() case final proxima?
-          when proxima.isAfter(DateTime.now())) {
+          when proxima.isAfter(_clock())) {
         _pendente = true;
       }
       if (_pendente && !_disposed) solicitar();

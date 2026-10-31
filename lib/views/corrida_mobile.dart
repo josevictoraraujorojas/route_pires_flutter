@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/config/localizacao_atual.dart';
 import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/aviso_notificacoes.dart';
 import 'package:route_pires_flutter/views/drawer_corrida.dart';
 import 'package:route_pires_flutter/views/drawer_entrega.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
@@ -693,7 +694,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       )..addListener(_aoAtualizarSolicitacoes);
 
       solicitacoesViewModel!.carregar();
-      solicitacoesViewModel!.configurarPolling(
+      solicitacoesViewModel!.configurarConsultas(
         online: widget.online,
         ativa: _appAtivo,
       );
@@ -704,7 +705,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   void didUpdateWidget(covariant Corrida oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.online != widget.online) {
-      solicitacoesViewModel?.configurarPolling(
+      solicitacoesViewModel?.configurarConsultas(
         online: widget.online,
         ativa: _appAtivo,
       );
@@ -716,7 +717,7 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
     _appAtivo = state == AppLifecycleState.resumed;
     final viewModel = solicitacoesViewModel;
     if (viewModel == null) return;
-    viewModel.configurarPolling(online: widget.online, ativa: _appAtivo);
+    viewModel.configurarConsultas(online: widget.online, ativa: _appAtivo);
     if (state == AppLifecycleState.resumed) {
       unawaited(viewModel.carregar(silenciosa: true));
       _iniciarEstimativa();
@@ -947,6 +948,11 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
+
+                    if (listaExpandida &&
+                        !mostrandoPassageiro &&
+                        solicitacoesViewModel != null)
+                      AvisoNotificacoes(online: widget.online),
 
                     Expanded(
                       child:

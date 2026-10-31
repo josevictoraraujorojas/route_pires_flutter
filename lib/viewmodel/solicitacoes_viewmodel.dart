@@ -16,14 +16,14 @@ class SolicitacoesViewModel extends ChangeNotifier {
   }) : _repository = repository ?? CorridaRepository(),
        _retryConsulta = ApiRetryGate(clock: clock),
        _retryEstimativa = ApiRetryGate(clock: clock) {
-    AtualizacoesService().addListener(_sincronizarPolling);
     _eventos = AtualizacaoPorEvento(
       aceita: (e) => e.corridas && e.dados['acao'] != 'PREVISAO_ATUALIZADA',
       atualizar: () => carregar(silenciosa: true),
       ocupado: () => _carregando || _atualizandoStatus,
       habilitado: () =>
-          _pollAtiva && (_online || !_bootstrapFeito || _emAtendimento),
+          _consultasAtivas && (_online || !_bootstrapFeito || _emAtendimento),
       proximaTentativa: () => _retryConsulta.nextAttempt,
+      clock: clock,
     );
   }
 
@@ -37,16 +37,12 @@ class SolicitacoesViewModel extends ChangeNotifier {
   bool _atualizandoStatus = false;
   String? _erro;
   List<SolicitacaoCorrida> _solicitacoes = const [];
-  final Map<String, int> _ausenciasConsecutivas = {};
   final Set<String> _encerradasLocalmente = {};
   int _revisaoLista = 0;
   bool _disposed = false;
-  Timer? _atualizacaoAutomatica;
-  Duration? _periodoPolling;
   bool _online = false;
-  bool _pollAtiva = true;
+  bool _consultasAtivas = true;
   bool _bootstrapFeito = false;
-  bool _consultaInicialTentada = false;
   final ApiRetryGate _retryConsulta;
   final ApiRetryGate _retryEstimativa;
   Timer? _intervaloEstimativa;
@@ -66,12 +62,11 @@ class SolicitacoesViewModel extends ChangeNotifier {
   bool get _emAtendimento =>
       _solicitacoes.any((item) => item.status.toUpperCase() == 'ANDAMENTO');
 
-  void configurarPolling({required bool online, bool ativa = true}) {
-    final retomando = ativa && (!_pollAtiva || online != _online);
+  void configurarConsultas({required bool online, bool ativa = true}) {
+    final retomando = ativa && (!_consultasAtivas || online != _online);
     _online = online;
-    _pollAtiva = ativa;
-    _sincronizarPolling();
-    if (retomando && AtualizacoesService().porEventos) _eventos.solicitar();
+    _consultasAtivas = ativa;
+    if (retomando && !_carregando) _eventos.solicitar();
   }
 
   void suspenderPublicacaoEstimativa() => descartarEstimativaPendente();
@@ -162,37 +157,6 @@ class SolicitacoesViewModel extends ChangeNotifier {
     return e.type == DioExceptionType.cancel || _disposed;
   }
 
-  void iniciarAtualizacaoAutomatica() {
-    _sincronizarPolling();
-  }
-
-  void _sincronizarPolling() {
-    if (_disposed ||
-        AtualizacoesService().porEventos ||
-        !_pollAtiva ||
-        !_consultaInicialTentada ||
-        (!_online && !_emAtendimento)) {
-      _atualizacaoAutomatica?.cancel();
-      _atualizacaoAutomatica = null;
-      _periodoPolling = null;
-      return;
-    }
-    final periodo = Duration(seconds: _emAtendimento ? 30 : 15);
-    if (_atualizacaoAutomatica != null && _periodoPolling == periodo) return;
-    _atualizacaoAutomatica?.cancel();
-    _periodoPolling = periodo;
-    _atualizacaoAutomatica = Timer.periodic(periodo, (_) {
-      unawaited(carregar(silenciosa: true));
-    });
-  }
-
-  void pararAtualizacaoAutomatica() {
-    _pollAtiva = false;
-    _atualizacaoAutomatica?.cancel();
-    _atualizacaoAutomatica = null;
-    _periodoPolling = null;
-  }
-
   String _chave(SolicitacaoCorrida corrida) =>
       '${corrida.categoria.name}:${corrida.id}';
 
@@ -256,14 +220,13 @@ class SolicitacoesViewModel extends ChangeNotifier {
     if (_disposed ||
         _carregando ||
         _atualizandoStatus ||
-        !_pollAtiva ||
+        !_consultasAtivas ||
         !_retryConsulta.canAttempt ||
         (!_online && _bootstrapFeito && !_emAtendimento)) {
       return;
     }
     final erroAnterior = _erro;
     var listaMudou = false;
-    _consultaInicialTentada = true;
     _carregando = true;
     if (!silenciosa) {
       _erro = null;
@@ -286,7 +249,6 @@ class SolicitacoesViewModel extends ChangeNotifier {
         final chave = _chave(solicitacao);
         if (_encerradasLocalmente.contains(chave)) continue;
         recebidasIds.add(chave);
-        _ausenciasConsecutivas.remove(chave);
         final anterior = anteriores[chave];
         if (anterior != null) {
           solicitacao = solicitacao.copyWith(
@@ -310,14 +272,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
             _encerradasLocalmente.contains(chave)) {
           continue;
         }
-        final ausencias = (_ausenciasConsecutivas[chave] ?? 0) + 1;
-        if ((ausencias < 2 && !AtualizacoesService().porEventos) ||
-            !await _naoPertenceMais(anterior)) {
-          _ausenciasConsecutivas[chave] = ausencias.clamp(0, 2);
-          novas.add(anterior);
-        } else {
-          _ausenciasConsecutivas.remove(chave);
-        }
+        if (!await _naoPertenceMais(anterior)) novas.add(anterior);
       }
       listaMudou = !_mesmaLista(_solicitacoes, novas);
       if (listaMudou) {
@@ -341,7 +296,8 @@ class SolicitacoesViewModel extends ChangeNotifier {
       _erro = 'Ocorreu um erro inesperado';
     } finally {
       _carregando = false;
-      _sincronizarPolling();
+      // Sem aviso novo, só esta tentativa recupera uma consulta que falhou.
+      if (_retryConsulta.nextAttempt != null) _eventos.solicitar();
       if (!silenciosa || listaMudou || _erro != erroAnterior) _avisar();
     }
   }
@@ -391,7 +347,6 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
-      _sincronizarPolling();
       _avisar();
     }
   }
@@ -444,7 +399,6 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
-      _sincronizarPolling();
       _avisar();
     }
   }
@@ -485,7 +439,6 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
-      _sincronizarPolling();
       _avisar();
     }
   }
@@ -530,7 +483,6 @@ class SolicitacoesViewModel extends ChangeNotifier {
       return false;
     } finally {
       _atualizandoStatus = false;
-      _sincronizarPolling();
       _avisar();
     }
   }
@@ -539,9 +491,7 @@ class SolicitacoesViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _eventos.dispose();
-    AtualizacoesService().removeListener(_sincronizarPolling);
     pararPublicacaoEstimativa();
-    pararAtualizacaoAutomatica();
     if (!_cancelToken.isCancelled) {
       _cancelToken.cancel();
     }

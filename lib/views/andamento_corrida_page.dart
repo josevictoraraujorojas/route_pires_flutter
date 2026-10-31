@@ -70,7 +70,6 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
     _relogio = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_visivel && !_finalizada) {
         setState(() {});
-        if (!AtualizacoesService().porEventos) _atualizarStatus();
       }
     });
   }

@@ -11,8 +11,8 @@ class ChatViewModel extends ChangeNotifier {
     ChatRepository? chatRepository,
   }) : _repository = chatRepository ?? ChatRepository() {
     _eventos = AtualizacaoPorEvento(
-      // Atualiza somente quando o evento pertence a este chat.
-      aceita: (e) => e.chats && e.chatId == chatId,
+      // A sincronização ao retomar o app não tem chatId; os demais avisos, sim.
+      aceita: (e) => e.sincronizacao || (e.chats && e.chatId == chatId),
       atualizar: () => carregarMensagens(silenciosa: true),
       ocupado: () => _consultando || _enviando,
       habilitado: () => _inicializado,
