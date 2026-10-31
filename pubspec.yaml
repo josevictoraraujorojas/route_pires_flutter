@@ -29,7 +29,6 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   jwt_decoder: ^2.0.1
-  stomp_dart_client: ^2.1.0
   google_fonts: ^8.2.1
   dio: ^5.7.0
   latlong2: ^0.10.1
