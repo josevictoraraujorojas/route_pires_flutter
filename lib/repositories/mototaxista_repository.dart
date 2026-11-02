@@ -3,6 +3,7 @@ import 'package:route_pires_flutter/config/api_client.dart';
 import 'package:route_pires_flutter/config/api_config.dart';
 import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
+import 'package:route_pires_flutter/model/veiculo.dart';
 import 'package:flutter/foundation.dart';
 
 class MototaxistaRepository {
@@ -83,6 +84,32 @@ class MototaxistaRepository {
       return data['disponivel'] as bool;
     }
     throw const FormatException('Resposta sem disponibilidade do mototaxista');
+  }
+
+  // ============================================================
+  // VEÍCULO
+  // ============================================================
+
+  Future<Veiculo> buscarVeiculo({required String id}) async {
+    final response = await _dio.get(
+      '${ApiConfig.mototaxistas}/$id',
+      queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+    );
+    final data = response.data;
+    if (data is Map && data['veiculo'] is Map) {
+      return Veiculo.fromJson(Map<String, dynamic>.from(data['veiculo'] as Map));
+    }
+    throw const FormatException('Resposta sem veículo do mototaxista');
+  }
+
+  Future<void> atualizarVeiculo({
+    required String id,
+    required Veiculo veiculo,
+  }) async {
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      data: {'veiculo': veiculo.toJson()},
+    );
   }
 
   // ============================================================

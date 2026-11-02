@@ -10,25 +10,27 @@ class HistoricoCorridasViewModel extends ChangeNotifier
     with SafeChangeNotifier {
   final CorridaRepository _repository;
   final MototaxistaRepository _mototaxistaRepository;
+  final bool doMototaxista;
 
   HistoricoCorridasViewModel({
     CorridaRepository? repository,
     MototaxistaRepository? mototaxistaRepository,
+    this.doMototaxista = false,
   }) : _repository = repository ?? CorridaRepository(),
        _mototaxistaRepository =
            mototaxistaRepository ?? MototaxistaRepository() {
     _eventos = AtualizacaoPorEvento(
       aceita: (e) => e.corridas && e.dados['acao'] != 'PREVISAO_ATUALIZADA',
       atualizar: () async {
-        if (_passageiroId case final id?) await carregarHistoricoInicial(id);
+        if (_usuarioId case final id?) await carregarHistoricoInicial(id);
       },
       ocupado: () => _carregando || _carregandoMais,
-      habilitado: () => _passageiroId != null,
+      habilitado: () => _usuarioId != null,
     );
   }
 
   late final AtualizacaoPorEvento _eventos;
-  String? _passageiroId;
+  String? _usuarioId;
 
   @override
   void dispose() {
@@ -59,9 +61,31 @@ class HistoricoCorridasViewModel extends ChangeNotifier
     return _nomesMototaxistas[mototaxistaId] ?? 'Carregando nome...';
   }
 
+  String nomeParticipante(SolicitacaoCorrida corrida) => doMototaxista
+      ? corrida.passageiroNome
+      : getNomeMototaxista(corrida.mototaxistaId);
+
+  Future<PaginaHistorico> _listar(String usuarioId, {String? aposId}) {
+    if (doMototaxista) {
+      return _repository.listarHistoricoMototaxista(
+        mototaxistaId: usuarioId,
+        aposId: aposId,
+        limite: 15,
+      );
+    }
+    return _repository.listarHistorico(
+      passageiroId: usuarioId,
+      aposId: aposId,
+      limite: 15,
+    );
+  }
+
   Future<void> _buscarNomesMototaxistas(
     List<SolicitacaoCorrida> novasCorridas,
   ) async {
+    // O nome do passageiro já vem na página do histórico do mototaxista.
+    if (doMototaxista) return;
+
     final idsParaBuscar = novasCorridas
         .map((c) => c.mototaxistaId)
         .where((id) => id.isNotEmpty && !_nomesMototaxistas.containsKey(id))
@@ -84,19 +108,16 @@ class HistoricoCorridasViewModel extends ChangeNotifier
     );
   }
 
-  Future<void> carregarHistoricoInicial(String passageiroId) async {
+  Future<void> carregarHistoricoInicial(String usuarioId) async {
     if (foiDisposed || _carregando || _carregandoMais) return;
-    _passageiroId = passageiroId;
+    _usuarioId = usuarioId;
     _carregando = true;
     _erro = null;
     _ultimoId = null;
     avisar();
 
     try {
-      final pagina = await _repository.listarHistorico(
-        passageiroId: passageiroId,
-        limite: 15,
-      );
+      final pagina = await _listar(usuarioId);
 
       if (foiDisposed) return;
       _corridas = pagina.corridas;
@@ -121,18 +142,14 @@ class HistoricoCorridasViewModel extends ChangeNotifier
     }
   }
 
-  Future<void> carregarMaisHistorico(String passageiroId) async {
+  Future<void> carregarMaisHistorico(String usuarioId) async {
     if (foiDisposed || !_temMais || _carregandoMais || _carregando) return;
 
     _carregandoMais = true;
     avisar();
 
     try {
-      final pagina = await _repository.listarHistorico(
-        passageiroId: passageiroId,
-        aposId: _ultimoId,
-        limite: 15,
-      );
+      final pagina = await _listar(usuarioId, aposId: _ultimoId);
 
       if (foiDisposed) return;
       _corridas.addAll(pagina.corridas);

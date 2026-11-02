@@ -9,6 +9,7 @@ class EditarPerfilRepository {
 
   Future<void> atualizarPerfil({
     required String id,
+    required String tipo,
     required String nome,
     required String email,
     required String telefone,
@@ -24,8 +25,12 @@ class EditarPerfilRepository {
       data['senha'] = senha;
     }
 
+    final path = tipo == 'MOTOTAXISTA'
+        ? ApiConfig.mototaxistas
+        : ApiConfig.passageiros;
+
     await _dio.patch(
-      '${ApiConfig.passageiros}/$id',
+      '$path/$id',
       data: data,
     );
   }

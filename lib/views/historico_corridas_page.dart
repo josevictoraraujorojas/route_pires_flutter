@@ -121,7 +121,7 @@ class _HistoricoCorridasPageState extends State<HistoricoCorridasPage> {
 
         final solicitacao = viewModel.corridas[index];
         
-        final nome = viewModel.getNomeMototaxista(solicitacao.mototaxistaId);
+        final nome = viewModel.nomeParticipante(solicitacao);
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

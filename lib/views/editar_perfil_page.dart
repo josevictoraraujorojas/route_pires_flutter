@@ -162,6 +162,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
 
     final ok = await viewModel.atualizarPerfil(
       id: usuarioAnterior.id,
+      tipo: usuarioAnterior.tipo,
       nome: novoNome,
       email: novoEmail,
       telefone: telefoneSomenteNumeros,
