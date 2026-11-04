@@ -4,10 +4,12 @@ import 'package:route_pires_flutter/viewmodel/editar_perfil_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/historico_corridas_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
+import 'package:route_pires_flutter/viewmodel/precos_corridas_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/veiculo_viewmodel.dart';
 import 'package:route_pires_flutter/views/editar_perfil_page.dart';
 import 'package:route_pires_flutter/views/historico_corridas_page.dart';
 import 'package:route_pires_flutter/views/notificacoes_page.dart';
+import 'package:route_pires_flutter/views/precos_corridas_page.dart';
 import 'package:route_pires_flutter/views/veiculo_page.dart';
 
 class PerfilMototaxista extends StatefulWidget {
@@ -32,6 +34,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
 
   Future<void> _carregarDisponibilidade() async {
     final mototaxistaId = context.read<LoginViewModel>().usuario?.id;
+
     if (mototaxistaId == null || mototaxistaId.isEmpty) {
       setState(() {
         carregandoDisponibilidade = false;
@@ -47,6 +50,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
 
     final viewModel = context.read<MototaxistaViewModel>();
     final valor = await viewModel.consultarDisponibilidade(id: mototaxistaId);
+
     if (!mounted) return;
 
     setState(() {
@@ -75,6 +79,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
     }
 
     final viewModel = context.read<MototaxistaViewModel>();
+
     if (viewModel.disponibilidadePara(mototaxistaId) == null) return;
 
     setState(() {
@@ -144,6 +149,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
     final saiu = await loginViewModel.sair();
 
     if (!mounted) return;
+
     if (!saiu) {
       _mostrarErro(loginViewModel.erro ?? 'Não foi possível sair da conta');
     }
@@ -170,7 +176,6 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
               isDestructiveAction: true,
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
-
                 await _fazerLogout();
               },
               child: const Text('Sair'),
@@ -185,14 +190,21 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
   // COMPONENTES DA TELA
   // ============================================================
 
-  Widget _buildMenuItem(String title, VoidCallback onTap, {bool isLast = false}) {
+  Widget _buildMenuItem(
+    String title,
+    VoidCallback onTap, {
+    bool isLast = false,
+  }) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 18.0,
+              horizontal: 8.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -211,8 +223,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
               ],
             ),
           ),
-          if (!isLast)
-            Container(height: 1, color: CupertinoColors.systemGrey5),
+          if (!isLast) Container(height: 1, color: CupertinoColors.systemGrey5),
         ],
       ),
     );
@@ -258,6 +269,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
   @override
   Widget build(BuildContext context) {
     final usuario = context.watch<LoginViewModel>().usuario;
+
     final disponivel = context.select<MototaxistaViewModel, bool?>(
       (viewModel) => viewModel.disponibilidadePara(usuario?.id),
     );
@@ -304,7 +316,10 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF0066FF),
                         shape: BoxShape.circle,
-                        border: Border.all(color: CupertinoColors.white, width: 2),
+                        border: Border.all(
+                          color: CupertinoColors.white,
+                          width: 2,
+                        ),
                       ),
                       child: const Icon(
                         CupertinoIcons.pencil,
@@ -316,6 +331,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
 
             // NOME E E-MAIL
@@ -329,7 +345,9 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                 ),
               ),
             ),
+
             const SizedBox(height: 4),
+
             Center(
               child: Text(
                 email,
@@ -339,32 +357,34 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                 ),
               ),
             ),
+
             const SizedBox(height: 40),
 
             // DISPONIBILIDADE
             const Center(
               child: Text(
                 'Disponibilidade:',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: CupertinoColors.black,
-                ),
+                style: TextStyle(fontSize: 16, color: CupertinoColors.black),
               ),
             ),
+
             const SizedBox(height: 10),
+
             Center(child: _buildDisponibilidade(disponivel)),
+
             const SizedBox(height: 8),
+
             const Text(
               'Enquanto estiver disponível ou atendendo, mantenha o aplicativo aberto e a tela ligada.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: CupertinoColors.systemGrey,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 13),
             ),
+
             const SizedBox(height: 16),
 
+            // ==================================================
             // MENUS
+            // ==================================================
             _buildMenuItem('Editar perfil', () {
               Navigator.push(
                 context,
@@ -376,6 +396,7 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                 ),
               );
             }),
+
             _buildMenuItem('Veículo ou Placa', () {
               Navigator.push(
                 context,
@@ -387,6 +408,29 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                 ),
               );
             }),
+
+            // NOVA OPÇÃO: PREÇOS DAS CORRIDAS
+            _buildMenuItem('Preços das corridas', () {
+              final usuario = context.read<LoginViewModel>().usuario;
+
+              if (usuario == null ||
+                  usuario.id.isEmpty ||
+                  usuario.tipo != 'MOTOTAXISTA') {
+                _mostrarErro('Não foi possível identificar o mototaxista.');
+                return;
+              }
+
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (_) => ChangeNotifierProvider(
+                    create: (_) => PrecosCorridasViewModel(),
+                    child: const PrecosCorridasPage(),
+                  ),
+                ),
+              );
+            }),
+
             _buildMenuItem('Histórico de corridas', () {
               Navigator.push(
                 context,
@@ -399,14 +443,14 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                 ),
               );
             }),
+
             _buildMenuItem('Notificações', () {
               Navigator.push(
                 context,
-                CupertinoPageRoute(
-                  builder: (_) => const NotificacoesPage(),
-                ),
+                CupertinoPageRoute(builder: (_) => const NotificacoesPage()),
               );
             }),
+
             _buildMenuItem('Sair da conta', _confirmarLogout, isLast: true),
           ],
         ),

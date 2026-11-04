@@ -11,6 +11,8 @@ class ApiConfig {
     if (_fromEnv.isNotEmpty) {
       return _fromEnv;
     }
+
+    debugPrint('API BASE URL: ${ApiConfig.baseUrl}');
     return 'https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.2.sslip.io';
   }
 

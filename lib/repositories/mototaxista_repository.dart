@@ -97,7 +97,9 @@ class MototaxistaRepository {
     );
     final data = response.data;
     if (data is Map && data['veiculo'] is Map) {
-      return Veiculo.fromJson(Map<String, dynamic>.from(data['veiculo'] as Map));
+      return Veiculo.fromJson(
+        Map<String, dynamic>.from(data['veiculo'] as Map),
+      );
     }
     throw const FormatException('Resposta sem veículo do mototaxista');
   }
@@ -110,6 +112,39 @@ class MototaxistaRepository {
       '${ApiConfig.mototaxistas}/$id',
       data: {'veiculo': veiculo.toJson()},
     );
+  }
+
+  // ============================================================
+  // PREÇOS DAS CORRIDAS
+  // ============================================================
+
+  Future<void> atualizarPrecos({
+    required String id,
+    required double precoZonaUrbana,
+    required double precoBairrosAfastados,
+    required double precoBandeira2,
+  }) async {
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      data: {
+        'precoZonaUrbana': precoZonaUrbana,
+        'precoBairrosAfastados': precoBairrosAfastados,
+        'precoBandeira2': precoBandeira2,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> buscarPrecos({required String id}) async {
+    final response = await _dio.get(
+      '${ApiConfig.mototaxistas}/$id',
+      queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+    );
+
+    if (response.data is! Map) {
+      throw const FormatException('Resposta inválida do mototaxista');
+    }
+
+    return Map<String, dynamic>.from(response.data);
   }
 
   // ============================================================
