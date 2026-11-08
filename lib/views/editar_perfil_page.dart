@@ -395,7 +395,6 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                 decoration: _decoracaoCampo(emFoco: _senhaEmFoco),
                 suffix: CupertinoButton(
                   padding: const EdgeInsets.only(left: 8, right: 12),
-                  minSize: 32,
                   onPressed: () {
                     setState(() {
                       _senhaVisivel = !_senhaVisivel;
@@ -410,6 +409,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                         : CupertinoColors.systemGrey,
                     size: 21,
                   ),
+                  minimumSize: Size(32, 32),
                 ),
               ),
 
