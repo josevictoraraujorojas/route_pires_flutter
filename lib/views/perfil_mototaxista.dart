@@ -10,6 +10,7 @@ import 'package:route_pires_flutter/views/editar_perfil_page.dart';
 import 'package:route_pires_flutter/views/historico_corridas_page.dart';
 import 'package:route_pires_flutter/views/notificacoes_page.dart';
 import 'package:route_pires_flutter/views/precos_corridas_page.dart';
+import 'package:route_pires_flutter/views/servicos_mototaxista_page.dart';
 import 'package:route_pires_flutter/views/veiculo_page.dart';
 
 class PerfilMototaxista extends StatefulWidget {
@@ -426,6 +427,23 @@ class _PerfilMototaxistaState extends State<PerfilMototaxista> {
                   builder: (_) => ChangeNotifierProvider(
                     create: (_) => PrecosCorridasViewModel(),
                     child: const PrecosCorridasPage(),
+                  ),
+                ),
+              );
+            }),
+
+            _buildMenuItem('Serviços oferecidos', () {
+              final usuario = context.read<LoginViewModel>().usuario;
+              if (usuario == null || usuario.id.isEmpty ||
+                  usuario.tipo != 'MOTOTAXISTA') {
+                _mostrarErro('Não foi possível identificar o mototaxista.');
+                return;
+              }
+              Navigator.push<void>(
+                context,
+                CupertinoPageRoute<void>(
+                  builder: (_) => ServicosMototaxistaPage(
+                    mototaxistaId: usuario.id,
                   ),
                 ),
               );
