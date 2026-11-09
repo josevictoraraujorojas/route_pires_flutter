@@ -105,7 +105,7 @@ class _ChatViewContentState extends State<_ChatViewContent> {
       return const Color(0xFFB3E5FC);
     }
 
-    return CupertinoColors.white.withOpacity(0.75);
+    return CupertinoColors.white.withValues(alpha: 0.75);
   }
 
   @override

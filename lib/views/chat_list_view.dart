@@ -394,7 +394,6 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
           Expanded(
             child: CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              minSize: 38,
               alignment: Alignment.centerLeft,
               onPressed: onPressed,
               child: Text(
@@ -406,18 +405,19 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
                   color: CupertinoColors.label,
                 ),
               ),
+              minimumSize: Size(38, 38),
             ),
           ),
           if (data != null)
             CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 30,
               onPressed: onClear,
               child: const Icon(
                 CupertinoIcons.xmark_circle_fill,
                 size: 15,
                 color: CupertinoColors.systemGrey,
               ),
+              minimumSize: Size(30, 30),
             ),
         ],
       ),
