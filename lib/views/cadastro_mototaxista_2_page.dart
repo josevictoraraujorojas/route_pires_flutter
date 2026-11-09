@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/cadastro_mototaxista_3_page.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
+import 'package:route_pires_flutter/views/seletor_servicos.dart';
 
 class CadastroMototaxista2Page extends StatefulWidget {
   const CadastroMototaxista2Page({super.key});
@@ -17,6 +18,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
   final _cnhController = TextEditingController();
   final _dataValidadeController = TextEditingController();
+  Set<String> _servicosSelecionados = <String>{};
 
   @override
   void initState() {
@@ -26,6 +28,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
     _cnhController.text = rascunho.cnh;
     _dataValidadeController.text = rascunho.dataValidade;
+    _servicosSelecionados = {...rascunho.servicosOferecidos};
   }
 
   @override
@@ -60,6 +63,7 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
     rascunho.cnh = _cnhController.text;
     rascunho.dataValidade = _dataValidadeController.text;
+    rascunho.servicosOferecidos = {..._servicosSelecionados};
   }
 
   Future<void> irParaProximoPasso() async {
@@ -67,6 +71,24 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
     _salvarRascunho();
 
+    if (_servicosSelecionados.isEmpty) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('Serviços oferecidos'),
+          content: const Text('Selecione pelo menos um serviço para continuar.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
     await Navigator.push<void>(
       context,
       CupertinoPageRoute<void>(
@@ -202,6 +224,20 @@ class _CadastroMototaxista2PageState extends State<CadastroMototaxista2Page> {
 
                       return null;
                     },
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: SeletorServicos(
+                      selecionados: _servicosSelecionados,
+                      onChanged: (novos) {
+                        setState(() => _servicosSelecionados = novos);
+                        context.read<MototaxistaViewModel>()
+                            .rascunho.servicosOferecidos = {...novos};
+                      },
+                    ),
                   ),
 
                   const SizedBox(height: 24),
