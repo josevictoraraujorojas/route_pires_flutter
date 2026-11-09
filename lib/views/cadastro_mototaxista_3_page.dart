@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/campo_formulario.dart';
-import 'package:route_pires_flutter/views/seletor_servicos.dart';
 import 'package:route_pires_flutter/views/termos_de_uso.dart';
 
 class CadastroMototaxista3Page extends StatefulWidget {
@@ -26,7 +25,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
   final _precoBandeira2Controller = TextEditingController();
 
   bool aceitouTermos = false;
-  Set<String> _servicosSelecionados = <String>{};
 
   @override
   void initState() {
@@ -45,7 +43,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
     _precoBandeira2Controller.text = rascunho.precoBandeira2;
 
     aceitouTermos = rascunho.aceitouTermos;
-    _servicosSelecionados = {...rascunho.servicosOferecidos};
   }
 
   @override
@@ -105,7 +102,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
     rascunho.precoBandeira2 = _precoBandeira2Controller.text;
 
     rascunho.aceitouTermos = aceitouTermos;
-    rascunho.servicosOferecidos = {..._servicosSelecionados};
   }
 
   Future<void> finalizarCadastro() async {
@@ -114,23 +110,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
     }
 
     _salvarRascunho();
-
-    if (_servicosSelecionados.isEmpty) {
-      await showCupertinoDialog<void>(
-        context: context,
-        builder: (dialogContext) => CupertinoAlertDialog(
-          title: const Text('Serviços oferecidos'),
-          content: const Text('Selecione pelo menos um serviço.'),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
 
     final cadastroViewModel = context.read<MototaxistaViewModel>();
     final cadastrou = await cadastroViewModel.cadastrar();
@@ -331,20 +310,6 @@ class _CadastroMototaxista3PageState extends State<CadastroMototaxista3Page> {
 
                       return null;
                     },
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: SeletorServicos(
-                      selecionados: _servicosSelecionados,
-                      onChanged: (novos) => setState(() {
-                        _servicosSelecionados = novos;
-                        context.read<MototaxistaViewModel>()
-                            .rascunho.servicosOferecidos = {...novos};
-                      }),
-                    ),
                   ),
 
                   const SizedBox(height: 28),
