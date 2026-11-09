@@ -57,6 +57,8 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   SolicitacoesViewModel? solicitacoesViewModel;
   int _ultimaRevisaoLista = 0;
   bool _limpandoSelecaoRemota = false;
+  // Não exibe solicitações antes de confirmar o estado inicial na API.
+  bool _consultaInicialConfirmada = false;
 
   GoogleNavigationViewController? mapController;
 
@@ -585,10 +587,87 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   }
 
   // ============================================================
+  // RESTAURAR CORRIDA EM ANDAMENTO AO ABRIR O APLICATIVO
+  // ============================================================
+
+  SolicitacaoCorrida? _buscarCorridaEmAndamento() {
+    final viewModel = solicitacoesViewModel;
+    final motoristaId = widget.mototaxistaId;
+    if (viewModel == null || motoristaId == null || motoristaId.isEmpty) {
+      return null;
+    }
+
+    for (final solicitacao in viewModel.solicitacoes) {
+      if (solicitacao.mototaxistaId == motoristaId &&
+          solicitacao.status.toUpperCase() == 'ANDAMENTO') {
+        return solicitacao;
+      }
+    }
+    return null;
+  }
+
+  void _restaurarCorridaEmAndamento(SolicitacaoCorrida corrida) {
+    if (!mounted || iniciandoNavegacao || _limpandoSelecaoRemota) return;
+
+    _pararEstimativa();
+    setState(() {
+      solicitacaoSelecionada = corrida;
+      corridaAceita = true;
+      navegacaoAtiva = false;
+      mostrandoPassageiro = true;
+      listaExpandida = true;
+      pontoAtual = corrida.pontoAtual == 1 ? 1 : 0;
+      tipoSolicitacao = corrida.ehEntrega
+          ? TipoSolicitacao.entrega
+          : TipoSolicitacao.corrida;
+      erroNavegacao = null;
+    });
+    widget.onTituloChanged('Corrida em andamento');
+
+    // Reutiliza o fluxo de navegação existente, sem aceitar a corrida de novo.
+    // Agenda após o build para a tela ter a corrida restaurada.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_appAtivo ||
+          !corridaAceita ||
+          navegacaoAtiva ||
+          iniciandoNavegacao ||
+          solicitacaoSelecionada?.id != corrida.id ||
+          solicitacaoSelecionada?.categoria != corrida.categoria) {
+        return;
+      }
+      unawaited(iniciarNavegacao());
+    });
+  }
+
+  // ============================================================
   // ABRIR PASSAGEIRO
   // ============================================================
 
   void abrirPassageiro(SolicitacaoCorrida solicitacao) {
+    // Impede troca de corrida durante a verificação inicial ou atendimento.
+    if (!_consultaInicialConfirmada) return;
+
+    final ativa = _buscarCorridaEmAndamento();
+    final selecionada = solicitacaoSelecionada;
+    if ((ativa != null &&
+            (ativa.id != solicitacao.id ||
+                ativa.categoria != solicitacao.categoria)) ||
+        (corridaAceita &&
+            selecionada != null &&
+            (selecionada.id != solicitacao.id ||
+                selecionada.categoria != solicitacao.categoria))) {
+      _mostrarErroCorrida(
+        'Você já possui uma corrida em andamento. '
+        'Finalize ou cancele a corrida atual antes de aceitar outra.',
+      );
+      return;
+    }
+    if (iniciandoNavegacao ||
+        (solicitacoesViewModel?.atualizandoStatus ?? false)) {
+      return;
+    }
+
     _pararEstimativa();
     setState(() {
       solicitacaoSelecionada = solicitacao;
@@ -654,6 +733,13 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   // ============================================================
 
   void voltarParaLista() {
+    // Uma corrida em andamento só pode ser liberada após confirmação da API.
+    if (corridaAceita || _buscarCorridaEmAndamento() != null) {
+      _mostrarErroCorrida(
+        'Finalize ou cancele a corrida atual antes de voltar às solicitações.',
+      );
+      return;
+    }
     _pararEstimativa();
     setState(() {
       mostrandoPassageiro = false;
@@ -720,6 +806,22 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
     viewModel.configurarConsultas(online: widget.online, ativa: _appAtivo);
     if (state == AppLifecycleState.resumed) {
       unawaited(viewModel.carregar(silenciosa: true));
+      // Se a corrida foi restaurada enquanto o app estava em segundo plano,
+      // inicia a navegação assim que a interface voltar a ficar ativa.
+      if (corridaAceita &&
+          solicitacaoSelecionada != null &&
+          !navegacaoAtiva &&
+          !iniciandoNavegacao) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              _appAtivo &&
+              corridaAceita &&
+              !navegacaoAtiva &&
+              !iniciandoNavegacao) {
+            unawaited(iniciarNavegacao());
+          }
+        });
+      }
       _iniciarEstimativa();
     } else {
       _pararEstimativa(suspender: true);
@@ -733,15 +835,36 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
   void _aoAtualizarSolicitacoes() {
     if (!mounted) return;
     final viewModel = solicitacoesViewModel;
-    widget.onAtendimentoChanged?.call(
-      viewModel?.solicitacoes.any(
-            (corrida) => corrida.status.toUpperCase() == 'ANDAMENTO',
-          ) ??
-          false,
-    );
-    if (viewModel != null && viewModel.revisaoLista != _ultimaRevisaoLista) {
+    if (viewModel == null) return;
+
+    // carregar() avisou depois de uma consulta bem-sucedida à API.
+    // Em caso de erro, mantém a lista bloqueada, evitando aceitar outra corrida.
+    if (!viewModel.carregando && viewModel.erro == null) {
+      _consultaInicialConfirmada = true;
+    }
+
+    final ativa = _buscarCorridaEmAndamento();
+    widget.onAtendimentoChanged?.call(ativa != null || corridaAceita);
+
+    if (viewModel.revisaoLista != _ultimaRevisaoLista) {
       _ultimaRevisaoLista = viewModel.revisaoLista;
+
+      // Ao reiniciar, a lista é carregada pela API, mas o estado da tela
+      // começa vazio. Recupera a corrida ativa antes de mostrar a lista.
       final selecionada = solicitacaoSelecionada;
+      final selecionouOutra =
+          ativa != null &&
+          (selecionada == null ||
+              selecionada.id != ativa.id ||
+              selecionada.categoria != ativa.categoria);
+      if (ativa != null &&
+          !iniciandoNavegacao &&
+          !_limpandoSelecaoRemota &&
+          (selecionouOutra || !corridaAceita)) {
+        _restaurarCorridaEmAndamento(ativa);
+        return;
+      }
+
       if (selecionada != null && !_limpandoSelecaoRemota) {
         SolicitacaoCorrida? atual;
         for (final item in viewModel.solicitacoes) {
@@ -959,20 +1082,25 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
                           mostrandoPassageiro && solicitacaoSelecionada != null
                           ? _construirDrawer()
                           : listaExpandida
-                          ? ListaPassageiros(
-                              solicitacoes:
-                                  solicitacoesViewModel?.solicitacoes ??
-                                  const [],
-                              carregando:
-                                  solicitacoesViewModel?.carregando ?? false,
-                              erro:
-                                  solicitacoesViewModel?.erro ??
-                                  (widget.mototaxistaId == null ||
-                                          widget.mototaxistaId!.isEmpty
-                                      ? 'Faça login como mototaxista para ver solicitações'
-                                      : null),
-                              onPassageiroSelecionado: abrirPassageiro,
-                            )
+                          ? (!_consultaInicialConfirmada &&
+                                    widget.mototaxistaId != null &&
+                                    widget.mototaxistaId!.isNotEmpty)
+                                ? _construirConsultaInicial()
+                                : ListaPassageiros(
+                                    solicitacoes:
+                                        solicitacoesViewModel?.solicitacoes ??
+                                        const [],
+                                    carregando:
+                                        solicitacoesViewModel?.carregando ??
+                                        false,
+                                    erro:
+                                        solicitacoesViewModel?.erro ??
+                                        (widget.mototaxistaId == null ||
+                                                widget.mototaxistaId!.isEmpty
+                                            ? 'Faça login como mototaxista para ver solicitações'
+                                            : null),
+                                    onPassageiroSelecionado: abrirPassageiro,
+                                  )
                           : const SizedBox(),
                     ),
                   ],
@@ -1053,6 +1181,51 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // VERIFICAÇÃO INICIAL DA CORRIDA NO SERVIDOR
+  // ============================================================
+
+  Widget _construirConsultaInicial() {
+    final viewModel = solicitacoesViewModel;
+    final erro = viewModel?.erro;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (erro == null) ...[
+              const CupertinoActivityIndicator(),
+              const SizedBox(height: 12),
+              const Text(
+                'Verificando se existe uma corrida em andamento...',
+                textAlign: TextAlign.center,
+              ),
+            ] else ...[
+              const Text(
+                'Não foi possível confirmar o estado da corrida.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                erro,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: CupertinoColors.systemRed),
+              ),
+              const SizedBox(height: 12),
+              CupertinoButton(
+                onPressed: viewModel == null || viewModel.carregando
+                    ? null
+                    : () => unawaited(viewModel.carregar()),
+                child: const Text('Tentar novamente'),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1145,10 +1318,6 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
         CupertinoButton(
           onPressed: carregando ? null : cancelarSolicitacao,
           child: const Text('Cancelar corrida'),
-        ),
-        CupertinoButton(
-          onPressed: carregando ? null : voltarParaLista,
-          child: const Text('Voltar às solicitações'),
         ),
       ],
     );
