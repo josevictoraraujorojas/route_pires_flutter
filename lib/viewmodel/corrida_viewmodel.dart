@@ -224,6 +224,9 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
       final lista = await _mototaxistaRepository.listar(
         latitude: origem.latitude,
         longitude: origem.longitude,
+        servico: categoria == CategoriaCorrida.corrida
+            ? 'TRANSPORTE_PASSAGEIRO'
+            : 'FRETE',
         cancelToken: _cancelLista,
       );
       _retryLista.succeeded();
