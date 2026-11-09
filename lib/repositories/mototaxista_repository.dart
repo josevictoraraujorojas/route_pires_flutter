@@ -28,13 +28,17 @@ class MototaxistaRepository {
   Future<List<MototaxistaResumo>> listar({
     double? latitude,
     double? longitude,
+    String? servico,
     CancelToken? cancelToken,
   }) async {
+    final parametros = <String, dynamic>{
+      if (latitude != null || longitude != null) 'latitude': latitude,
+      if (latitude != null || longitude != null) 'longitude': longitude,
+      if (servico != null) 'servico': servico,
+    };
     final response = await _dio.get(
       ApiConfig.mototaxistasDisponiveis,
-      queryParameters: latitude == null && longitude == null
-          ? null
-          : {'latitude': latitude, 'longitude': longitude},
+      queryParameters: parametros.isEmpty ? null : parametros,
       cancelToken: cancelToken,
     );
 
@@ -84,6 +88,40 @@ class MototaxistaRepository {
       return data['disponivel'] as bool;
     }
     throw const FormatException('Resposta sem disponibilidade do mototaxista');
+  }
+
+  // ============================================================
+  // SERVIÇOS OFERECIDOS
+  // ============================================================
+
+  Future<Set<String>> buscarServicosOferecidos({required String id}) async {
+    final response = await _dio.get(
+      '${ApiConfig.mototaxistas}/$id',
+      queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+    );
+    final data = response.data;
+    if (data is! Map) {
+      throw const FormatException('Resposta inválida do mototaxista');
+    }
+    final servicos = data['servicosOferecidos'];
+    if (servicos == null) return <String>{};
+    if (servicos is! List) {
+      throw const FormatException('Lista de serviços inválida');
+    }
+    return servicos.whereType<String>().toSet();
+  }
+
+  Future<void> atualizarServicosOferecidos({
+    required String id,
+    required Set<String> servicos,
+  }) async {
+    if (servicos.isEmpty) {
+      throw const FormatException('Selecione pelo menos um serviço.');
+    }
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      data: {'servicosOferecidos': servicos.toList()},
+    );
   }
 
   // ============================================================
