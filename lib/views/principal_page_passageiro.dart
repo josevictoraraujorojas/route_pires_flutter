@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/views/chat_list_view.dart';
 import 'package:route_pires_flutter/views/perfil_passageiro.dart';
 import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
+import 'package:route_pires_flutter/views/avaliacoes_recebidas_page.dart';
 import 'package:route_pires_flutter/views/selecao_local_page.dart';
 
 class PrincipalPagePassageiro extends StatefulWidget {
@@ -75,14 +76,7 @@ class _PrincipalPagePassageiroState extends State<PrincipalPagePassageiro> {
           case 1:
             return CupertinoTabView(
               builder: (context) {
-                return const CupertinoPageScaffold(
-                  backgroundColor: CupertinoColors.white,
-                  navigationBar: CupertinoNavigationBar(
-                    backgroundColor: CupertinoColors.white,
-                    middle: Text('Avaliações'),
-                  ),
-                  child: SafeArea(child: Center(child: Text('Avaliações'))),
-                );
+                return const AvaliacoesRecebidasPage(doMototaxista: false);
               },
             );
 

@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/chat_list_view.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
+import 'package:route_pires_flutter/views/avaliacoes_recebidas_page.dart';
 import 'package:route_pires_flutter/views/perfil_mototaxista.dart';
 import 'package:route_pires_flutter/services/notificacoes_service.dart';
 
@@ -173,14 +174,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
           case 1:
             return CupertinoTabView(
               builder: (context) {
-                return const CupertinoPageScaffold(
-                  backgroundColor: CupertinoColors.white,
-                  navigationBar: CupertinoNavigationBar(
-                    backgroundColor: CupertinoColors.white,
-                    middle: Text('Avaliações'),
-                  ),
-                  child: Center(child: Text('Avaliações')),
-                );
+                return const AvaliacoesRecebidasPage(doMototaxista: true);
               },
             );
 
