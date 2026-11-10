@@ -7,6 +7,7 @@ import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/andamento_corrida_page.dart';
+import 'package:route_pires_flutter/views/avaliacao_dialog.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/motivo_cancelamento_dialog.dart';
 import 'package:route_pires_flutter/services/atualizacoes_service.dart';
@@ -31,6 +32,8 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
   String? _aposId;
   String? _cancelandoId;
   String? _erro;
+  // Avaliadas nesta tela; a lista só traz o id da avaliação ao recarregar.
+  final _avaliadas = <String>{};
   late final AtualizacaoPorEvento _eventos;
 
   @override
@@ -339,6 +342,22 @@ class _MinhasCorridasPageState extends State<MinhasCorridasPage> {
             const Text(
               'A corrida já foi aceita pelo mototaxista e não pode mais ser cancelada pelo aplicativo.',
               style: TextStyle(color: CupertinoColors.systemGrey),
+            ),
+          if (corrida.podeAvaliar(doMototaxista: false) &&
+              !_avaliadas.contains(corrida.id))
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                final avaliada = await avaliarCorrida(
+                  context,
+                  corridaId: corrida.id,
+                  doMototaxista: false,
+                );
+                if (avaliada && mounted) {
+                  setState(() => _avaliadas.add(corrida.id));
+                }
+              },
+              child: const Text('Avaliar mototaxista'),
             ),
           if (pendente)
             CupertinoButton(

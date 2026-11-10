@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/historico_corridas_viewmodel.dart';
+import 'package:route_pires_flutter/views/avaliacao_dialog.dart';
 
 class HistoricoCorridasPage extends StatefulWidget {
   const HistoricoCorridasPage({super.key});
@@ -14,6 +15,8 @@ class HistoricoCorridasPage extends StatefulWidget {
 
 class _HistoricoCorridasPageState extends State<HistoricoCorridasPage> {
   final ScrollController _scrollController = ScrollController();
+  // Avaliadas nesta tela; a lista só traz o id da avaliação ao recarregar.
+  final _avaliadas = <String>{};
 
   @override
   void initState() {
@@ -157,6 +160,29 @@ class _HistoricoCorridasPageState extends State<HistoricoCorridasPage> {
                         : CupertinoColors.systemGreen,
                   ),
                 ),
+                if (solicitacao.podeAvaliar(
+                      doMototaxista: viewModel.doMototaxista,
+                    ) &&
+                    !_avaliadas.contains(solicitacao.id))
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () async {
+                      final avaliada = await avaliarCorrida(
+                        context,
+                        corridaId: solicitacao.id,
+                        doMototaxista: viewModel.doMototaxista,
+                        nome: viewModel.doMototaxista ? nome : null,
+                      );
+                      if (avaliada && mounted) {
+                        setState(() => _avaliadas.add(solicitacao.id));
+                      }
+                    },
+                    child: Text(
+                      viewModel.doMototaxista
+                          ? 'Avaliar passageiro'
+                          : 'Avaliar mototaxista',
+                    ),
+                  ),
               ],
             ),
           ],
