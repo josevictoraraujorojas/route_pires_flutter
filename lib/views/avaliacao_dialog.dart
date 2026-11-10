@@ -65,78 +65,83 @@ class _AvaliacaoDialogState extends State<_AvaliacaoDialog> {
       builder: (context, _) {
         final vm = widget.viewModel;
         final bloqueado = vm.enviando || vm.avaliada;
-        return CupertinoAlertDialog(
-          title: Text(
-            widget.doMototaxista ? 'Avaliar passageiro' : 'Avaliar mototaxista',
+        // Voltar do sistema durante o envio fecharia o diálogo sem o resultado.
+        return PopScope(canPop: !vm.enviando, child: _dialogo(vm, bloqueado));
+      },
+    );
+  }
+
+  Widget _dialogo(AvaliacaoViewModel vm, bool bloqueado) {
+    return CupertinoAlertDialog(
+      title: Text(
+        widget.doMototaxista ? 'Avaliar passageiro' : 'Avaliar mototaxista',
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.nome == null
+                ? 'Como foi a corrida?'
+                : 'Como foi a corrida com ${widget.nome}?',
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                widget.nome == null
-                    ? 'Como foi a corrida?'
-                    : 'Como foi a corrida com ${widget.nome}?',
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 1; i <= 5; i++)
-                    Semantics(
-                      selected: i == _nota,
-                      child: CupertinoButton(
-                        key: ValueKey('estrela-$i'),
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(44, 44),
-                        onPressed: bloqueado
-                            ? null
-                            : () => setState(() => _nota = i),
-                        child: Icon(
-                          i <= _nota
-                              ? CupertinoIcons.star_fill
-                              : CupertinoIcons.star,
-                          color: i <= _nota
-                              ? const Color(0xFF007AFF)
-                              : const Color(0xFFC5C6CC),
-                          size: 30,
-                          semanticLabel: i == 1 ? '1 estrela' : '$i estrelas',
-                        ),
-                      ),
+              for (var i = 1; i <= 5; i++)
+                Semantics(
+                  selected: i == _nota,
+                  child: CupertinoButton(
+                    key: ValueKey('estrela-$i'),
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(44, 44),
+                    onPressed: bloqueado
+                        ? null
+                        : () => setState(() => _nota = i),
+                    child: Icon(
+                      i <= _nota
+                          ? CupertinoIcons.star_fill
+                          : CupertinoIcons.star,
+                      color: i <= _nota
+                          ? const Color(0xFF007AFF)
+                          : const Color(0xFFC5C6CC),
+                      size: 30,
+                      semanticLabel: i == 1 ? '1 estrela' : '$i estrelas',
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              CupertinoTextField(
-                placeholder: 'Comentário (opcional)',
-                maxLines: 3,
-                maxLength: 500,
-                enabled: !bloqueado,
-                onChanged: (valor) => _comentario = valor,
-              ),
-              if (vm.erro != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  vm.erro!,
-                  style: const TextStyle(color: CupertinoColors.systemRed),
+                  ),
                 ),
-              ],
             ],
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: vm.enviando
-                  ? null
-                  : () => Navigator.pop(context, vm.avaliada),
-              child: Text(vm.avaliada ? 'Fechar' : 'Agora não'),
-            ),
-            CupertinoDialogAction(
-              isDefaultAction: true,
-              onPressed: bloqueado || _nota == 0 ? null : _enviar,
-              child: Text(vm.enviando ? 'Enviando...' : 'Enviar'),
+          const SizedBox(height: 8),
+          CupertinoTextField(
+            placeholder: 'Comentário (opcional)',
+            maxLines: 3,
+            maxLength: 500,
+            enabled: !bloqueado,
+            onChanged: (valor) => _comentario = valor,
+          ),
+          if (vm.erro != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              vm.erro!,
+              style: const TextStyle(color: CupertinoColors.systemRed),
             ),
           ],
-        );
-      },
+        ],
+      ),
+      actions: [
+        CupertinoDialogAction(
+          onPressed: vm.enviando
+              ? null
+              : () => Navigator.pop(context, vm.avaliada),
+          child: Text(vm.avaliada ? 'Fechar' : 'Agora não'),
+        ),
+        CupertinoDialogAction(
+          isDefaultAction: true,
+          onPressed: bloqueado || _nota == 0 ? null : _enviar,
+          child: Text(vm.enviando ? 'Enviando...' : 'Enviar'),
+        ),
+      ],
     );
   }
 }

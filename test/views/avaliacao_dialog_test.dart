@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -95,6 +97,27 @@ void main() {
 
     expect(avaliada, isFalse);
     verifyZeroInteractions(repository);
+  });
+
+  testWidgets('Voltar do sistema não fecha o diálogo durante o envio', (
+    tester,
+  ) async {
+    final resposta = Completer<void>();
+    envio().thenAnswer((_) => resposta.future);
+    await abrir(tester);
+
+    await tester.tap(find.byKey(const ValueKey('estrela-5')));
+    await tester.pump();
+    await tester.tap(find.text('Enviar'));
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Enviando...'), findsOneWidget);
+    expect(avaliada, isNull);
+
+    resposta.complete();
+    await tester.pumpAndSettle();
+    expect(avaliada, isTrue);
   });
 
   testWidgets('Corrida já avaliada mostra a mensagem e bloqueia o envio', (
