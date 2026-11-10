@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/config/localizacao_atual.dart';
 import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/avaliacao_dialog.dart';
 import 'package:route_pires_flutter/views/aviso_notificacoes.dart';
 import 'package:route_pires_flutter/views/drawer_corrida.dart';
 import 'package:route_pires_flutter/views/drawer_entrega.dart';
@@ -525,6 +526,14 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       if (!mounted) return;
       _limparCorridaSelecionada();
       unawaited(viewModel.carregar());
+      unawaited(
+        avaliarCorrida(
+          context,
+          corridaId: atual.id,
+          doMototaxista: true,
+          nome: atual.passageiroNome,
+        ),
+      );
     } catch (_) {
       if (mounted) {
         _mostrarErroCorrida('Não foi possível finalizar a corrida');

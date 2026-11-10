@@ -9,6 +9,7 @@ import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
+import 'package:route_pires_flutter/views/avaliacao_dialog.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/previsao_chegada.dart';
 import 'package:route_pires_flutter/services/atualizacoes_service.dart';
@@ -37,6 +38,7 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
   String? _motoristaConsultado;
   String? _erro;
   bool _atualizandoStatus = false;
+  late bool _avaliada = _corrida.avaliacaoMototaxistaId != null;
   bool _appAtivo = true;
   bool get _visivel =>
       mounted &&
@@ -121,7 +123,10 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
         _acompanhamento = atual;
         _erro = null;
       });
-      if (_finalizada) _relogio?.cancel();
+      if (_finalizada) {
+        _relogio?.cancel();
+        if (!_cancelada && !_avaliada) unawaited(_avaliar());
+      }
     } on DioException catch (e) {
       if (!mounted || e.type == DioExceptionType.cancel) return;
       _retry.failed(e);
@@ -141,6 +146,16 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
     } finally {
       _atualizandoStatus = false;
     }
+  }
+
+  Future<void> _avaliar() async {
+    final avaliada = await avaliarCorrida(
+      context,
+      corridaId: _corrida.id,
+      doMototaxista: false,
+      nome: _nomeMototaxista,
+    );
+    if (avaliada && mounted) setState(() => _avaliada = true);
   }
 
   Future<void> _buscarMototaxista(String id) async {
@@ -288,6 +303,11 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
               ),
               const SizedBox(height: 8),
             ],
+            if (_finalizada && !_cancelada && !_avaliada)
+              CupertinoButton(
+                onPressed: _avaliar,
+                child: const Text('Avaliar mototaxista'),
+              ),
             if (_finalizada)
               CupertinoButton.filled(
                 onPressed: () => Navigator.pop(context),
