@@ -239,10 +239,8 @@ Future<List<Map<String, dynamic>>> _iniciarSdk(
       home: Corrida(mototaxistaId: 'moto-1', onTituloChanged: (_) {}),
     ),
   );
+  // A corrida em andamento é restaurada e a navegação começa sem toque.
   await _flush(tester);
-  await tester.tap(find.text('Maria'));
-  await _flush(tester);
-  await tester.tap(find.text('Iniciar navegação'));
   await _flush(tester);
   expect(envios.single['pontoAtual'], 0);
   return envios;
@@ -763,6 +761,11 @@ void main() {
         expect(session.consultas, consultas);
         expect(session.remaining.hasListener, isFalse);
         expect(session.arrival.hasListener, isFalse);
+        // Só a corrida finalizada leva o mototaxista a avaliar o passageiro.
+        expect(
+          find.text('Avaliar passageiro'),
+          cancelar ? findsNothing : findsOneWidget,
+        );
         await tester.pumpWidget(const SizedBox());
         await _flush(tester);
       },
