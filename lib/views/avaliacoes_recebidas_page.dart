@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/config/api_error.dart';
 import 'package:route_pires_flutter/repositories/avaliacao_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 
 /// Aba "Avaliações": o que o usuário logado recebeu nas corridas finalizadas.
@@ -27,10 +28,23 @@ class _AvaliacoesRecebidasPageState extends State<AvaliacoesRecebidasPage> {
   List<AvaliacaoRecebida>? _avaliacoes;
   String? _erro;
   bool _carregando = false;
+  // A API avisa quando uma corrida é avaliada; a tela não consulta de tempos em tempos.
+  late final AtualizacaoPorEvento _eventos;
+
+  @override
+  void dispose() {
+    _eventos.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _eventos = AtualizacaoPorEvento(
+      aceita: (e) => e.sincronizacao || e.dados['acao'] == 'AVALIADA',
+      atualizar: _carregar,
+      ocupado: () => _carregando,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _carregar());
   }
 

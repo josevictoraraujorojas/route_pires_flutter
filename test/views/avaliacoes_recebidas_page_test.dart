@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/usuario_response.dart';
 import 'package:route_pires_flutter/repositories/avaliacao_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/views/avaliacoes_recebidas_page.dart';
 
@@ -124,6 +125,29 @@ void main() {
         find.textContaining('ainda não recebeu avaliações'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('Aviso de corrida avaliada recarrega a lista', (tester) async {
+      lista().thenAnswer((_) async => []);
+      await abrir(tester);
+
+      lista().thenAnswer(
+        (_) async => [(nota: 5, comentario: null, data: null)],
+      );
+      AtualizacoesService().publicar(const {
+        'tipo': 'CORRIDAS_ATUALIZADAS',
+        'acao': 'ATUALIZADA',
+      });
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('1 avaliação'), findsNothing);
+
+      AtualizacoesService().publicar(const {
+        'tipo': 'CORRIDAS_ATUALIZADAS',
+        'acao': 'AVALIADA',
+      });
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(find.text('1 avaliação'), findsOneWidget);
     });
 
     testWidgets('Erro permite tentar de novo', (tester) async {
