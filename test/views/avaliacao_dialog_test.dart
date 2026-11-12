@@ -89,6 +89,23 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('Estrelas cabem em tela estreita com fonte ampliada', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(280, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await abrir(tester);
+
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('estrela-5')));
+    await tester.pump();
+    expect(acao(tester, 'Enviar'), isNotNull);
+  });
+
   testWidgets('Agora não fecha sem enviar', (tester) async {
     await abrir(tester);
 

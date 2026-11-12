@@ -85,32 +85,36 @@ class _AvaliacaoDialogState extends State<_AvaliacaoDialog> {
                 : 'Como foi a corrida com ${widget.nome}?',
           ),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (var i = 1; i <= 5; i++)
-                Semantics(
-                  selected: i == _nota,
-                  child: CupertinoButton(
-                    key: ValueKey('estrela-$i'),
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(44, 44),
-                    onPressed: bloqueado
-                        ? null
-                        : () => setState(() => _nota = i),
-                    child: Icon(
-                      i <= _nota
-                          ? CupertinoIcons.star_fill
-                          : CupertinoIcons.star,
-                      color: i <= _nota
-                          ? const Color(0xFF007AFF)
-                          : const Color(0xFFC5C6CC),
-                      size: 30,
-                      semanticLabel: i == 1 ? '1 estrela' : '$i estrelas',
+          // Em tela estreita as cinco estrelas encolhem em vez de estourar o diálogo.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 1; i <= 5; i++)
+                  Semantics(
+                    selected: i == _nota,
+                    child: CupertinoButton(
+                      key: ValueKey('estrela-$i'),
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
+                      onPressed: bloqueado
+                          ? null
+                          : () => setState(() => _nota = i),
+                      child: Icon(
+                        i <= _nota
+                            ? CupertinoIcons.star_fill
+                            : CupertinoIcons.star,
+                        color: i <= _nota
+                            ? const Color(0xFF007AFF)
+                            : const Color(0xFFC5C6CC),
+                        size: 30,
+                        semanticLabel: i == 1 ? '1 estrela' : '$i estrelas',
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           CupertinoTextField(
