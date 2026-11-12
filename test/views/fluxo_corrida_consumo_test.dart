@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:route_pires_flutter/config/api_client.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 import 'package:route_pires_flutter/views/fluxo_corrida_page.dart';
 
@@ -117,6 +118,52 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
       await tester.pump(const Duration(milliseconds: 1));
       expect(consultas, ocultas);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'Finalizada sem abrir o acompanhamento sai da busca com a corrida concluída',
+    (tester) async {
+      SolicitacaoCorrida? resultado;
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: Builder(
+            builder: (context) => CupertinoButton(
+              onPressed: () async {
+                resultado = await Navigator.push<SolicitacaoCorrida>(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => const FluxoCorridaPage(
+                      passageiroId: 'p-1',
+                      categoria: CategoriaCorrida.corrida,
+                      origem: ponto,
+                      destino: ponto,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Abrir'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 10));
+      expect(find.text('Acompanhar corrida'), findsOneWidget);
+
+      status = 'FINALIZADO';
+      avisarCorrida();
+      await aguardarEvento(tester);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(resultado?.id, 'c-1');
+      expect(resultado?.status, 'FINALIZADO');
+      expect(find.text('Acompanhar corrida'), findsNothing);
+      expect(find.text('Ana'), findsNothing);
       await tester.pumpWidget(const SizedBox());
     },
   );
