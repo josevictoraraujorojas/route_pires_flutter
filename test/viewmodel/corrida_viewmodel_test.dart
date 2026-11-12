@@ -168,9 +168,19 @@ void main() {
         await viewModel.confirmarNegociacao();
         await viewModel.atualizarSolicitacao();
         await viewModel.atualizarSolicitacao();
-        expect(viewModel.etapa, EtapaCorrida.motoristas);
-        expect(viewModel.corridaCriada, isNull);
+        // Não volta para a busca: a tela sai e mostra a corrida concluída.
+        expect(viewModel.finalizada, isTrue);
+        expect(viewModel.etapa, EtapaCorrida.aceita);
+        expect(viewModel.corridaCriada?.status, 'FINALIZADO');
         expect(consultas, 1);
+        verifyNever(
+          () => mototaxistaRepository.listar(
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            servico: any(named: 'servico'),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        );
       },
     );
 

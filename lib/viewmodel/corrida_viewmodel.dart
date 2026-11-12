@@ -64,6 +64,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   int _versaoAcompanhamento = 0;
   bool _criacaoIncerta = false;
   DateTime? _inicioEspera;
+  bool _finalizada = false;
 
   EtapaCorrida get etapa => _etapa;
   List<MototaxistaResumo> get motoristas => _motoristas;
@@ -80,6 +81,9 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   bool get encerrandoEspera => _encerrandoEspera;
   bool get trocandoMotorista => _trocandoMotorista;
   bool get criacaoIncerta => _criacaoIncerta;
+
+  /// O mototaxista concluiu a corrida enquanto o passageiro estava nesta tela.
+  bool get finalizada => _finalizada;
   bool get podeConsultarSolicitacao => _retryAcompanhamento.canAttempt;
   DateTime? get proximaConsultaSolicitacao => _retryAcompanhamento.nextAttempt;
   int get segundosRestantes {
@@ -339,6 +343,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
 
   Future<void> atualizarSolicitacao() async {
     if ((_etapa != EtapaCorrida.aguardando && _etapa != EtapaCorrida.aceita) ||
+        _finalizada ||
         _atualizandoSolicitacao ||
         _encerrandoEspera ||
         !_retryAcompanhamento.canAttempt) {
@@ -366,10 +371,12 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
       if (status == 'ANDAMENTO') {
         _etapa = EtapaCorrida.aceita;
         avisar();
-      } else if (status == 'CANCELADO' ||
-          status == 'CANCELADA' ||
-          status == 'FINALIZADO' ||
-          status == 'FINALIZADA') {
+      } else if (status == 'FINALIZADO' || status == 'FINALIZADA') {
+        // A tela encerra e mostra a corrida concluída; não volta para a busca.
+        _finalizada = true;
+        _etapa = EtapaCorrida.aceita;
+        avisar();
+      } else if (status == 'CANCELADO' || status == 'CANCELADA') {
         await _voltarALista();
       } else if (status != 'PENDENTE') {
         _erroAcompanhamento =
