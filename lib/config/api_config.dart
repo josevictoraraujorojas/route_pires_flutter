@@ -31,4 +31,6 @@ class ApiConfig {
   static String passageiroResumo(String id) => '$passageiros/$id/resumo';
   static const String corridasPassageiro = '/corridas-passageiro';
   static const String corridaFrete = '/corrida-frete';
+  static const String avaliacoesMototaxista = '/avaliacoes-mototaxista';
+  static const String avaliacoesPassageiro = '/avaliacoes-passageiro';
 }

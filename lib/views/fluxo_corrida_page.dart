@@ -44,8 +44,10 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   late final AtualizacaoPorEvento _eventos;
 
   Timer? _relogio;
+  Timer? _relogioLista;
   bool _tentouEncerrarPrazo = false;
   bool _confirmandoTroca = false;
+  bool _saindo = false;
   bool _mostrarAcompanhamentoNaLista = true;
   Route<void>? _rotaEspera;
   bool _appAtivo = true;
@@ -79,6 +81,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     );
 
     viewModel.addListener(_sincronizarEspera);
+    viewModel.addListener(_sairAoFinalizar);
     _eventos = AtualizacaoPorEvento(
       aceita: (e) =>
           e.corridas &&
@@ -93,6 +96,13 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       proximaTentativa: () => viewModel.proximaConsultaSolicitacao,
     );
     viewModel.iniciar();
+
+    // A busca não fica parada no primeiro resultado: disponibilidade e
+    // distância mudam enquanto o passageiro escolhe.
+    _relogioLista = Timer.periodic(
+      const Duration(seconds: 61),
+      (_) => _atualizarLista(),
+    );
 
     _relogio = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_visivel) return;
@@ -122,10 +132,25 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _relogio?.cancel();
+    _relogioLista?.cancel();
     _eventos.dispose();
     viewModel.removeListener(_sincronizarEspera);
+    viewModel.removeListener(_sairAoFinalizar);
     viewModel.dispose();
     super.dispose();
+  }
+
+  void _atualizarLista() {
+    final escolhendo =
+        viewModel.etapa == EtapaCorrida.motoristas ||
+        viewModel.etapa == EtapaCorrida.aguardando;
+    if (!_visivel ||
+        !escolhendo ||
+        viewModel.carregando ||
+        viewModel.trocandoMotorista) {
+      return;
+    }
+    unawaited(viewModel.buscarMotoristas(manterEtapa: true));
   }
 
   @override
@@ -134,6 +159,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
 
     if (_visivel) {
       unawaited(viewModel.atualizarSolicitacao());
+      _atualizarLista();
     }
   }
 
@@ -152,6 +178,43 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
         Navigator.of(context, rootNavigator: true).removeRoute(rota);
       });
     }
+  }
+
+  SolicitacaoCorrida _solicitacaoAtual({String status = 'ANDAMENTO'}) =>
+      viewModel.solicitacaoAtiva?.copyWith(status: status) ??
+      SolicitacaoCorrida(
+        id: viewModel.corridaCriada!.id,
+        categoria: widget.categoria,
+        status: status,
+        mototaxistaId: viewModel.motoristaSelecionado?.id ?? '',
+        passageiroId: widget.passageiroId,
+        origem: widget.origem,
+        destino: widget.destino,
+        formaPagamento: widget.formaPagamento,
+        descricaoCarga: widget.descricaoCarga,
+        pesoCarga: widget.pesoCarga,
+        cargaFragil: widget.cargaFragil,
+        tempoRestanteSegundos: viewModel.corridaCriada?.tempoRestanteSegundos,
+        distanciaRestanteMetros:
+            viewModel.corridaCriada?.distanciaRestanteMetros,
+        pontoAtual: viewModel.corridaCriada?.pontoAtual,
+        estimativaAtualizadaEm: viewModel.corridaCriada?.estimativaAtualizadaEm,
+      );
+
+  // O mototaxista finalizou sem o passageiro abrir o acompanhamento:
+  // sai da busca e mostra a corrida concluída, que pede a avaliação.
+  void _sairAoFinalizar() {
+    if (!viewModel.finalizada || _saindo) return;
+    _saindo = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final corrida = _solicitacaoAtual(status: 'FINALIZADO');
+      final rota = _rotaEspera;
+      if (rota != null && rota.isActive) {
+        Navigator.of(context, rootNavigator: true).removeRoute(rota);
+      }
+      Navigator.pop(context, corrida);
+    });
   }
 
   void _mostrarEspera() {
@@ -406,32 +469,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
             CupertinoButton.filled(
               onPressed: viewModel.corridaCriada == null
                   ? null
-                  : () => Navigator.pop(
-                      context,
-                      viewModel.solicitacaoAtiva ??
-                          SolicitacaoCorrida(
-                            id: viewModel.corridaCriada!.id,
-                            categoria: widget.categoria,
-                            status: 'ANDAMENTO',
-                            mototaxistaId:
-                                viewModel.motoristaSelecionado?.id ?? '',
-                            passageiroId: widget.passageiroId,
-                            origem: widget.origem,
-                            destino: widget.destino,
-                            formaPagamento: widget.formaPagamento,
-                            descricaoCarga: widget.descricaoCarga,
-                            pesoCarga: widget.pesoCarga,
-                            cargaFragil: widget.cargaFragil,
-                            tempoRestanteSegundos:
-                                viewModel.corridaCriada?.tempoRestanteSegundos,
-                            distanciaRestanteMetros: viewModel
-                                .corridaCriada
-                                ?.distanciaRestanteMetros,
-                            pontoAtual: viewModel.corridaCriada?.pontoAtual,
-                            estimativaAtualizadaEm:
-                                viewModel.corridaCriada?.estimativaAtualizadaEm,
-                          ),
-                    ),
+                  : () => Navigator.pop(context, _solicitacaoAtual()),
               child: const Text('Acompanhar corrida'),
             ),
           ],

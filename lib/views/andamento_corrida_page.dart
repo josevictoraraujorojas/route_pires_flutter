@@ -9,6 +9,7 @@ import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
+import 'package:route_pires_flutter/views/avaliacao_dialog.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/previsao_chegada.dart';
 import 'package:route_pires_flutter/services/atualizacoes_service.dart';
@@ -34,9 +35,12 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
   late String _status;
   late CorridaResponse _acompanhamento;
   String? _nomeMototaxista;
+  String? _placa;
+  String? _modelo;
   String? _motoristaConsultado;
   String? _erro;
   bool _atualizandoStatus = false;
+  late bool _avaliada = _corrida.avaliacaoMototaxistaId != null;
   bool _appAtivo = true;
   bool get _visivel =>
       mounted &&
@@ -66,6 +70,8 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
       if (!mounted) return;
       _buscarMototaxista(_corrida.mototaxistaId);
       _eventos.solicitar();
+      // Aberta já concluída (o mototaxista finalizou antes do acompanhamento).
+      if (_finalizada && !_cancelada && !_avaliada) unawaited(_avaliar());
     });
     _relogio = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_visivel && !_finalizada) {
@@ -121,7 +127,10 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
         _acompanhamento = atual;
         _erro = null;
       });
-      if (_finalizada) _relogio?.cancel();
+      if (_finalizada) {
+        _relogio?.cancel();
+        if (!_cancelada && !_avaliada) unawaited(_avaliar());
+      }
     } on DioException catch (e) {
       if (!mounted || e.type == DioExceptionType.cancel) return;
       _retry.failed(e);
@@ -143,6 +152,16 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
     }
   }
 
+  Future<void> _avaliar() async {
+    final avaliada = await avaliarCorrida(
+      context,
+      corridaId: _corrida.id,
+      doMototaxista: false,
+      nome: _nomeMototaxista,
+    );
+    if (avaliada && mounted) setState(() => _avaliada = true);
+  }
+
   Future<void> _buscarMototaxista(String id) async {
     if (id.isEmpty || id == _motoristaConsultado) return;
     _motoristaConsultado = id;
@@ -151,7 +170,13 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
         id: id,
         cancelToken: _cancelToken,
       );
-      if (mounted) setState(() => _nomeMototaxista = motorista.nome);
+      if (mounted) {
+        setState(() {
+          _nomeMototaxista = motorista.nome;
+          _placa = motorista.placa;
+          _modelo = motorista.modelo;
+        });
+      }
     } catch (_) {
       // O andamento continua disponível mesmo sem o nome do mototaxista.
     }
@@ -261,6 +286,8 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
                 children: [
                   _detalhe('Tipo', _corrida.categoria.label),
                   _detalhe('Mototaxista', _nomeMototaxista ?? 'Mototaxista'),
+                  if (_modelo != null) _detalhe('Moto', _modelo!),
+                  if (_placa != null) _detalhe('Placa', _placa!),
                   _detalheEndereco('Origem', _corrida.origem),
                   _detalheEndereco('Destino', _corrida.destino),
                   _detalhe('Pagamento', _pagamento),
@@ -288,6 +315,11 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
               ),
               const SizedBox(height: 8),
             ],
+            if (_finalizada && !_cancelada && !_avaliada)
+              CupertinoButton(
+                onPressed: _avaliar,
+                child: const Text('Avaliar mototaxista'),
+              ),
             if (_finalizada)
               CupertinoButton.filled(
                 onPressed: () => Navigator.pop(context),

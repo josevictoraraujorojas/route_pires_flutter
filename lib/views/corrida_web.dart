@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/avaliacao_dialog.dart';
 import 'package:route_pires_flutter/views/aviso_notificacoes.dart';
 import 'package:route_pires_flutter/views/endereco_corrida.dart';
 import 'package:route_pires_flutter/views/lista_passageiros.dart';
@@ -134,6 +135,21 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
     );
   }
 
+  Future<bool> _finalizar(SolicitacaoCorrida solicitacao) async {
+    final finalizou = await _viewModel!.finalizar(solicitacao);
+    if (finalizou && mounted) {
+      unawaited(
+        avaliarCorrida(
+          context,
+          corridaId: solicitacao.id,
+          doMototaxista: true,
+          nome: solicitacao.passageiroNome,
+        ),
+      );
+    }
+    return finalizou;
+  }
+
   Future<void> _cancelar(SolicitacaoCorrida solicitacao) async {
     final viewModel = _viewModel;
     if (viewModel == null ||
@@ -224,7 +240,7 @@ class _CorridaWebState extends State<Corrida> with WidgetsBindingObserver {
               ? null
               : () => _executar(
                   () => emAndamento
-                      ? viewModel.finalizar(solicitacao)
+                      ? _finalizar(solicitacao)
                       : viewModel.aceitar(solicitacao),
                 ),
           child: Text(emAndamento ? 'Finalizar corrida' : 'Iniciar corrida'),

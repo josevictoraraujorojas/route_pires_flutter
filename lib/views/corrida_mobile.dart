@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/config/localizacao_atual.dart';
 import 'package:route_pires_flutter/config/api_retry.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
+import 'package:route_pires_flutter/views/avaliacao_dialog.dart';
 import 'package:route_pires_flutter/views/aviso_notificacoes.dart';
 import 'package:route_pires_flutter/views/drawer_corrida.dart';
 import 'package:route_pires_flutter/views/drawer_entrega.dart';
@@ -525,6 +526,14 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
       if (!mounted) return;
       _limparCorridaSelecionada();
       unawaited(viewModel.carregar());
+      unawaited(
+        avaliarCorrida(
+          context,
+          corridaId: atual.id,
+          doMototaxista: true,
+          nome: atual.passageiroNome,
+        ),
+      );
     } catch (_) {
       if (mounted) {
         _mostrarErroCorrida('Não foi possível finalizar a corrida');
@@ -1140,32 +1149,50 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton.filled(
-                      onPressed:
-                          iniciandoNavegacao ||
-                              (solicitacoesViewModel?.atualizandoStatus ??
-                                  false)
-                          ? null
-                          : finalizarNavegacao,
-                      child: const Text(
-                        'Finalizar corrida',
-                        style: TextStyle(color: CupertinoColors.white),
+                  // Lado a lado e baixos, para não cobrir o mapa da navegação.
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CupertinoButton(
+                          color: CupertinoColors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 36),
+                          onPressed:
+                              iniciandoNavegacao ||
+                                  (solicitacoesViewModel?.atualizandoStatus ??
+                                      false)
+                              ? null
+                              : cancelarSolicitacao,
+                          child: const Text(
+                            'Cancelar corrida',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: CupertinoColors.systemRed,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton(
-                      onPressed:
-                          iniciandoNavegacao ||
-                              (solicitacoesViewModel?.atualizandoStatus ??
-                                  false)
-                          ? null
-                          : cancelarSolicitacao,
-                      child: const Text('Cancelar corrida'),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: CupertinoButton.filled(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 36),
+                          onPressed:
+                              iniciandoNavegacao ||
+                                  (solicitacoesViewModel?.atualizandoStatus ??
+                                      false)
+                              ? null
+                              : finalizarNavegacao,
+                          child: const Text(
+                            'Finalizar corrida',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: CupertinoColors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

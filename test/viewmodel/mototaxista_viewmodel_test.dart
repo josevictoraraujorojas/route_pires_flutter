@@ -28,6 +28,9 @@ void main() {
       renavam: '12345678901',
       modelo: 'Honda CG 160',
       ano: '2024',
+      precoZonaUrbana: 8,
+      precoBairrosAfastados: 12,
+      precoBandeira2: 10,
     );
   });
 
@@ -46,6 +49,9 @@ void main() {
           renavam: mototaxista.renavam,
           modelo: mototaxista.modelo,
           ano: mototaxista.ano,
+          precoZonaUrbana: mototaxista.precoZonaUrbana,
+          precoBairrosAfastados: mototaxista.precoBairrosAfastados,
+          precoBandeira2: mototaxista.precoBandeira2,
         );
 
         final resultado = await viewModel.cadastrar(fraco);
@@ -185,7 +191,7 @@ void main() {
       expect(resultado, isFalse);
       expect(
         viewModel.erro,
-        equals('Ocorreu um erro inesperado ao realizar o cadastro'),
+        equals('Ocorreu um erro inesperado ao realizar o cadastro.'),
       );
     });
   });

@@ -22,6 +22,8 @@ class SolicitacaoCorrida {
     this.distanciaRestanteMetros,
     this.pontoAtual,
     this.estimativaAtualizadaEm,
+    this.avaliacaoMototaxistaId,
+    this.avaliacaoPassageiroId,
   });
 
   final String id;
@@ -42,6 +44,8 @@ class SolicitacaoCorrida {
   final double? distanciaRestanteMetros;
   final int? pontoAtual;
   final DateTime? estimativaAtualizadaEm;
+  final String? avaliacaoMototaxistaId;
+  final String? avaliacaoPassageiroId;
 
   CorridaResponse get acompanhamento => CorridaResponse(
     id: id,
@@ -55,6 +59,11 @@ class SolicitacaoCorrida {
   );
 
   bool get ehEntrega => categoria != CategoriaCorrida.corrida;
+
+  /// Só corrida finalizada e ainda sem avaliação feita por este lado.
+  bool podeAvaliar({required bool doMototaxista}) =>
+      status.toUpperCase() == 'FINALIZADO' &&
+      (doMototaxista ? avaliacaoPassageiroId : avaliacaoMototaxistaId) == null;
 
   factory SolicitacaoCorrida.fromJson(
     Map<String, dynamic> json, {
@@ -98,6 +107,8 @@ class SolicitacaoCorrida {
       distanciaRestanteMetros: acompanhamento.distanciaRestanteMetros,
       pontoAtual: acompanhamento.pontoAtual,
       estimativaAtualizadaEm: acompanhamento.estimativaAtualizadaEm,
+      avaliacaoMototaxistaId: json['avaliacaoMototaxistaId']?.toString(),
+      avaliacaoPassageiroId: json['avaliacaoPassageiroId']?.toString(),
     );
   }
 
@@ -134,6 +145,8 @@ class SolicitacaoCorrida {
       estimativaAtualizadaEm: acompanhamento == null
           ? estimativaAtualizadaEm
           : acompanhamento.estimativaAtualizadaEm,
+      avaliacaoMototaxistaId: avaliacaoMototaxistaId,
+      avaliacaoPassageiroId: avaliacaoPassageiroId,
     );
   }
 
