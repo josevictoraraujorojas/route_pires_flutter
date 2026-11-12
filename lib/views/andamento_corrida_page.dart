@@ -35,6 +35,8 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
   late String _status;
   late CorridaResponse _acompanhamento;
   String? _nomeMototaxista;
+  String? _placa;
+  String? _modelo;
   String? _motoristaConsultado;
   String? _erro;
   bool _atualizandoStatus = false;
@@ -68,6 +70,8 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
       if (!mounted) return;
       _buscarMototaxista(_corrida.mototaxistaId);
       _eventos.solicitar();
+      // Aberta já concluída (o mototaxista finalizou antes do acompanhamento).
+      if (_finalizada && !_cancelada && !_avaliada) unawaited(_avaliar());
     });
     _relogio = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_visivel && !_finalizada) {
@@ -166,7 +170,13 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
         id: id,
         cancelToken: _cancelToken,
       );
-      if (mounted) setState(() => _nomeMototaxista = motorista.nome);
+      if (mounted) {
+        setState(() {
+          _nomeMototaxista = motorista.nome;
+          _placa = motorista.placa;
+          _modelo = motorista.modelo;
+        });
+      }
     } catch (_) {
       // O andamento continua disponível mesmo sem o nome do mototaxista.
     }
@@ -276,6 +286,8 @@ class _AndamentoCorridaPageState extends State<AndamentoCorridaPage>
                 children: [
                   _detalhe('Tipo', _corrida.categoria.label),
                   _detalhe('Mototaxista', _nomeMototaxista ?? 'Mototaxista'),
+                  if (_modelo != null) _detalhe('Moto', _modelo!),
+                  if (_placa != null) _detalhe('Placa', _placa!),
                   _detalheEndereco('Origem', _corrida.origem),
                   _detalheEndereco('Destino', _corrida.destino),
                   _detalhe('Pagamento', _pagamento),
