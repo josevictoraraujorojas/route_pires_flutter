@@ -1149,32 +1149,50 @@ class _CorridaState extends State<Corrida> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton.filled(
-                      onPressed:
-                          iniciandoNavegacao ||
-                              (solicitacoesViewModel?.atualizandoStatus ??
-                                  false)
-                          ? null
-                          : finalizarNavegacao,
-                      child: const Text(
-                        'Finalizar corrida',
-                        style: TextStyle(color: CupertinoColors.white),
+                  // Lado a lado e baixos, para não cobrir o mapa da navegação.
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CupertinoButton(
+                          color: CupertinoColors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 36),
+                          onPressed:
+                              iniciandoNavegacao ||
+                                  (solicitacoesViewModel?.atualizandoStatus ??
+                                      false)
+                              ? null
+                              : cancelarSolicitacao,
+                          child: const Text(
+                            'Cancelar corrida',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: CupertinoColors.systemRed,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton(
-                      onPressed:
-                          iniciandoNavegacao ||
-                              (solicitacoesViewModel?.atualizandoStatus ??
-                                  false)
-                          ? null
-                          : cancelarSolicitacao,
-                      child: const Text('Cancelar corrida'),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: CupertinoButton.filled(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 36),
+                          onPressed:
+                              iniciandoNavegacao ||
+                                  (solicitacoesViewModel?.atualizandoStatus ??
+                                      false)
+                              ? null
+                              : finalizarNavegacao,
+                          child: const Text(
+                            'Finalizar corrida',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: CupertinoColors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
