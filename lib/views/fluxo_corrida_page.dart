@@ -8,6 +8,7 @@ import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/corrida_viewmodel.dart';
+import 'package:route_pires_flutter/views/animacao_busca.dart';
 import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/previsao_chegada.dart';
 import 'package:route_pires_flutter/services/atualizacoes_service.dart';
@@ -564,12 +565,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       }
 
       return Center(
-        child: Image.asset(
-          'assets/images/img_busca.png',
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.contain,
-        ),
+        child: const AnimacaoBusca(),
       );
     }
 
