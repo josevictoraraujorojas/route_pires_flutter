@@ -8,6 +8,7 @@ class EventoAtualizacao {
   String? get chatId => dados['chatId'] as String?;
   String? get corridaId => dados['corridaId'] as String?;
   bool get sincronizacao => dados['tipo'] == 'SINCRONIZAR';
+  bool get mototaxistas => sincronizacao || dados['tipo'] == 'MOTOTAXISTAS_ATUALIZADOS';
   bool get corridas => sincronizacao || dados['tipo'] == 'CORRIDAS_ATUALIZADAS';
   bool get chats =>
       sincronizacao ||
