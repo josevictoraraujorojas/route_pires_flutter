@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'
@@ -43,6 +45,26 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     with WidgetsBindingObserver {
   late final CorridaViewModel viewModel;
   late final AtualizacaoPorEvento _eventos;
+  late final AtualizacaoPorEvento _eventosMotoristas;
+  bool _topicoInscrito = false;
+  Future<void> _filaTopico = Future.value();
+  bool get _buscaAtiva => viewModel.etapa == EtapaCorrida.motoristas || viewModel.etapa == EtapaCorrida.negociacao;
+
+  void _sincronizarTopico() {
+    if (kIsWeb || !const {TargetPlatform.android, TargetPlatform.iOS}.contains(defaultTargetPlatform)) return;
+    _filaTopico = _filaTopico.then((_) async {
+      final deveInscrever = mounted && !_saindo && _buscaAtiva;
+      if (deveInscrever == _topicoInscrito) return;
+      try {
+        if (deveInscrever) {
+          await FirebaseMessaging.instance.subscribeToTopic('mototaxistas_atualizados');
+        } else {
+          await FirebaseMessaging.instance.unsubscribeFromTopic('mototaxistas_atualizados');
+        }
+        _topicoInscrito = deveInscrever;
+      } catch (_) { /* O timer continua funcionando sem FCM. */ }
+    });
+  }
 
   Timer? _relogio;
   Timer? _relogioLista;
@@ -96,12 +118,24 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
               viewModel.etapa == EtapaCorrida.aceita),
       proximaTentativa: () => viewModel.proximaConsultaSolicitacao,
     );
+    _eventosMotoristas = AtualizacaoPorEvento(
+      aceita: (e) => e.mototaxistas && _buscaAtiva,
+      atualizar: () async {
+        if (_buscaAtiva && _visivel) {
+          await viewModel.buscarMotoristas(manterEtapa: true);
+        }
+      },
+      ocupado: () => viewModel.carregando || viewModel.carregandoCriacao,
+      proximaTentativa: () => viewModel.proximaConsultaMotoristas,
+    );
+    viewModel.addListener(_sincronizarTopico);
     viewModel.iniciar();
+    _sincronizarTopico();
 
     // A busca não fica parada no primeiro resultado: disponibilidade e
     // distância mudam enquanto o passageiro escolhe.
     _relogioLista = Timer.periodic(
-      const Duration(seconds: 61),
+      const Duration(seconds: 15),
       (_) => _atualizarLista(),
     );
 
@@ -135,6 +169,10 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     _relogio?.cancel();
     _relogioLista?.cancel();
     _eventos.dispose();
+    _eventosMotoristas.dispose();
+    _saindo = true;
+    viewModel.removeListener(_sincronizarTopico);
+    _sincronizarTopico();
     viewModel.removeListener(_sincronizarEspera);
     viewModel.removeListener(_sairAoFinalizar);
     viewModel.dispose();
@@ -144,10 +182,12 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   void _atualizarLista() {
     final escolhendo =
         viewModel.etapa == EtapaCorrida.motoristas ||
-        viewModel.etapa == EtapaCorrida.aguardando;
+        viewModel.etapa == EtapaCorrida.aguardando ||
+        viewModel.etapa == EtapaCorrida.negociacao;
     if (!_visivel ||
         !escolhendo ||
         viewModel.carregando ||
+        viewModel.carregandoCriacao ||
         viewModel.trocandoMotorista) {
       return;
     }
@@ -619,6 +659,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     }
 
     if (lista.isEmpty) {
+      if (motoristas == null) return const Center(child: AnimacaoBusca());
       return Center(
         child: Text(
           mensagemVazia,
