@@ -309,6 +309,15 @@ class NotificacoesService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _receber(RemoteMessage message, {bool abrir = false}) {
     final dados = message.data;
+    if (dados['tipo'] == 'MOTOTAXISTAS_ATUALIZADOS') {
+      if (_usuarioId != null &&
+          dados['versao'] == '1' &&
+          dados['eventoId'] is String &&
+          dados.values.every((valor) => valor is String)) {
+        _atualizacoes.publicar(const {'tipo': 'MOTOTAXISTAS_ATUALIZADOS'});
+      }
+      return;
+    }
     if (abrir) _abrir(dados);
     if (!_valido(dados)) return;
     final eventoId = dados['eventoId'] as String?;
