@@ -6,6 +6,7 @@ import 'package:route_pires_flutter/model/corrida_response.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
 
 class MockCorridaRepository extends Mock implements CorridaRepository {}
@@ -56,7 +57,7 @@ void main() {
       mototaxistaId: 'moto-1',
       repository: repository,
     );
-    viewModel.configurarPolling(online: true);
+    viewModel.configurarConsultas(online: true);
   });
   tearDown(descartar);
 
@@ -109,12 +110,23 @@ void main() {
       tester,
     ) async {
       mockCarregar();
-      await viewModel.carregar();
+      descartar();
+      // Criado aqui para os timers usarem o tempo simulado do teste.
+      final tela = SolicitacoesViewModel(
+        mototaxistaId: 'moto-1',
+        repository: repository,
+      );
+      addTearDown(tela.dispose);
+      // Mesma ordem das telas: a abertura não gera uma segunda consulta.
+      final abertura = tela.carregar();
+      tela.configurarConsultas(online: true);
+      await abertura;
       var avisos = 0;
-      viewModel.addListener(() => avisos++);
-      viewModel.iniciarAtualizacaoAutomatica();
+      tela.addListener(() => avisos++);
 
-      await tester.pump(const Duration(seconds: 15));
+      await tester.pump(const Duration(minutes: 1));
+      AtualizacoesService().publicar(const {'tipo': 'CORRIDAS_ATUALIZADAS'});
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
 
       verify(
@@ -124,8 +136,7 @@ void main() {
         ),
       ).called(2);
       expect(avisos, 0);
-      expect(viewModel.revisaoLista, 1);
-      descartar();
+      expect(tela.revisaoLista, 1);
     });
 
     test('Deve carregar solicitações pendentes do mototaxista', () async {
@@ -152,8 +163,9 @@ void main() {
       },
     );
 
-    test('Mantém o passageiro durante uma resposta vazia isolada', () async {
+    test('Resposta vazia só remove o que a API confirmar encerrado', () async {
       var consulta = 0;
+      var status = 'PENDENTE';
       when(
         () => repository.listarPendentes(
           mototaxistaId: any(named: 'mototaxistaId'),
@@ -161,10 +173,7 @@ void main() {
         ),
       ).thenAnswer((_) async {
         consulta++;
-        return switch (consulta) {
-          1 || 3 => [solicitacao],
-          _ => <SolicitacaoCorrida>[],
-        };
+        return consulta == 1 ? [solicitacao] : <SolicitacaoCorrida>[];
       });
       when(
         () => repository.buscarPorId(
@@ -173,20 +182,14 @@ void main() {
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
-        (_) async =>
-            const CorridaResponse(id: 'solicitacao-1', status: 'CANCELADO'),
+        (_) async => CorridaResponse(id: 'solicitacao-1', status: status),
       );
 
       await viewModel.carregar();
       await viewModel.carregar(silenciosa: true);
       expect(viewModel.solicitacoes, hasLength(1));
 
-      await viewModel.carregar(silenciosa: true);
-      expect(viewModel.solicitacoes, hasLength(1));
-
-      await viewModel.carregar(silenciosa: true);
-      expect(viewModel.solicitacoes, hasLength(1));
-
+      status = 'CANCELADO';
       await viewModel.carregar(silenciosa: true);
       expect(viewModel.solicitacoes, isEmpty);
     });
@@ -224,7 +227,7 @@ void main() {
           id: 'solicitacao-1',
           cancelToken: any(named: 'cancelToken'),
         ),
-      ).called(1);
+      ).called(2);
     });
 
     test(

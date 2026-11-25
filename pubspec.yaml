@@ -29,7 +29,6 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   jwt_decoder: ^2.0.1
-  stomp_dart_client: ^2.1.0
   google_fonts: ^8.2.1
   dio: ^5.7.0
   latlong2: ^0.10.1
@@ -47,6 +46,11 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   shared_preferences: ^2.5.5
   intl: ^0.20.3
+  firebase_core: ^5.1.0
+  firebase_messaging: ^17.0.1
+  flutter_local_notifications: ^22.3.3
+  connectivity_plus: ^7.3.1
+  web: ^1.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -58,6 +62,28 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  image_path: assets/images/icon_route_pires.png
+  android: true
+  adaptive_icon_background: "#0868B4"
+  adaptive_icon_foreground: assets/images/icon_route_pires.png
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#0868B4"
+  web:
+    generate: true
+    image_path: assets/images/icon_route_pires.png
+    background_color: "#0868B4"
+    theme_color: "#0868B4"
+  windows:
+    generate: true
+    image_path: assets/images/icon_route_pires.png
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: assets/images/icon_route_pires.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

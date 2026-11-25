@@ -64,6 +64,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   int _versaoAcompanhamento = 0;
   bool _criacaoIncerta = false;
   DateTime? _inicioEspera;
+  bool _finalizada = false;
 
   EtapaCorrida get etapa => _etapa;
   List<MototaxistaResumo> get motoristas => _motoristas;
@@ -80,7 +81,12 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
   bool get encerrandoEspera => _encerrandoEspera;
   bool get trocandoMotorista => _trocandoMotorista;
   bool get criacaoIncerta => _criacaoIncerta;
+
+  /// O mototaxista concluiu a corrida enquanto o passageiro estava nesta tela.
+  bool get finalizada => _finalizada;
+  DateTime? get proximaConsultaMotoristas => _retryLista.nextAttempt;
   bool get podeConsultarSolicitacao => _retryAcompanhamento.canAttempt;
+  DateTime? get proximaConsultaSolicitacao => _retryAcompanhamento.nextAttempt;
   int get segundosRestantes {
     final inicio = _inicioEspera;
     if (inicio == null) return prazoAceite.inSeconds;
@@ -223,12 +229,24 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
       final lista = await _mototaxistaRepository.listar(
         latitude: origem.latitude,
         longitude: origem.longitude,
+        servico: categoria == CategoriaCorrida.corrida
+            ? 'TRANSPORTE_PASSAGEIRO'
+            : 'FRETE',
         cancelToken: _cancelLista,
       );
       _retryLista.succeeded();
       _motoristas = lista
           .where((mototaxista) => mototaxista.disponivel)
           .toList();
+      final selecionado = _motoristaSelecionado;
+      if (_etapa == EtapaCorrida.negociacao &&
+          !_carregandoCriacao &&
+          selecionado != null &&
+          !_motoristas.any((m) => m.id == selecionado.id)) {
+        _motoristaSelecionado = null;
+        _erroCriacao = 'O mototaxista não está mais disponível';
+        _etapa = EtapaCorrida.motoristas;
+      }
     } on DioException catch (e) {
       if (_foiCancelado(e)) return;
       _retryLista.failed(e);
@@ -253,6 +271,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
     if (_carregandoCriacao || _trocandoMotorista || _corridaCriada != null) {
       return;
     }
+    if (!_motoristas.any((m) => m.id == mototaxista.id)) return;
     _motoristaSelecionado = mototaxista;
     _erroCriacao = null;
     _etapa = EtapaCorrida.negociacao;
@@ -311,6 +330,14 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
       return !foiDisposed;
     } on DioException catch (e) {
       if (_foiCancelado(e)) return false;
+      if (e.response?.statusCode == 409) {
+        _motoristaSelecionado = null;
+        _motoristas = _motoristas.where((m) => m.id != mototaxista.id).toList();
+        _etapa = EtapaCorrida.motoristas;
+        _erroCriacao = 'O mototaxista não está mais disponível';
+        await buscarMotoristas(manterEtapa: true);
+        return false;
+      }
       _criacaoIncerta = e.response == null;
       _erroCriacao = _criacaoIncerta
           ? 'Não foi possível confirmar o envio. Verifique suas corridas antes de tentar novamente.'
@@ -335,6 +362,7 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
 
   Future<void> atualizarSolicitacao() async {
     if ((_etapa != EtapaCorrida.aguardando && _etapa != EtapaCorrida.aceita) ||
+        _finalizada ||
         _atualizandoSolicitacao ||
         _encerrandoEspera ||
         !_retryAcompanhamento.canAttempt) {
@@ -362,10 +390,12 @@ class CorridaViewModel extends ChangeNotifier with SafeChangeNotifier {
       if (status == 'ANDAMENTO') {
         _etapa = EtapaCorrida.aceita;
         avisar();
-      } else if (status == 'CANCELADO' ||
-          status == 'CANCELADA' ||
-          status == 'FINALIZADO' ||
-          status == 'FINALIZADA') {
+      } else if (status == 'FINALIZADO' || status == 'FINALIZADA') {
+        // A tela encerra e mostra a corrida concluída; não volta para a busca.
+        _finalizada = true;
+        _etapa = EtapaCorrida.aceita;
+        avisar();
+      } else if (status == 'CANCELADO' || status == 'CANCELADA') {
         await _voltarALista();
       } else if (status != 'PENDENTE') {
         _erroAcompanhamento =

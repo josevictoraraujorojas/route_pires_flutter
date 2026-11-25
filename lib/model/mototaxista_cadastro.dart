@@ -11,6 +11,7 @@ class MototaxistaCadastro {
   final String renavam;
   final String modelo;
   final String ano;
+  final List<String> servicosOferecidos;
 
   // Preços das corridas, em reais.
   final double precoZonaUrbana;
@@ -28,6 +29,7 @@ class MototaxistaCadastro {
     required this.renavam,
     required this.modelo,
     required this.ano,
+    this.servicosOferecidos = const [],
     required this.precoZonaUrbana,
     required this.precoBairrosAfastados,
     required this.precoBandeira2,
@@ -51,7 +53,7 @@ class MototaxistaCadastro {
         'modelo': modelo,
         'ano': int.parse(ano),
       },
-      'servicosOferecidos': [],
+      'servicosOferecidos': servicosOferecidos,
       'cnh': cnh,
       'dataValidade': dataValidade,
 
@@ -74,6 +76,7 @@ class MototaxistaRascunho {
   String renavam = '';
   String modelo = '';
   String ano = '';
+  Set<String> servicosOferecidos = <String>{};
 
   // Guardamos os preços como texto enquanto o usuário preenche o formulário.
   String precoZonaUrbana = '';
@@ -94,6 +97,9 @@ class MototaxistaRascunho {
   }
 
   MototaxistaCadastro paraCadastro() {
+    if (servicosOferecidos.isEmpty) {
+      throw const FormatException('Selecione pelo menos um serviço oferecido.');
+    }
     return MototaxistaCadastro(
       nome: nome,
       email: email,
@@ -105,6 +111,7 @@ class MototaxistaRascunho {
       renavam: renavam,
       modelo: modelo,
       ano: ano,
+      servicosOferecidos: servicosOferecidos.toList(),
       precoZonaUrbana: _converterPreco(precoZonaUrbana),
       precoBairrosAfastados: _converterPreco(precoBairrosAfastados),
       precoBandeira2: _converterPreco(precoBandeira2),

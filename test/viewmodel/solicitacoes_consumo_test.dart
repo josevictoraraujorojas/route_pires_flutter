@@ -4,12 +4,23 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 import 'package:route_pires_flutter/viewmodel/solicitacoes_viewmodel.dart';
 
 class _Dio extends Mock implements Dio {}
 
+void _avisarCorrida() => AtualizacoesService().publicar(const {
+  'tipo': 'CORRIDAS_ATUALIZADAS',
+  'corridaId': 'c-1',
+});
+
+Future<void> _aguardarEvento(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump();
+}
+
 void main() {
-  testWidgets('Offline faz bootstrap uma vez e online consulta a cada 15 s', (
+  testWidgets('Offline faz bootstrap uma vez; online só consulta por evento', (
     tester,
   ) async {
     final dio = _Dio();
@@ -32,25 +43,31 @@ void main() {
       repository: CorridaRepository(dio: dio),
     );
 
-    vm.configurarPolling(online: false);
+    vm.configurarConsultas(online: false);
     await vm.carregar();
-    vm.iniciarAtualizacaoAutomatica();
     await tester.pump(const Duration(seconds: 45));
     expect(chamadas, 2);
-    vm.configurarPolling(online: true);
-    await tester.pump(const Duration(seconds: 14));
+    _avisarCorrida();
+    await _aguardarEvento(tester);
     expect(chamadas, 2);
+    vm.configurarConsultas(online: true);
     await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump();
     expect(chamadas, 4);
-    vm.configurarPolling(online: true, ativa: false);
+    await tester.pump(const Duration(minutes: 5));
+    expect(chamadas, 4);
+    _avisarCorrida();
+    await _aguardarEvento(tester);
+    expect(chamadas, 6);
+    vm.configurarConsultas(online: true, ativa: false);
+    _avisarCorrida();
     await tester.pump(const Duration(seconds: 30));
-    expect(chamadas, 4);
+    expect(chamadas, 6);
     vm.dispose();
   });
 
   testWidgets(
-    'Bootstrap retoma atendimento offline e consulta apenas a cada 30 s',
+    'Bootstrap retoma atendimento offline e só consulta de novo por evento',
     (tester) async {
       final dio = _Dio();
       var chamadas = 0;
@@ -81,12 +98,12 @@ void main() {
         repository: CorridaRepository(dio: dio),
       );
 
-      vm.configurarPolling(online: false);
+      vm.configurarConsultas(online: false);
       await vm.carregar();
-      await tester.pump(const Duration(seconds: 29));
+      await tester.pump(const Duration(minutes: 5));
       expect(chamadas, 2);
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pump(const Duration(milliseconds: 1));
+      _avisarCorrida();
+      await _aguardarEvento(tester);
       expect(chamadas, 4);
       vm.dispose();
     },
@@ -122,18 +139,62 @@ void main() {
       repository: CorridaRepository(dio: dio),
     );
 
-    vm.configurarPolling(online: true);
+    vm.configurarConsultas(online: true);
     await vm.carregar();
-    vm.pararAtualizacaoAutomatica();
-    vm.configurarPolling(online: true);
+    vm.configurarConsultas(online: true, ativa: false);
+    vm.configurarConsultas(online: true);
     await vm.carregar(silenciosa: true);
     await vm.carregar();
     expect(chamadas, 2);
     vm.dispose();
   });
 
+  testWidgets('Consulta que falhou tenta de novo até dar certo e para', (
+    tester,
+  ) async {
+    final dio = _Dio();
+    var chamadas = 0;
+    var agora = DateTime(2026);
+    when(
+      () => dio.get<dynamic>(
+        any(),
+        queryParameters: any(named: 'queryParameters'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((call) async {
+      chamadas++;
+      final request = RequestOptions(path: '');
+      if (chamadas <= 2) {
+        throw DioException(
+          requestOptions: request,
+          response: Response(requestOptions: request, statusCode: 500),
+        );
+      }
+      return Response(requestOptions: request, data: []);
+    });
+    final vm = SolicitacoesViewModel(
+      mototaxistaId: 'm-1',
+      repository: CorridaRepository(dio: dio),
+      clock: () => agora,
+    );
+    vm.configurarConsultas(online: true);
+    await vm.carregar();
+    expect(vm.erro, isNotNull);
+    await tester.pump(const Duration(seconds: 29));
+    expect(chamadas, 2);
+    agora = agora.add(const Duration(seconds: 31));
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    expect(chamadas, 4);
+    expect(vm.erro, isNull);
+    agora = agora.add(const Duration(minutes: 10));
+    await tester.pump(const Duration(minutes: 10));
+    expect(chamadas, 4);
+    vm.dispose();
+  });
+
   testWidgets(
-    'Polling não inicia outra consulta enquanto a anterior aguarda a rede',
+    'Evento não inicia outra consulta enquanto a anterior aguarda a rede',
     (tester) async {
       final dio = _Dio();
       var consultas = 0;
@@ -153,10 +214,13 @@ void main() {
         mototaxistaId: 'm-1',
         repository: CorridaRepository(dio: dio),
       );
-      vm.configurarPolling(online: true);
+      vm.configurarConsultas(online: true);
       final primeira = vm.carregar();
       await tester.pump();
       await vm.carregar();
+      expect(consultas, 2);
+      _avisarCorrida();
+      await tester.pump(const Duration(seconds: 15));
       expect(consultas, 2);
       inicial.complete(
         Response(
@@ -165,8 +229,9 @@ void main() {
         ),
       );
       await primeira;
-      await tester.pump(const Duration(seconds: 15));
+      await _aguardarEvento(tester);
       expect(consultas, 4);
+      _avisarCorrida();
       await tester.pump(const Duration(seconds: 30));
       expect(consultas, 4);
       proxima.complete(
@@ -226,14 +291,13 @@ void main() {
         mototaxistaId: 'm-1',
         repository: CorridaRepository(dio: dio),
       );
-      vm.configurarPolling(online: true);
+      vm.configurarConsultas(online: true);
       await vm.carregar();
       vazia = true;
       await vm.carregar(silenciosa: true);
+      expect(chamadas, 5);
       await vm.carregar(silenciosa: true);
-      expect(chamadas, 7);
-      await vm.carregar(silenciosa: true);
-      expect(chamadas, 7);
+      expect(chamadas, 5);
       expect(vm.solicitacoes.single.id, 'c-1');
       vm.dispose();
     },

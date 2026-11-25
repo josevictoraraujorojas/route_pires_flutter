@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:route_pires_flutter/config/api_client.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 import 'package:route_pires_flutter/views/andamento_corrida_page.dart';
 
 void main() {
@@ -65,14 +66,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  testWidgets('Polling atualiza previsão quando somente as métricas mudam', (
+  void avisarCorrida() => AtualizacoesService().publicar(const {
+    'tipo': 'CORRIDAS_ATUALIZADAS',
+    'corridaId': 'corrida-1',
+  });
+
+  testWidgets('Evento atualiza previsão quando somente as métricas mudam', (
     tester,
   ) async {
     await abrir(tester);
-    await tester.pump(const Duration(seconds: 14));
-    await tester.pump();
-    expect(consultas, 0);
-    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pump();
     expect(consultas, 1);
     expect(find.text('2 min • 900 m'), findsOneWidget);
@@ -80,8 +83,13 @@ void main() {
 
     resposta['tempoRestanteSegundos'] = 60;
     resposta['distanciaRestanteMetros'] = 400.0;
-    await tester.pump(const Duration(seconds: 15));
+    await tester.pump(const Duration(minutes: 1));
     await tester.pump();
+    expect(consultas, 1);
+    avisarCorrida();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(consultas, 2);
     expect(find.text('1 min • 400 m'), findsOneWidget);
     expect(find.text('2 min • 900 m'), findsNothing);
     await tester.pumpWidget(const SizedBox());
@@ -129,12 +137,15 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('Finalização encerra polling e remove previsão', (tester) async {
+  testWidgets('Finalização encerra consultas e remove previsão', (
+    tester,
+  ) async {
     await abrir(tester);
     resposta['status'] = 'FINALIZADO';
     await tester.pump(const Duration(seconds: 15));
     await tester.pump();
     final antes = consultas;
+    avisarCorrida();
     await tester.pump(const Duration(seconds: 15));
     await tester.pump();
     expect(consultas, antes);
@@ -160,12 +171,13 @@ void main() {
       CupertinoPageRoute<void>(builder: (_) => const Text('Outra tela')),
     );
     await tester.pumpAndSettle();
+    avisarCorrida();
     await tester.pump(const Duration(seconds: 30));
     await tester.pump();
     expect(consultas, antes);
     navigator.pop();
     await tester.pumpAndSettle();
-    await tester.pump(const Duration(seconds: 15));
+    await tester.pump(const Duration(seconds: 2));
     await tester.pump();
     expect(consultas, greaterThan(antes));
     await tester.pumpWidget(const SizedBox());

@@ -6,7 +6,9 @@ import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/mototaxista_viewmodel.dart';
 import 'package:route_pires_flutter/views/chat_list_view.dart';
 import 'package:route_pires_flutter/views/corrida.dart';
+import 'package:route_pires_flutter/views/avaliacoes_recebidas_page.dart';
 import 'package:route_pires_flutter/views/perfil_mototaxista.dart';
+import 'package:route_pires_flutter/services/notificacoes_service.dart';
 
 class PrincipalPageMototaxista extends StatefulWidget {
   const PrincipalPageMototaxista({super.key});
@@ -22,6 +24,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
   MototaxistaViewModel? _mototaxista;
   String? _mototaxistaId;
   Timer? _retryDisponibilidade;
+  final _abas = CupertinoTabController();
 
   bool get _appAtivo =>
       WidgetsBinding.instance.lifecycleState == null ||
@@ -31,6 +34,9 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    NotificacoesService().onAbrirCorridas = () {
+      if (mounted) _abas.index = 0;
+    };
   }
 
   @override
@@ -85,6 +91,8 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
 
   @override
   void dispose() {
+    NotificacoesService().onAbrirCorridas = null;
+    _abas.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _login?.removeListener(_sincronizarSessao);
     _retryDisponibilidade?.cancel();
@@ -101,6 +109,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
   @override
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
+      controller: _abas,
       tabBar: CupertinoTabBar(
         backgroundColor: CupertinoColors.white,
         activeColor: CupertinoColors.systemBlue,
@@ -165,14 +174,7 @@ class _PrincipalPageState extends State<PrincipalPageMototaxista>
           case 1:
             return CupertinoTabView(
               builder: (context) {
-                return const CupertinoPageScaffold(
-                  backgroundColor: CupertinoColors.white,
-                  navigationBar: CupertinoNavigationBar(
-                    backgroundColor: CupertinoColors.white,
-                    middle: Text('Avaliações'),
-                  ),
-                  child: Center(child: Text('Avaliações')),
-                );
+                return const AvaliacoesRecebidasPage(doMototaxista: true);
               },
             );
 

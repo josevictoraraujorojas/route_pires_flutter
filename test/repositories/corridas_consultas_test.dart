@@ -132,6 +132,36 @@ void main() {
     },
   );
 
+  test('Histórico do mototaxista filtra as corridas e traz o passageiro', () async {
+    final dio = _Dio();
+    when(
+      () => dio.get<dynamic>(
+        any(),
+        queryParameters: any(named: 'queryParameters'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((call) async {
+      final path = call.positionalArguments.first as String;
+      return Response(
+        requestOptions: RequestOptions(path: path),
+        data: switch (path) {
+          '/corridas-passageiro' => [
+            corrida('minha', '2026-10-02T12:00:00Z'),
+            {...corrida('outra', '2026-10-03T12:00:00Z'), 'mototaxistaId': 'm-2'},
+          ],
+          '/corrida-frete' => [],
+          _ => {'nome': 'Ana', 'avaliacaoMedia': 4.5},
+        },
+      );
+    });
+
+    final pagina = await CorridaRepository(dio: dio)
+        .listarHistoricoMototaxista(mototaxistaId: 'm-1');
+
+    expect(pagina.corridas.map((c) => c.id).toList(), ['minha']);
+    expect(pagina.corridas.single.passageiroNome, 'Ana');
+  });
+
   test('Resumo com 503 não é consultado de novo em cada polling', () async {
     final dio = _Dio();
     var resumos = 0;

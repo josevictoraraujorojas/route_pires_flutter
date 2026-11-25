@@ -8,6 +8,7 @@ import 'package:route_pires_flutter/config/api_error.dart';
 import 'package:route_pires_flutter/config/token_storage.dart';
 import 'package:route_pires_flutter/model/usuario_response.dart';
 import 'package:route_pires_flutter/repositories/login_repository.dart';
+import 'package:route_pires_flutter/services/notificacoes_service.dart';
 
 class LoginViewModel extends ChangeNotifier {
   LoginViewModel({
@@ -112,6 +113,7 @@ class LoginViewModel extends ChangeNotifier {
   Future<bool> sair() async {
     _erro = null;
     try {
+      await NotificacoesService().desvincular();
       if (_isWeb) {
         await _repository.sairWeb();
       } else {
@@ -131,6 +133,8 @@ class LoginViewModel extends ChangeNotifier {
       _erro = 'Não foi possível sair da conta';
       notifyListeners();
       return false;
+    } finally {
+      if (_usuario != null) NotificacoesService().definirUsuario(_usuario!.id);
     }
   }
 

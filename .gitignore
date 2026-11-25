@@ -43,7 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.kotlin/
 
 # Widget Preview related
 .widget_preview/
 android/local.properties
+
+# Configuração local por aplicativo/plataforma Firebase.
+config/firebase.*.json

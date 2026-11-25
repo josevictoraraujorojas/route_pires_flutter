@@ -71,6 +71,7 @@ void main() {
       () => mototaxistaRepository.listar(
         latitude: any(named: 'latitude'),
         longitude: any(named: 'longitude'),
+        servico: any(named: 'servico'),
         cancelToken: any(named: 'cancelToken'),
       ),
     ).thenAnswer((_) async => motoristas ?? [joa]);
@@ -108,6 +109,7 @@ void main() {
         () => mototaxistaRepository.listar(
           latitude: captureAny(named: 'latitude'),
           longitude: captureAny(named: 'longitude'),
+          servico: any(named: 'servico'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).captured;
@@ -166,9 +168,19 @@ void main() {
         await viewModel.confirmarNegociacao();
         await viewModel.atualizarSolicitacao();
         await viewModel.atualizarSolicitacao();
-        expect(viewModel.etapa, EtapaCorrida.motoristas);
-        expect(viewModel.corridaCriada, isNull);
+        // Não volta para a busca: a tela sai e mostra a corrida concluída.
+        expect(viewModel.finalizada, isTrue);
+        expect(viewModel.etapa, EtapaCorrida.aceita);
+        expect(viewModel.corridaCriada?.status, 'FINALIZADO');
         expect(consultas, 1);
+        verifyNever(
+          () => mototaxistaRepository.listar(
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            servico: any(named: 'servico'),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        );
       },
     );
 
@@ -217,6 +229,7 @@ void main() {
         () => mototaxistaRepository.listar(
           latitude: origem.latitude,
           longitude: origem.longitude,
+          servico: any(named: 'servico'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
@@ -416,6 +429,7 @@ void main() {
         () => mototaxistaRepository.listar(
           latitude: origem.latitude,
           longitude: origem.longitude,
+          servico: any(named: 'servico'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) => pendente.future);
@@ -804,6 +818,7 @@ void main() {
         () => mototaxistaRepository.listar(
           latitude: origem.latitude,
           longitude: origem.longitude,
+          servico: any(named: 'servico'),
           cancelToken: any(named: 'cancelToken'),
         ),
       );
@@ -903,6 +918,7 @@ void main() {
         () => mototaxistaRepository.listar(
           latitude: origem.latitude,
           longitude: origem.longitude,
+          servico: any(named: 'servico'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);

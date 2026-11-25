@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'package:route_pires_flutter/config/validacao.dart';
 import 'package:route_pires_flutter/viewmodel/login_viewmodel.dart';
 import 'package:route_pires_flutter/viewmodel/editar_perfil_viewmodel.dart';
 
@@ -162,6 +161,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
 
     final ok = await viewModel.atualizarPerfil(
       id: usuarioAnterior.id,
+      tipo: usuarioAnterior.tipo,
       nome: novoNome,
       email: novoEmail,
       telefone: telefoneSomenteNumeros,
@@ -394,7 +394,6 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                 decoration: _decoracaoCampo(emFoco: _senhaEmFoco),
                 suffix: CupertinoButton(
                   padding: const EdgeInsets.only(left: 8, right: 12),
-                  minSize: 32,
                   onPressed: () {
                     setState(() {
                       _senhaVisivel = !_senhaVisivel;
@@ -409,6 +408,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                         : CupertinoColors.systemGrey,
                     size: 21,
                   ),
+                  minimumSize: Size(32, 32),
                 ),
               ),
 

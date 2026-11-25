@@ -3,6 +3,7 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:route_pires_flutter/config/token_storage.dart';
 import 'package:route_pires_flutter/model/chat.dart';
 import 'package:route_pires_flutter/repositories/chat_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class ChatListViewModel extends ChangeNotifier {
   final ChatRepository _repository;
@@ -10,7 +11,15 @@ class ChatListViewModel extends ChangeNotifier {
 
   ChatListViewModel({ChatRepository? repository, TokenStorage? tokenStorage})
     : _repository = repository ?? ChatRepository(),
-      _tokenStorage = tokenStorage ?? createTokenStorage();
+      _tokenStorage = tokenStorage ?? createTokenStorage() {
+    _eventos = AtualizacaoPorEvento(
+      aceita: (evento) => evento.chats,
+      atualizar: carregarChatsEContagens,
+      ocupado: () => _atualizacaoEmAndamento,
+    );
+  }
+
+  late final AtualizacaoPorEvento _eventos;
 
   List<Chat> _chats = [];
   Map<String, int> _mensagensNaoLidas = {};
@@ -82,17 +91,20 @@ class ChatListViewModel extends ChangeNotifier {
 
   Future<void> _carregarContagensNaoLidas(List<Chat> chats) async {
     try {
-      final token = await _tokenStorage.read();
+      var userId = AtualizacoesService().usuarioId;
+      final token = userId == null ? await _tokenStorage.read() : null;
 
       if (_disposed) return;
 
-      if (token == null || token.isEmpty) {
+      if (userId == null && (token == null || token.isEmpty)) {
         _mensagensNaoLidas = {};
         return;
       }
 
-      final payload = JwtDecoder.decode(token);
-      final userId = _normalizarId(payload['sub']?.toString());
+      if (userId == null) {
+        final payload = JwtDecoder.decode(token!);
+        userId = _normalizarId(payload['sub']?.toString());
+      }
 
       if (userId == null || chats.isEmpty) {
         _mensagensNaoLidas = {};
@@ -104,7 +116,7 @@ class ChatListViewModel extends ChangeNotifier {
           try {
             final quantidade = await _repository.contarMensagensNaoLidas(
               chat.id,
-              userId,
+              userId!,
             );
 
             return MapEntry(chat.id, quantidade);
@@ -132,6 +144,7 @@ class ChatListViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _eventos.dispose();
     super.dispose();
   }
 }

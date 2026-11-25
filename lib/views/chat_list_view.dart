@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:route_pires_flutter/model/chat.dart';
@@ -28,8 +26,6 @@ class _ChatListViewContent extends StatefulWidget {
 class _ChatListViewContentState extends State<_ChatListViewContent> {
   final TextEditingController _buscaController = TextEditingController();
 
-  Timer? _timerAtualizacao;
-
   bool _encerradasExpandida = true;
   bool _atualizando = false;
 
@@ -39,18 +35,7 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
   DateTime? _dataEncerramento;
 
   @override
-  void initState() {
-    super.initState();
-
-    // Atualiza a lista automaticamente a cada 30 segundos.
-    _timerAtualizacao = Timer.periodic(const Duration(seconds: 30), (_) {
-      _recarregarChats();
-    });
-  }
-
-  @override
   void dispose() {
-    _timerAtualizacao?.cancel();
     _buscaController.dispose();
     super.dispose();
   }
@@ -409,7 +394,6 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
           Expanded(
             child: CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              minSize: 38,
               alignment: Alignment.centerLeft,
               onPressed: onPressed,
               child: Text(
@@ -421,18 +405,19 @@ class _ChatListViewContentState extends State<_ChatListViewContent> {
                   color: CupertinoColors.label,
                 ),
               ),
+              minimumSize: Size(38, 38),
             ),
           ),
           if (data != null)
             CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 30,
               onPressed: onClear,
               child: const Icon(
                 CupertinoIcons.xmark_circle_fill,
                 size: 15,
                 color: CupertinoColors.systemGrey,
               ),
+              minimumSize: Size(30, 30),
             ),
         ],
       ),

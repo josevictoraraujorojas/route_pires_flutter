@@ -1,88 +1,45 @@
 import 'package:flutter/cupertino.dart';
+import 'package:route_pires_flutter/services/notificacoes_service.dart';
 
 class NotificacoesPage extends StatelessWidget {
   const NotificacoesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> notificacoesMock = [
-      {'nome': 'João', 'data': '20/03/2025'},
-      {'nome': 'Dany', 'data': '20/03/2025'},
-      {'nome': 'Rachel', 'data': '20/03/2025'},
-      {'nome': 'Luan', 'data': '20/03/2025'},
-      {'nome': 'Pedro', 'data': '20/03/2025'},
-      {'nome': 'Ari', 'data': '20/03/2025'},
-    ];
-
+    final notificacoes = NotificacoesService();
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.white,
-      navigationBar: const CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.white,
-        previousPageTitle: 'Voltar',
-        middle: Text(
-          'Notificações',
-          style: TextStyle(fontWeight: FontWeight.w400),
-        ),
-        border: null,
-      ),
+      navigationBar: const CupertinoNavigationBar(middle: Text('Notificações')),
       child: SafeArea(
-        child: ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          itemCount: notificacoesMock.length,
-          separatorBuilder: (context, index) => Container(
-            height: 1,
-            color: CupertinoColors.systemGrey5,
-            margin: const EdgeInsets.symmetric(vertical: 16),
-          ),
-          itemBuilder: (context, index) {
-            final notificacao = notificacoesMock[index];
-            
-            return Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0066FF),
-                    shape: BoxShape.circle,
+        child: AnimatedBuilder(
+          animation: notificacoes,
+          builder: (context, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(CupertinoIcons.bell, size: 40),
+                  const SizedBox(height: 16),
+                  Text(
+                    notificacoes.ativo
+                        ? 'Os alertas de corridas e mensagens estão ativados.'
+                        : notificacoes.disponivel
+                        ? 'Ative os alertas para receber novidades sobre suas corridas e mensagens.'
+                        : 'Os alertas ainda não estão disponíveis neste dispositivo.',
+                    textAlign: TextAlign.center,
                   ),
-                  child: const Center(
-                    child: Icon(
-                      CupertinoIcons.exclamationmark,
-                      color: CupertinoColors.white,
-                      size: 18,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(height: 16),
+                  if (notificacoes.ativando)
+                    const CupertinoActivityIndicator()
+                  else if (notificacoes.disponivel && !notificacoes.ativo)
+                    CupertinoButton.filled(
+                      onPressed: notificacoes.ativar,
+                      child: const Text('Ativar notificações'),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        notificacao['nome']!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: CupertinoColors.black,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        notificacao['data']!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: CupertinoColors.systemGrey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

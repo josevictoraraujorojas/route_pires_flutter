@@ -3,21 +3,45 @@ import 'package:flutter/foundation.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/repositories/corrida_repository.dart';
 import 'package:route_pires_flutter/repositories/mototaxista_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
+import 'package:route_pires_flutter/config/safe_change_notifier.dart';
 
-class HistoricoCorridasViewModel extends ChangeNotifier {
+class HistoricoCorridasViewModel extends ChangeNotifier
+    with SafeChangeNotifier {
   final CorridaRepository _repository;
   final MototaxistaRepository _mototaxistaRepository;
+  final bool doMototaxista;
 
   HistoricoCorridasViewModel({
     CorridaRepository? repository,
     MototaxistaRepository? mototaxistaRepository,
-  })  : _repository = repository ?? CorridaRepository(),
-        _mototaxistaRepository = mototaxistaRepository ?? MototaxistaRepository();
+    this.doMototaxista = false,
+  }) : _repository = repository ?? CorridaRepository(),
+       _mototaxistaRepository =
+           mototaxistaRepository ?? MototaxistaRepository() {
+    _eventos = AtualizacaoPorEvento(
+      aceita: (e) => e.corridas && e.dados['acao'] != 'PREVISAO_ATUALIZADA',
+      atualizar: () async {
+        if (_usuarioId case final id?) await carregarHistoricoInicial(id);
+      },
+      ocupado: () => _carregando || _carregandoMais,
+      habilitado: () => _usuarioId != null,
+    );
+  }
+
+  late final AtualizacaoPorEvento _eventos;
+  String? _usuarioId;
+
+  @override
+  void dispose() {
+    _eventos.dispose();
+    super.dispose();
+  }
 
   bool _carregando = false;
   String? _erro;
   List<SolicitacaoCorrida> _corridas = [];
-  
+
   bool _temMais = true;
   String? _ultimoId;
   bool _carregandoMais = false;
@@ -37,10 +61,34 @@ class HistoricoCorridasViewModel extends ChangeNotifier {
     return _nomesMototaxistas[mototaxistaId] ?? 'Carregando nome...';
   }
 
-  Future<void> _buscarNomesMototaxistas(List<SolicitacaoCorrida> novasCorridas) async {
+  String nomeParticipante(SolicitacaoCorrida corrida) => doMototaxista
+      ? corrida.passageiroNome
+      : getNomeMototaxista(corrida.mototaxistaId);
+
+  Future<PaginaHistorico> _listar(String usuarioId, {String? aposId}) {
+    if (doMototaxista) {
+      return _repository.listarHistoricoMototaxista(
+        mototaxistaId: usuarioId,
+        aposId: aposId,
+        limite: 15,
+      );
+    }
+    return _repository.listarHistorico(
+      passageiroId: usuarioId,
+      aposId: aposId,
+      limite: 15,
+    );
+  }
+
+  Future<void> _buscarNomesMototaxistas(
+    List<SolicitacaoCorrida> novasCorridas,
+  ) async {
+    // O nome do passageiro já vem na página do histórico do mototaxista.
+    if (doMototaxista) return;
+
     final idsParaBuscar = novasCorridas
         .map((c) => c.mototaxistaId)
-        .where((id) => id != null && id.isNotEmpty && !_nomesMototaxistas.containsKey(id))
+        .where((id) => id.isNotEmpty && !_nomesMototaxistas.containsKey(id))
         .cast<String>()
         .toSet();
 
@@ -49,9 +97,10 @@ class HistoricoCorridasViewModel extends ChangeNotifier {
     await Future.wait(
       idsParaBuscar.map((id) async {
         try {
-          final perfil = await _mototaxistaRepository.buscarPerfilParaPassageiro(id: id);
+          final perfil = await _mototaxistaRepository
+              .buscarPerfilParaPassageiro(id: id);
           _nomesMototaxistas[id] = perfil.nome;
-          notifyListeners(); 
+          avisar();
         } catch (_) {
           _nomesMototaxistas[id] = 'Mototaxista (ID: ${id.substring(0, 4)})';
         }
@@ -59,28 +108,28 @@ class HistoricoCorridasViewModel extends ChangeNotifier {
     );
   }
 
-  Future<void> carregarHistoricoInicial(String passageiroId) async {
+  Future<void> carregarHistoricoInicial(String usuarioId) async {
+    if (foiDisposed || _carregando || _carregandoMais) return;
+    _usuarioId = usuarioId;
     _carregando = true;
     _erro = null;
-    _ultimoId = null; 
-    notifyListeners();
+    _ultimoId = null;
+    avisar();
 
     try {
-      final pagina = await _repository.listarHistorico(
-        passageiroId: passageiroId,
-        limite: 15,
-      );
+      final pagina = await _listar(usuarioId);
 
+      if (foiDisposed) return;
       _corridas = pagina.corridas;
       _ultimoId = pagina.aposId;
       _temMais = pagina.temMais;
-      
-      notifyListeners(); 
-      
-      _buscarNomesMototaxistas(_corridas);
 
+      avisar();
+
+      _buscarNomesMototaxistas(_corridas);
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.receiveTimeout) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.receiveTimeout) {
         _erro = 'Verifique sua conexão com a internet.';
       } else {
         _erro = 'Não foi possível carregar o histórico.';
@@ -89,36 +138,32 @@ class HistoricoCorridasViewModel extends ChangeNotifier {
       _erro = 'Ocorreu um erro inesperado.';
     } finally {
       _carregando = false;
-      notifyListeners();
+      avisar();
     }
   }
 
-  Future<void> carregarMaisHistorico(String passageiroId) async {
-    if (!_temMais || _carregandoMais || _carregando) return;
+  Future<void> carregarMaisHistorico(String usuarioId) async {
+    if (foiDisposed || !_temMais || _carregandoMais || _carregando) return;
 
     _carregandoMais = true;
-    notifyListeners();
+    avisar();
 
     try {
-      final pagina = await _repository.listarHistorico(
-        passageiroId: passageiroId,
-        aposId: _ultimoId,
-        limite: 15,
-      );
+      final pagina = await _listar(usuarioId, aposId: _ultimoId);
 
+      if (foiDisposed) return;
       _corridas.addAll(pagina.corridas);
       _ultimoId = pagina.aposId;
       _temMais = pagina.temMais;
-      
-      notifyListeners(); 
-      
-      _buscarNomesMototaxistas(pagina.corridas);
 
+      avisar();
+
+      _buscarNomesMototaxistas(pagina.corridas);
     } catch (e) {
       debugPrint('Erro ao carregar mais corridas: $e');
     } finally {
       _carregandoMais = false;
-      notifyListeners();
+      avisar();
     }
   }
 }

@@ -8,10 +8,17 @@ class ApiConfig {
     if (kIsWeb) {
       return Uri.base.origin;
     }
+
     if (_fromEnv.isNotEmpty) {
+      debugPrint('API BASE URL: $_fromEnv');
       return _fromEnv;
     }
-    return 'https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.2.sslip.io';
+
+    const url = 'https://siqs5nq4jauaxmdzdotn0jsj.62.171.158.2.sslip.io';
+
+    debugPrint('API BASE URL: $url');
+
+    return url;
   }
 
   static const String health = '/actuator/health/liveness';
@@ -24,4 +31,6 @@ class ApiConfig {
   static String passageiroResumo(String id) => '$passageiros/$id/resumo';
   static const String corridasPassageiro = '/corridas-passageiro';
   static const String corridaFrete = '/corrida-frete';
+  static const String avaliacoesMototaxista = '/avaliacoes-mototaxista';
+  static const String avaliacoesPassageiro = '/avaliacoes-passageiro';
 }

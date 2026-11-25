@@ -255,6 +255,60 @@ class CorridaRepository {
     String? aposId,
     int limite = 10,
     CancelToken? cancelToken,
+  }) {
+    return _listarHistorico(
+      pertence: (c) => c.passageiroId == passageiroId,
+      aposId: aposId,
+      limite: limite,
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<PaginaHistorico> listarHistoricoMototaxista({
+    required String mototaxistaId,
+    String? aposId,
+    int limite = 10,
+    CancelToken? cancelToken,
+  }) async {
+    final pagina = await _listarHistorico(
+      pertence: (c) => c.mototaxistaId == mototaxistaId,
+      aposId: aposId,
+      limite: limite,
+      cancelToken: cancelToken,
+    );
+    final idsPassageiros = pagina.corridas
+        .map((c) => c.passageiroId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    Map<String, _PassageiroResumo> passageiros = const {};
+    try {
+      passageiros = await _buscarPassageiros(
+        idsPassageiros,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      // Sem acesso ao resumo, o histórico aparece com o nome padrão.
+      if (e.response?.statusCode != 403) rethrow;
+    }
+    return (
+      corridas: pagina.corridas.map((c) {
+        final dados = passageiros[c.passageiroId];
+        if (dados == null) return c;
+        return c.copyWith(
+          passageiroNome: dados.nome,
+          passageiroAvaliacao: dados.avaliacaoMedia,
+        );
+      }).toList(),
+      aposId: pagina.aposId,
+      temMais: pagina.temMais,
+    );
+  }
+
+  Future<PaginaHistorico> _listarHistorico({
+    required bool Function(SolicitacaoCorrida) pertence,
+    String? aposId,
+    required int limite,
+    CancelToken? cancelToken,
   }) async {
     final parametros = <String, dynamic>{
       'status': 'FINALIZADO,CANCELADO',
@@ -282,7 +336,7 @@ class CorridaRepository {
         respostas[1].data,
         categoria: CategoriaCorrida.frete,
       ),
-    ].where((c) => c.passageiroId == passageiroId).toList();
+    ].where(pertence).toList();
     todas.sort((a, b) {
       final dataA = a.dataHoraSolicitacao;
       final dataB = b.dataHoraSolicitacao;

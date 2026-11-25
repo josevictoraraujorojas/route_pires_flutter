@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:route_pires_flutter/config/api_client.dart';
 import 'package:route_pires_flutter/model/categoria_corrida.dart';
 import 'package:route_pires_flutter/model/localizacao_ponto.dart';
+import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 import 'package:route_pires_flutter/views/fluxo_corrida_page.dart';
 
 void main() {
@@ -81,19 +83,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 10));
   }
 
+  void avisarCorrida() => AtualizacoesService().publicar(const {
+    'tipo': 'CORRIDAS_ATUALIZADAS',
+    'corridaId': 'c-1',
+  });
+
+  Future<void> aguardarEvento(WidgetTester tester) async {
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+
   testWidgets(
-    'Aceita consulta a cada 15 s e pausa em background e aba oculta',
+    'Aceita só consulta por evento e pausa em background e aba oculta',
     (tester) async {
       await abrir(tester);
       final inicial = consultas;
       expect(inicial, 1);
-      await tester.pump(const Duration(seconds: 14));
+      await tester.pump(const Duration(seconds: 30));
       await tester.pump(const Duration(milliseconds: 1));
       expect(consultas, inicial);
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pump(const Duration(milliseconds: 1));
+      avisarCorrida();
+      await aguardarEvento(tester);
       expect(consultas, inicial + 1);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      avisarCorrida();
       await tester.pump(const Duration(seconds: 30));
       await tester.pump(const Duration(milliseconds: 1));
       expect(consultas, inicial + 1);
@@ -101,6 +114,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1));
       await abrir(tester, visivel: false);
       final ocultas = consultas;
+      avisarCorrida();
       await tester.pump(const Duration(seconds: 30));
       await tester.pump(const Duration(milliseconds: 1));
       expect(consultas, ocultas);
@@ -109,26 +123,74 @@ void main() {
   );
 
   testWidgets(
-    'O próprio diálogo de espera mantém a consulta de três segundos',
+    'Finalizada sem abrir o acompanhamento sai da busca com a corrida concluída',
     (tester) async {
-      criada = false;
-      status = 'PENDENTE';
-      tester.view.physicalSize = const Size(1200, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await abrir(tester);
-      await tester.tap(find.text('Ana'));
+      SolicitacaoCorrida? resultado;
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: Builder(
+            builder: (context) => CupertinoButton(
+              onPressed: () async {
+                resultado = await Navigator.push<SolicitacaoCorrida>(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => const FluxoCorridaPage(
+                      passageiroId: 'p-1',
+                      categoria: CategoriaCorrida.corrida,
+                      origem: ponto,
+                      destino: ponto,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Abrir'));
       await tester.pump();
-      await tester.tap(find.text('Confirmar'));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 10));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Aguardando Ana'), findsOneWidget);
-      final antes = consultas;
-      await tester.pump(const Duration(seconds: 3));
-      await tester.pump(const Duration(milliseconds: 1));
-      expect(consultas, antes + 1);
+      expect(find.text('Acompanhar corrida'), findsOneWidget);
+
+      status = 'FINALIZADO';
+      avisarCorrida();
+      await aguardarEvento(tester);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(resultado?.id, 'c-1');
+      expect(resultado?.status, 'FINALIZADO');
+      expect(find.text('Acompanhar corrida'), findsNothing);
+      expect(find.text('Ana'), findsNothing);
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets('O próprio diálogo de espera só consulta ao receber evento', (
+    tester,
+  ) async {
+    criada = false;
+    status = 'PENDENTE';
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await abrir(tester);
+    await tester.tap(find.text('Ana'));
+    await tester.pump();
+    await tester.tap(find.text('Confirmar'));
+    await tester.pump(const Duration(milliseconds: 10));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Aguardando Ana'), findsOneWidget);
+    final antes = consultas;
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(consultas, antes);
+    avisarCorrida();
+    await aguardarEvento(tester);
+    expect(consultas, antes + 1);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'
@@ -8,8 +10,10 @@ import 'package:route_pires_flutter/model/localizacao_ponto.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
 import 'package:route_pires_flutter/model/solicitacao_corrida.dart';
 import 'package:route_pires_flutter/viewmodel/corrida_viewmodel.dart';
+import 'package:route_pires_flutter/views/animacao_busca.dart';
 import 'package:route_pires_flutter/views/minhas_corridas_page.dart';
 import 'package:route_pires_flutter/views/previsao_chegada.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class FluxoCorridaPage extends StatefulWidget {
   const FluxoCorridaPage({
@@ -40,11 +44,33 @@ class FluxoCorridaPage extends StatefulWidget {
 class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     with WidgetsBindingObserver {
   late final CorridaViewModel viewModel;
+  late final AtualizacaoPorEvento _eventos;
+  late final AtualizacaoPorEvento _eventosMotoristas;
+  bool _topicoInscrito = false;
+  Future<void> _filaTopico = Future.value();
+  bool get _buscaAtiva => viewModel.etapa == EtapaCorrida.motoristas || viewModel.etapa == EtapaCorrida.negociacao;
+
+  void _sincronizarTopico() {
+    if (kIsWeb || !const {TargetPlatform.android, TargetPlatform.iOS}.contains(defaultTargetPlatform)) return;
+    _filaTopico = _filaTopico.then((_) async {
+      final deveInscrever = mounted && !_saindo && _buscaAtiva;
+      if (deveInscrever == _topicoInscrito) return;
+      try {
+        if (deveInscrever) {
+          await FirebaseMessaging.instance.subscribeToTopic('mototaxistas_atualizados');
+        } else {
+          await FirebaseMessaging.instance.unsubscribeFromTopic('mototaxistas_atualizados');
+        }
+        _topicoInscrito = deveInscrever;
+      } catch (_) { /* O timer continua funcionando sem FCM. */ }
+    });
+  }
 
   Timer? _relogio;
-  int _segundosDecorridos = 0;
+  Timer? _relogioLista;
   bool _tentouEncerrarPrazo = false;
   bool _confirmandoTroca = false;
+  bool _saindo = false;
   bool _mostrarAcompanhamentoNaLista = true;
   Route<void>? _rotaEspera;
   bool _appAtivo = true;
@@ -78,17 +104,46 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     );
 
     viewModel.addListener(_sincronizarEspera);
+    viewModel.addListener(_sairAoFinalizar);
+    _eventos = AtualizacaoPorEvento(
+      aceita: (e) =>
+          e.corridas &&
+          (e.sincronizacao || e.corridaId == viewModel.corridaCriada?.id),
+      atualizar: viewModel.atualizarSolicitacao,
+      ocupado: () =>
+          viewModel.atualizandoSolicitacao || viewModel.encerrandoEspera,
+      habilitado: () =>
+          _visivel &&
+          (viewModel.etapa == EtapaCorrida.aguardando ||
+              viewModel.etapa == EtapaCorrida.aceita),
+      proximaTentativa: () => viewModel.proximaConsultaSolicitacao,
+    );
+    _eventosMotoristas = AtualizacaoPorEvento(
+      aceita: (e) => e.mototaxistas && _buscaAtiva,
+      atualizar: () async {
+        if (_buscaAtiva && _visivel) {
+          await viewModel.buscarMotoristas(manterEtapa: true);
+        }
+      },
+      ocupado: () => viewModel.carregando || viewModel.carregandoCriacao,
+      proximaTentativa: () => viewModel.proximaConsultaMotoristas,
+    );
+    viewModel.addListener(_sincronizarTopico);
     viewModel.iniciar();
+    _sincronizarTopico();
+
+    // A busca não fica parada no primeiro resultado: disponibilidade e
+    // distância mudam enquanto o passageiro escolhe.
+    _relogioLista = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _atualizarLista(),
+    );
 
     _relogio = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_visivel) return;
 
       if (viewModel.etapa == EtapaCorrida.aceita) {
         setState(() {});
-
-        if (++_segundosDecorridos % 15 == 0) {
-          unawaited(viewModel.atualizarSolicitacao());
-        }
 
         return;
       }
@@ -104,8 +159,6 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
           _tentouEncerrarPrazo = true;
           unawaited(viewModel.encerrarEspera(porTempo: true));
         }
-      } else if (++_segundosDecorridos % 3 == 0) {
-        unawaited(viewModel.atualizarSolicitacao());
       }
     });
   }
@@ -114,9 +167,31 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _relogio?.cancel();
+    _relogioLista?.cancel();
+    _eventos.dispose();
+    _eventosMotoristas.dispose();
+    _saindo = true;
+    viewModel.removeListener(_sincronizarTopico);
+    _sincronizarTopico();
     viewModel.removeListener(_sincronizarEspera);
+    viewModel.removeListener(_sairAoFinalizar);
     viewModel.dispose();
     super.dispose();
+  }
+
+  void _atualizarLista() {
+    final escolhendo =
+        viewModel.etapa == EtapaCorrida.motoristas ||
+        viewModel.etapa == EtapaCorrida.aguardando ||
+        viewModel.etapa == EtapaCorrida.negociacao;
+    if (!_visivel ||
+        !escolhendo ||
+        viewModel.carregando ||
+        viewModel.carregandoCriacao ||
+        viewModel.trocandoMotorista) {
+      return;
+    }
+    unawaited(viewModel.buscarMotoristas(manterEtapa: true));
   }
 
   @override
@@ -125,6 +200,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
 
     if (_visivel) {
       unawaited(viewModel.atualizarSolicitacao());
+      _atualizarLista();
     }
   }
 
@@ -143,6 +219,43 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
         Navigator.of(context, rootNavigator: true).removeRoute(rota);
       });
     }
+  }
+
+  SolicitacaoCorrida _solicitacaoAtual({String status = 'ANDAMENTO'}) =>
+      viewModel.solicitacaoAtiva?.copyWith(status: status) ??
+      SolicitacaoCorrida(
+        id: viewModel.corridaCriada!.id,
+        categoria: widget.categoria,
+        status: status,
+        mototaxistaId: viewModel.motoristaSelecionado?.id ?? '',
+        passageiroId: widget.passageiroId,
+        origem: widget.origem,
+        destino: widget.destino,
+        formaPagamento: widget.formaPagamento,
+        descricaoCarga: widget.descricaoCarga,
+        pesoCarga: widget.pesoCarga,
+        cargaFragil: widget.cargaFragil,
+        tempoRestanteSegundos: viewModel.corridaCriada?.tempoRestanteSegundos,
+        distanciaRestanteMetros:
+            viewModel.corridaCriada?.distanciaRestanteMetros,
+        pontoAtual: viewModel.corridaCriada?.pontoAtual,
+        estimativaAtualizadaEm: viewModel.corridaCriada?.estimativaAtualizadaEm,
+      );
+
+  // O mototaxista finalizou sem o passageiro abrir o acompanhamento:
+  // sai da busca e mostra a corrida concluída, que pede a avaliação.
+  void _sairAoFinalizar() {
+    if (!viewModel.finalizada || _saindo) return;
+    _saindo = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final corrida = _solicitacaoAtual(status: 'FINALIZADO');
+      final rota = _rotaEspera;
+      if (rota != null && rota.isActive) {
+        Navigator.of(context, rootNavigator: true).removeRoute(rota);
+      }
+      Navigator.pop(context, corrida);
+    });
   }
 
   void _mostrarEspera() {
@@ -233,7 +346,6 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
   }
 
   void _iniciarAcompanhamento() {
-    _segundosDecorridos = 0;
     _tentouEncerrarPrazo = false;
 
     if (viewModel.etapa == EtapaCorrida.aguardando) {
@@ -398,32 +510,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
             CupertinoButton.filled(
               onPressed: viewModel.corridaCriada == null
                   ? null
-                  : () => Navigator.pop(
-                      context,
-                      viewModel.solicitacaoAtiva ??
-                          SolicitacaoCorrida(
-                            id: viewModel.corridaCriada!.id,
-                            categoria: widget.categoria,
-                            status: 'ANDAMENTO',
-                            mototaxistaId:
-                                viewModel.motoristaSelecionado?.id ?? '',
-                            passageiroId: widget.passageiroId,
-                            origem: widget.origem,
-                            destino: widget.destino,
-                            formaPagamento: widget.formaPagamento,
-                            descricaoCarga: widget.descricaoCarga,
-                            pesoCarga: widget.pesoCarga,
-                            cargaFragil: widget.cargaFragil,
-                            tempoRestanteSegundos:
-                                viewModel.corridaCriada?.tempoRestanteSegundos,
-                            distanciaRestanteMetros: viewModel
-                                .corridaCriada
-                                ?.distanciaRestanteMetros,
-                            pontoAtual: viewModel.corridaCriada?.pontoAtual,
-                            estimativaAtualizadaEm:
-                                viewModel.corridaCriada?.estimativaAtualizadaEm,
-                          ),
-                    ),
+                  : () => Navigator.pop(context, _solicitacaoAtual()),
               child: const Text('Acompanhar corrida'),
             ),
           ],
@@ -518,12 +605,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
       }
 
       return Center(
-        child: Image.asset(
-          'assets/images/img_busca.png',
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.contain,
-        ),
+        child: const AnimacaoBusca(),
       );
     }
 
@@ -577,6 +659,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
     }
 
     if (lista.isEmpty) {
+      if (motoristas == null) return const Center(child: AnimacaoBusca());
       return Center(
         child: Text(
           mensagemVazia,
@@ -635,65 +718,83 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'Solicitar ${widget.categoria.label.toLowerCase()}?',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF303038),
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
+                      // Em telas baixas, rola os dados e mantém as ações visíveis.
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Solicitar ${widget.categoria.label.toLowerCase()}?',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF303038),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
 
-                      // Foto do mototaxista escolhido.
-                      _AvatarMotorista(fotoUrl: mototaxista?.fotoUrl, raio: 54),
+                              // Foto do mototaxista escolhido.
+                              _AvatarMotorista(
+                                fotoUrl: mototaxista?.fotoUrl,
+                                raio: 54,
+                              ),
 
-                      const SizedBox(height: 12),
-                      _Estrelas(valor: mototaxista?.estrelas ?? 0, tamanho: 28),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        height: 52,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.white,
-                          border: Border.all(color: const Color(0xFF006FFD)),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          viewModel.motorista,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF303038),
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                              const SizedBox(height: 12),
+                              _Estrelas(
+                                valor: mototaxista?.estrelas ?? 0,
+                                tamanho: 28,
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                height: 52,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.white,
+                                  border: Border.all(
+                                    color: const Color(0xFF006FFD),
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  viewModel.motorista,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF303038),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
 
-                      // Tarifas do profissional selecionado.
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _TarifaMotorista(
-                            rotulo: 'Urbana',
-                            valor: mototaxista?.precoZonaUrbana,
+                              // Tarifas do profissional selecionado.
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _TarifaMotorista(
+                                    rotulo: 'Urbana',
+                                    valor: mototaxista?.precoZonaUrbana,
+                                  ),
+                                  _TarifaMotorista(
+                                    rotulo: 'Bairros afastados',
+                                    valor: mototaxista?.precoBairrosAfastados,
+                                  ),
+                                  _TarifaMotorista(
+                                    rotulo: 'Bandeira 2',
+                                    valor: mototaxista?.precoBandeira2,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          _TarifaMotorista(
-                            rotulo: 'Bairros afastados',
-                            valor: mototaxista?.precoBairrosAfastados,
-                          ),
-                          _TarifaMotorista(
-                            rotulo: 'Bandeira 2',
-                            valor: mototaxista?.precoBandeira2,
-                          ),
-                        ],
+                        ),
                       ),
 
                       const SizedBox(height: 18),
@@ -727,6 +828,7 @@ class _FluxoCorridaPageState extends State<FluxoCorridaPage>
               ],
             ),
           ),
+          const SizedBox(height: 12),
           _botaoCancelar(),
         ],
       ),

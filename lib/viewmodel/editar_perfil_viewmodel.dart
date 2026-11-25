@@ -16,6 +16,7 @@ class EditarPerfilViewModel extends ChangeNotifier {
 
   Future<bool> atualizarPerfil({
     required String id,
+    required String tipo,
     required String nome,
     required String email,
     required String telefone,
@@ -28,6 +29,7 @@ class EditarPerfilViewModel extends ChangeNotifier {
     try {
       await _repository.atualizarPerfil(
         id: id,
+        tipo: tipo,
         nome: nome,
         email: email,
         telefone: telefone,

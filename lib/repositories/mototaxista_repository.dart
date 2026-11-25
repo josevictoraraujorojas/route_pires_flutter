@@ -3,6 +3,7 @@ import 'package:route_pires_flutter/config/api_client.dart';
 import 'package:route_pires_flutter/config/api_config.dart';
 import 'package:route_pires_flutter/model/mototaxista_cadastro.dart';
 import 'package:route_pires_flutter/model/mototaxista_resumo.dart';
+import 'package:route_pires_flutter/model/veiculo.dart';
 import 'package:flutter/foundation.dart';
 
 class MototaxistaRepository {
@@ -27,13 +28,17 @@ class MototaxistaRepository {
   Future<List<MototaxistaResumo>> listar({
     double? latitude,
     double? longitude,
+    String? servico,
     CancelToken? cancelToken,
   }) async {
+    final parametros = <String, dynamic>{
+      if (latitude != null || longitude != null) 'latitude': latitude,
+      if (latitude != null || longitude != null) 'longitude': longitude,
+      if (servico != null) 'servico': servico,
+    };
     final response = await _dio.get(
       ApiConfig.mototaxistasDisponiveis,
-      queryParameters: latitude == null && longitude == null
-          ? null
-          : {'latitude': latitude, 'longitude': longitude},
+      queryParameters: parametros.isEmpty ? null : parametros,
       cancelToken: cancelToken,
     );
 
@@ -83,6 +88,101 @@ class MototaxistaRepository {
       return data['disponivel'] as bool;
     }
     throw const FormatException('Resposta sem disponibilidade do mototaxista');
+  }
+
+  // ============================================================
+  // SERVIÇOS OFERECIDOS
+  // ============================================================
+
+  Future<Set<String>> buscarServicosOferecidos({required String id}) async {
+    final response = await _dio.get(
+      '${ApiConfig.mototaxistas}/$id',
+      queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+    );
+    final data = response.data;
+    if (data is! Map) {
+      throw const FormatException('Resposta inválida do mototaxista');
+    }
+    final servicos = data['servicosOferecidos'];
+    if (servicos == null) return <String>{};
+    if (servicos is! List) {
+      throw const FormatException('Lista de serviços inválida');
+    }
+    return servicos.whereType<String>().toSet();
+  }
+
+  Future<void> atualizarServicosOferecidos({
+    required String id,
+    required Set<String> servicos,
+  }) async {
+    if (servicos.isEmpty) {
+      throw const FormatException('Selecione pelo menos um serviço.');
+    }
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      data: {'servicosOferecidos': servicos.toList()},
+    );
+  }
+
+  // ============================================================
+  // VEÍCULO
+  // ============================================================
+
+  Future<Veiculo> buscarVeiculo({required String id}) async {
+    final response = await _dio.get(
+      '${ApiConfig.mototaxistas}/$id',
+      queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+    );
+    final data = response.data;
+    if (data is Map && data['veiculo'] is Map) {
+      return Veiculo.fromJson(
+        Map<String, dynamic>.from(data['veiculo'] as Map),
+      );
+    }
+    throw const FormatException('Resposta sem veículo do mototaxista');
+  }
+
+  Future<void> atualizarVeiculo({
+    required String id,
+    required Veiculo veiculo,
+  }) async {
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      data: {'veiculo': veiculo.toJson()},
+    );
+  }
+
+  // ============================================================
+  // PREÇOS DAS CORRIDAS
+  // ============================================================
+
+  Future<void> atualizarPrecos({
+    required String id,
+    required double precoZonaUrbana,
+    required double precoBairrosAfastados,
+    required double precoBandeira2,
+  }) async {
+    await _dio.patch(
+      '${ApiConfig.mototaxistas}/$id',
+      data: {
+        'precoZonaUrbana': precoZonaUrbana,
+        'precoBairrosAfastados': precoBairrosAfastados,
+        'precoBandeira2': precoBandeira2,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> buscarPrecos({required String id}) async {
+    final response = await _dio.get(
+      '${ApiConfig.mototaxistas}/$id',
+      queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+    );
+
+    if (response.data is! Map) {
+      throw const FormatException('Resposta inválida do mototaxista');
+    }
+
+    return Map<String, dynamic>.from(response.data);
   }
 
   // ============================================================

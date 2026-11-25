@@ -46,6 +46,29 @@ class ChatRepository {
         .toList();
   }
 
+  Future<Chat> buscar(String chatId) async {
+    final response = await _dio.get(
+      '${ApiConfig.chats}/${Uri.encodeComponent(chatId)}',
+    );
+    return Chat.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<Mensagem> enviarMensagem({
+    required String chatId,
+    required String destinatario,
+    required String conteudo,
+  }) async {
+    final response = await _dio.post(
+      '/mensagem',
+      data: {
+        'chat': chatId,
+        'destinatario': destinatario,
+        'conteudo': conteudo,
+      },
+    );
+    return Mensagem.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
   Future<void> marcarMensagensVisualizadas(String chatId) async {
     await _dio.put('${ApiConfig.chats}/$chatId/mensagens/visualizadas');
   }

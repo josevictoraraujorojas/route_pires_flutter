@@ -1,199 +1,173 @@
-import 'dart:async';
-
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
-import 'package:route_pires_flutter/config/token_storage.dart';
 import 'package:route_pires_flutter/model/mensagem.dart';
 import 'package:route_pires_flutter/repositories/chat_repository.dart';
-import 'package:route_pires_flutter/repositories/chat_websocket_repository.dart';
+import 'package:route_pires_flutter/services/atualizacoes_service.dart';
 
 class ChatViewModel extends ChangeNotifier {
-  final String chatId;
-  final bool encerrado;
-
-  final ChatRepository _chatRepository;
-  final ChatWebSocketRepository _webSocket;
-  final TokenStorage _tokenStorage;
-
   ChatViewModel({
     required this.chatId,
     required this.encerrado,
     ChatRepository? chatRepository,
-    ChatWebSocketRepository? webSocket,
-    TokenStorage? tokenStorage,
-  }) : _chatRepository = chatRepository ?? ChatRepository(),
-       _webSocket = webSocket ?? ChatWebSocketRepository(),
-       _tokenStorage = tokenStorage ?? createTokenStorage();
+  }) : _repository = chatRepository ?? ChatRepository() {
+    _eventos = AtualizacaoPorEvento(
+      // A sincronização ao retomar o app não tem chatId; os demais avisos, sim.
+      aceita: (e) => e.sincronizacao || (e.chats && e.chatId == chatId),
+      atualizar: () => carregarMensagens(silenciosa: true),
+      ocupado: () => _consultando || _enviando,
+      habilitado: () => _inicializado,
+    );
+  }
+
+  final String chatId;
+  final ChatRepository _repository;
+  late final AtualizacaoPorEvento _eventos;
 
   final List<Mensagem> _mensagens = [];
 
+  bool encerrado;
   bool _carregandoMensagens = true;
+  bool _consultando = false;
+  bool _enviando = false;
   bool _inicializado = false;
   bool _disposed = false;
 
-  String? _meuUsuarioId;
+  String? _destinatarioId;
   String? _erro;
 
+  bool get enviando => _enviando;
   List<Mensagem> get mensagens => List.unmodifiable(_mensagens);
-
   bool get carregandoMensagens => _carregandoMensagens;
-
   String? get erro => _erro;
 
-  void _notificarListeners() {
-    if (!_disposed) {
-      notifyListeners();
-    }
-  }
-
-  String? _normalizarId(String? id) {
-    if (id == null || id.isEmpty) {
-      return null;
-    }
-
-    return id.split('/').last;
+  void _avisar() {
+    if (!_disposed) notifyListeners();
   }
 
   Future<void> inicializar() async {
     if (_inicializado) return;
 
     _inicializado = true;
+    await carregarMensagens();
+  }
 
-    String? token;
-
-    try {
-      token = await _tokenStorage.read();
-
-      if (token != null && token.isNotEmpty) {
-        final payload = JwtDecoder.decode(token);
-        _meuUsuarioId = _normalizarId(payload['sub']?.toString());
-      }
-    } catch (e) {
-      debugPrint('Erro ao recuperar o usuário autenticado: $e');
-      token = null;
-    }
-
+  Future<void> carregarMensagens({bool silenciosa = false}) async {
     if (_disposed) return;
 
-    await carregarMensagens();
-
-    if (_disposed || token == null || token.isEmpty) {
+    if (_consultando) {
+      _eventos.solicitar();
       return;
     }
 
-    if (!encerrado) {
-      _conectar(token);
-    }
+    _consultando = true;
 
-    await marcarMensagensVisualizadas();
-  }
+    if (!silenciosa) _carregandoMensagens = true;
 
-  Future<void> carregarMensagens() async {
-    _carregandoMensagens = true;
     _erro = null;
-    _notificarListeners();
+    _avisar();
 
     try {
-      final mensagensCarregadas = await _chatRepository.listarMensagens(chatId);
+      final chat = await _repository.buscar(chatId);
+
+      if (_disposed) return;
+
+      encerrado = chat.encerrado;
+
+      final meuId = AtualizacoesService().usuarioId;
+      _destinatarioId = null;
+
+      if (meuId != null) {
+        for (final id in chat.participantes) {
+          if (id != meuId) {
+            _destinatarioId = id;
+            break;
+          }
+        }
+      }
+
+      final carregadas = await _repository.listarMensagens(chatId);
 
       if (_disposed) return;
 
       _mensagens
         ..clear()
-        ..addAll(mensagensCarregadas);
-    } catch (e) {
-      if (_disposed) return;
+        ..addAll(carregadas);
 
-      _erro = 'Não foi possível carregar as mensagens.';
-      debugPrint('Erro ao carregar mensagens: $e');
-    } finally {
-      _carregandoMensagens = false;
-      _notificarListeners();
-    }
-  }
-
-  void _conectar(String token) {
-    try {
-      _webSocket.conectar(
-        token: token,
-        chatId: chatId,
-        onMensagem: (dados) {
-          _processarMensagem(dados);
-        },
+      final recebidas = carregadas.any(
+        (m) => m.remetente.split('/').last != meuId && m.status == 'ENVIADA',
       );
-    } catch (e) {
-      debugPrint('Erro ao conectar ao WebSocket: $e');
-    }
-  }
 
-  void _processarMensagem(dynamic dados) {
-    if (_disposed || dados is! Map<String, dynamic>) {
-      return;
-    }
-
-    try {
-      final novaMensagem = Mensagem.fromJson(dados);
-      final remetenteId = _normalizarId(novaMensagem.remetente);
-
-      final indice = novaMensagem.id.isEmpty
-          ? -1
-          : _mensagens.indexWhere((mensagem) => mensagem.id == novaMensagem.id);
-
-      if (indice >= 0) {
-        _mensagens[indice] = novaMensagem;
-      } else {
-        _mensagens.add(novaMensagem);
+      if (recebidas) {
+        await marcarMensagensVisualizadas();
       }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) encerrado = true;
 
-      _notificarListeners();
-
-      final mensagemRecebida =
-          remetenteId != null &&
-          remetenteId != _meuUsuarioId &&
-          novaMensagem.status.toUpperCase() == 'ENVIADA';
-
-      if (!encerrado && mensagemRecebida) {
-        unawaited(marcarMensagensVisualizadas());
-      }
-    } catch (e) {
-      debugPrint('Erro ao processar mensagem recebida: $e');
+      _erro = 'Não foi possível carregar a conversa.';
+    } catch (_) {
+      _erro = 'Não foi possível carregar as mensagens.';
+    } finally {
+      _consultando = false;
+      _carregandoMensagens = false;
+      _avisar();
     }
   }
 
   Future<void> marcarMensagensVisualizadas() async {
     try {
-      await _chatRepository.marcarMensagensVisualizadas(chatId);
-    } catch (e) {
-      debugPrint('Erro ao marcar mensagens como visualizadas: $e');
+      await _repository.marcarMensagensVisualizadas(chatId);
+    } catch (_) {
+      debugPrint('Não foi possível confirmar a leitura.');
     }
   }
 
-  bool enviarMensagem(String conteudo) {
-    if (encerrado) {
-      return false;
-    }
-
+  Future<bool> enviarMensagem(String conteudo) async {
     final texto = conteudo.trim();
+    final destinatario = _destinatarioId;
 
-    if (texto.isEmpty) {
+    if (encerrado || _enviando || texto.isEmpty || destinatario == null) {
       return false;
     }
 
-    _webSocket.enviarMensagem(chatId: chatId, conteudo: texto);
+    _enviando = true;
+    _erro = null;
+    _avisar();
 
-    return true;
+    try {
+      final mensagem = await _repository.enviarMensagem(
+        chatId: chatId,
+        destinatario: destinatario,
+        conteudo: texto,
+      );
+
+      if (_disposed) return false;
+
+      final indice = _mensagens.indexWhere((m) => m.id == mensagem.id);
+
+      if (indice < 0) {
+        _mensagens.add(mensagem);
+      } else {
+        _mensagens[indice] = mensagem;
+      }
+
+      return true;
+    } catch (_) {
+      _erro = 'Não foi possível enviar a mensagem. Tente novamente.';
+      return false;
+    } finally {
+      _enviando = false;
+      _avisar();
+    }
   }
 
-  bool ehMinhaMensagem(Mensagem mensagem) {
-    final remetenteId = _normalizarId(mensagem.remetente);
-
-    return _meuUsuarioId != null && remetenteId == _meuUsuarioId;
-  }
+  bool ehMinhaMensagem(Mensagem mensagem) =>
+      AtualizacoesService().usuarioId != null &&
+      mensagem.remetente.split('/').last == AtualizacoesService().usuarioId;
 
   @override
   void dispose() {
     _disposed = true;
-    _webSocket.desconectar();
+    _eventos.dispose();
     super.dispose();
   }
 }

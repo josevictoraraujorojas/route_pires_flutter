@@ -74,12 +74,14 @@ class _ChatViewContentState extends State<_ChatViewContent> {
     return '$dia/$mes/$ano $hora:$minuto';
   }
 
-  void _enviarMensagem() {
+  Future<void> _enviarMensagem() async {
     final viewModel = context.read<ChatViewModel>();
 
-    final enviada = viewModel.enviarMensagem(_mensagemController.text);
+    final texto = _mensagemController.text;
+    final enviada = await viewModel.enviarMensagem(texto);
+    if (!mounted) return;
 
-    if (enviada) {
+    if (enviada && _mensagemController.text == texto) {
       _mensagemController.clear();
     }
   }
@@ -103,7 +105,7 @@ class _ChatViewContentState extends State<_ChatViewContent> {
       return const Color(0xFFB3E5FC);
     }
 
-    return CupertinoColors.white.withOpacity(0.75);
+    return CupertinoColors.white.withValues(alpha: 0.75);
   }
 
   @override
@@ -279,7 +281,9 @@ class _ChatViewContentState extends State<_ChatViewContent> {
           const SizedBox(width: 8),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            onPressed: _enviarMensagem,
+            onPressed: context.watch<ChatViewModel>().enviando
+                ? null
+                : _enviarMensagem,
             child: const Icon(
               CupertinoIcons.arrow_up_circle_fill,
               size: 32,

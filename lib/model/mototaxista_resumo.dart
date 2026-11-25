@@ -8,6 +8,8 @@ class MototaxistaResumo {
     this.precoZonaUrbana,
     this.precoBairrosAfastados,
     this.precoBandeira2,
+    this.placa,
+    this.modelo,
   });
 
   final String id;
@@ -19,6 +21,10 @@ class MototaxistaResumo {
   final double? precoZonaUrbana;
   final double? precoBairrosAfastados;
   final double? precoBandeira2;
+
+  // Só vêm no perfil que o passageiro consulta.
+  final String? placa;
+  final String? modelo;
 
   int get estrelas => avaliacaoMedia.round().clamp(0, 5);
 
@@ -32,7 +38,13 @@ class MototaxistaResumo {
     return null;
   }
 
+  static String? _texto(dynamic valor) {
+    final texto = valor?.toString().trim() ?? '';
+    return texto.isEmpty ? null : texto;
+  }
+
   factory MototaxistaResumo.fromJson(Map<String, dynamic> json) {
+    final veiculo = json['veiculo'];
     return MototaxistaResumo(
       id: json['id']?.toString() ?? '',
       nome: json['nome']?.toString() ?? '',
@@ -42,6 +54,8 @@ class MototaxistaResumo {
       precoZonaUrbana: _lerPreco(json['precoZonaUrbana']),
       precoBairrosAfastados: _lerPreco(json['precoBairrosAfastados']),
       precoBandeira2: _lerPreco(json['precoBandeira2']),
+      placa: veiculo is Map ? _texto(veiculo['placa']) : null,
+      modelo: veiculo is Map ? _texto(veiculo['modelo']) : null,
     );
   }
 

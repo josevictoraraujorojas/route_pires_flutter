@@ -114,6 +114,9 @@ void main() {
         600,
         scrollable: find.byType(Scrollable),
       );
+      // O botão pode ficar só na área de cache, fora da tela.
+      await tester.ensureVisible(mais);
+      await tester.pump();
       await tester.tap(mais);
       await tester.pump(const Duration(milliseconds: 10));
       await tester.pump();
